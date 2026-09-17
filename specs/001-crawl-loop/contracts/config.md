@@ -28,8 +28,8 @@ seed_sets:
 
 discovery:                  # optional; values shown are the defaults
   max_task_attempts: 3
-  step_timeout: 120s
-  step_output_limit: 64MiB
+  step_idle_timeout: 60s    # no byte received for this long: the family is `unreachable`, detail `timeout`
+  step_deadline: 30m        # total per step: the task fails with last_error `deadline:` (FR-014)
   lease: 5m
   claim_batch: 16
   poll_interval: 1s

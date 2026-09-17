@@ -176,9 +176,24 @@ resolution.
   once, which bounds run time.
 - Consequence: `snapshot.state` needs a `closed` value meaning "closed, not yet judged", since the
   gate is the next feature. Update the data model doc accordingly.
-- Bound on one device (edge case "very large table"): a per step timeout and a per step output cap,
-  both configurable with a default (R16). Exceeding either records the family as `parse_failed` with detail
-  `truncated` or times out the step, and the scrape continues with the next family.
+- Bound on one device (edge case "very large table"): no output size cap. A cap would store a cut-off
+  table under a status that claims something false, and a truncated MAC table marked `collected` would
+  show up as disappearances in the next diff. Two time bounds instead:
+  - an idle timeout per step (`step_idle_timeout`): no byte received for that long. The device stopped
+    answering in the middle of a session, so the family is recorded `unreachable` with detail
+    `timeout`, and the scrape moves on to the next family. A large table that keeps arriving never
+    trips it.
+  - a total deadline per step (`step_deadline`), which keeps the run bounded (FR-016). If it fires, the
+    operator setting was too short for that device, which is a collector-side failure: the task ends
+    under FR-014 with `last_error` starting `deadline:` and no observation for that family. None of
+    the six statuses describes "the device was still sending when we stopped", and the case is
+    expected to be rare, so no seventh status is added. If it happens in the lab or in production,
+    that occurrence is the evidence for a constitution amendment.
+- Known limit: the whole output of one step is held in memory once. scrapligo returns the output of a
+  command as one string, and TextFSM parses a whole string, so streaming the raw bytes to the object
+  store would not lower the peak. The same buffer is hashed, uploaded and parsed. Upgrade path, if a
+  real table proves too large: read at the scrapligo channel level, stream to the object store while
+  hashing, and parse from a re-read.
 
 ## R13. Starting a run without the API
 
@@ -225,8 +240,8 @@ chosen by judgement, not measured values, and an operator overrides them after r
 | tasks claimed per batch | `discovery.claim_batch` | 16 |
 | frontier poll interval | `discovery.poll_interval` | 1s |
 | attempts per task | `discovery.max_task_attempts` | 3 |
-| per step timeout | `discovery.step_timeout` | 120s |
-| per step output cap | `discovery.step_output_limit` | 64MiB |
+| idle timeout per step (no byte received) | `discovery.step_idle_timeout` | 60s |
+| total deadline per step | `discovery.step_deadline` | 30m |
 
 `credential_sets[].max_attempts_per_device` has no default and must be stated. A wrong value locks
 accounts on a central authentication service, a consequence that lands outside the tool, so the

@@ -109,9 +109,14 @@ pending -> cancelled      (job cancelling)
 
 `done` means the task wrote its outcomes, whatever those outcomes were. A denied or unreachable device
 is a `done` task with a `denied` or `unreachable` observation. `failed` is kept for errors that stopped
-the task before it could record an outcome (crash, timeout of the whole task). When the run closes,
-the job runner writes an `unreachable` observation with detail `task_failed: <last_error>` for every
-target still `failed`, so FR-009 holds for every attempted target.
+the task before it could record an outcome (crash, timeout of the whole task). A `failed` task gets no
+observation. Its failure says something about the collector, not about the device: a lease that
+expired three times means a worker died or hung, and the device may have answered every time. Writing
+`unreachable` for it would make the same false statement rejected for out-of-perimeter targets.
+`last_error` carries the reason with a kind prefix, `lease_expired: <n> attempts`,
+`deadline: <family> after <duration>` (the step deadline fired while the step was still running;
+the setting was too short, research R12) or `error: <message>`, so the run shows each failed target and why (FR-014). Observations the task wrote
+before failing, such as an `identity` written in find step 2, stay as they are.
 
 A `skipped` task has no observation: no packet was sent, so nothing was attempted and FR-009 does not
 apply. The task row is the record that the target was skipped (US1 scenario 3). Task rows live as
@@ -158,7 +163,7 @@ Append only (FR-023). Written in the same batch as the task's observations.
 | recipe_id           | text null     | `<pack>/<family>@<recipe version>`                                                                                      |
 | fact_family         | text          | `identity`, `neighbours`, or a pack family                                                                              |
 | status              | text NOT NULL | `collected`, `empty`, `unsupported`, `parse_failed`, `unreachable`, `denied` (CHECK)                                    |
-| detail              | text null     | **(delta)** machine-readable reason: `unknown_platform`, `truncated`, `timeout`, `task_failed: ...`                     |
+| detail              | text null     | **(delta)** machine-readable reason: `unknown_platform`, `timeout` (idle timeout mid-session)                           |
 | parse_generation_id | bigint FK     | generation 1 is created with the snapshot                                                                               |
 | parsed              | jsonb null    | rows in the fact family schema, null unless `collected`                                                                 |
 

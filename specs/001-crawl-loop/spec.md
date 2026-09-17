@@ -138,8 +138,11 @@ the run finishes with the same result as an uninterrupted run, with no device vi
   and MUST store identical output once regardless of how many devices produced it.
 - **FR-008**: Every stored fact MUST reference the device, the command or OID, the collection time,
   and the stored raw output it was parsed from.
-- **FR-009**: Every attempted fact family MUST carry exactly one outcome from: collected, empty,
-  unsupported, parse failed, unreachable, denied. The outcome MUST never be absent.
+- **FR-009**: Every fact family the collector attempted against a device MUST carry exactly one
+  outcome from: collected, empty, unsupported, parse failed, unreachable, denied. The outcome MUST
+  never be absent. A task that ended before it could record an outcome, because the collector itself
+  failed, records its failure on the task under FR-014 and writes no observation: there is
+  nothing it learned about the device to state.
 - **FR-010**: Collected facts MUST be written and never modified afterwards.
 - **FR-011**: A re-parse of stored output MUST be possible later without contacting any device. This
   feature must store everything such a re-parse would need.
