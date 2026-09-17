@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" role="img" aria-label="Map of the schema in four zones: control plane, what was collected, what was computed, and what is reported. Data flows from left to right, and only the collected zone is written by the collector.">
+  <defs>
+    <marker id="d-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g font-family="IBM Plex Sans, system-ui, sans-serif" fill="currentColor">
+
+    <!-- zone 1 : control -->
+    <rect x="30" y="60" width="200" height="330" rx="8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.5"/>
+    <text x="46" y="84" font-size="11" letter-spacing="0.09em" opacity="0.7">CONTROL PLANE</text>
+    <g font-family="IBM Plex Mono, monospace" font-size="11.5">
+      <text x="50" y="114">config_version</text>
+      <text x="50" y="140">perimeter</text>
+      <text x="50" y="166">credential_set</text>
+      <text x="50" y="192">seed_set</text>
+      <text x="50" y="218">schedule</text>
+      <text x="50" y="244">api_token</text>
+      <text x="50" y="270">job</text>
+      <text x="50" y="296">task</text>
+      <text x="50" y="322">audit_log</text>
+    </g>
+    <text x="50" y="352" font-size="10" opacity="0.65">task is partitioned</text>
+    <text x="50" y="366" font-size="10" opacity="0.65">by job</text>
+
+    <!-- zone 2 : collected -->
+    <rect x="280" y="60" width="210" height="330" rx="8" fill="none" class="dg-accent" stroke-width="2"/>
+    <text x="296" y="84" font-size="11" letter-spacing="0.09em" class="dg-accent-f">WHAT WAS COLLECTED</text>
+    <g font-family="IBM Plex Mono, monospace" font-size="11.5">
+      <text x="300" y="114">snapshot</text>
+      <text x="300" y="140">observation</text>
+      <text x="300" y="166">raw_object</text>
+      <text x="300" y="192">parse_generation</text>
+      <text x="300" y="218">identifier_claim</text>
+    </g>
+    <text x="300" y="252" font-size="10" opacity="0.65">immutable, append only</text>
+    <text x="300" y="268" font-size="10" opacity="0.65">observation partitioned</text>
+    <text x="300" y="282" font-size="10" opacity="0.65">by snapshot range</text>
+    <text x="300" y="306" font-size="10" opacity="0.65">the only zone the</text>
+    <text x="300" y="320" font-size="10" opacity="0.65">collector writes</text>
+
+    <!-- zone 3 : computed -->
+    <rect x="540" y="60" width="200" height="330" rx="8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.5"/>
+    <text x="556" y="84" font-size="11" letter-spacing="0.09em" opacity="0.7">WHAT WAS COMPUTED</text>
+    <g font-family="IBM Plex Mono, monospace" font-size="11.5">
+      <text x="560" y="114">entity</text>
+      <text x="560" y="140">entity_decision</text>
+      <text x="560" y="166">interface</text>
+      <text x="560" y="192">interface_alias</text>
+      <text x="560" y="218">edge</text>
+      <text x="560" y="244">l2domain</text>
+      <text x="560" y="270">l2domain_member</text>
+      <text x="560" y="296">site</text>
+    </g>
+    <text x="560" y="330" font-size="10" opacity="0.65">rebuildable, always</text>
+    <text x="560" y="344" font-size="10" opacity="0.65">from the two on the left</text>
+
+    <!-- zone 4 : reported -->
+    <rect x="790" y="60" width="160" height="330" rx="8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" opacity="0.5"/>
+    <text x="806" y="84" font-size="11" letter-spacing="0.09em" opacity="0.7">REPORTED</text>
+    <g font-family="IBM Plex Mono, monospace" font-size="11.5">
+      <text x="810" y="114">finding</text>
+      <text x="810" y="140">intent_source</text>
+      <text x="810" y="166">intent_record</text>
+      <text x="810" y="192">intent_match</text>
+    </g>
+    <text x="810" y="226" font-size="10" opacity="0.65">intent sits beside</text>
+    <text x="810" y="240" font-size="10" opacity="0.65">the graph, never</text>
+    <text x="810" y="254" font-size="10" opacity="0.65">inside it</text>
+
+    <!-- flow -->
+    <g stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#d-ah)">
+      <line x1="234" y1="440" x2="276" y2="440"/>
+      <line x1="494" y1="440" x2="536" y2="440"/>
+      <line x1="744" y1="440" x2="786" y2="440"/>
+      <path d="M 640 480 C 640 540, 380 540, 380 400"/>
+    </g>
+    <g font-size="11" text-anchor="middle" opacity="0.85">
+      <text x="130" y="435" font-weight="600">a run</text>
+      <text x="130" y="452">reads the config</text>
+      <text x="385" y="435" font-weight="600">the collector</text>
+      <text x="385" y="452">writes here, only</text>
+      <text x="640" y="435" font-weight="600">the engine</text>
+      <text x="640" y="452">projects</text>
+      <text x="868" y="435" font-weight="600">and compares</text>
+      <text x="510" y="556">a replay rebuilds the right two zones from the left one</text>
+    </g>
+
+  </g>
+</svg>

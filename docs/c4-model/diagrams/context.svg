@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" role="img" aria-label="System context: two kinds of user and a CI job drive NetMapper, which reads network devices, credentials from a vault and intent from NetBox, and whose stored data Grafana reads.">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+    </marker>
+    <marker id="ah-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b8672a"/>
+    </marker>
+  </defs>
+
+  <g font-family="IBM Plex Sans, system-ui, sans-serif" fill="currentColor">
+
+    <!-- actors -->
+    <g>
+      <rect x="20" y="70" width="180" height="70" rx="35" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="110" y="100" text-anchor="middle" font-size="14" font-weight="600">Network engineer</text>
+      <text x="110" y="119" text-anchor="middle" font-size="11" opacity="0.7">person</text>
+    </g>
+    <g>
+      <rect x="20" y="240" width="180" height="70" rx="35" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="110" y="270" text-anchor="middle" font-size="14" font-weight="600">AI agent</text>
+      <text x="110" y="289" text-anchor="middle" font-size="11" opacity="0.7">software, over MCP</text>
+    </g>
+    <g>
+      <rect x="20" y="410" width="180" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="110" y="440" text-anchor="middle" font-size="14" font-weight="600">Git and CI</text>
+      <text x="110" y="459" text-anchor="middle" font-size="11" opacity="0.7">external system</text>
+    </g>
+
+    <!-- the system -->
+    <rect x="330" y="215" width="230" height="120" rx="8" fill="none" stroke="#b8672a" stroke-width="2.5"/>
+    <text x="445" y="262" text-anchor="middle" font-size="18" font-weight="600" fill="#b8672a">NetMapper</text>
+    <text x="445" y="284" text-anchor="middle" font-size="11.5" opacity="0.75">discovers the network,</text>
+    <text x="445" y="301" text-anchor="middle" font-size="11.5" opacity="0.75">keeps the evidence,</text>
+    <text x="445" y="318" text-anchor="middle" font-size="11.5" opacity="0.75">compares it with intent</text>
+
+    <!-- externals -->
+    <g>
+      <rect x="700" y="60" width="180" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="790" y="90" text-anchor="middle" font-size="14" font-weight="600">Network devices</text>
+      <text x="790" y="109" text-anchor="middle" font-size="11" opacity="0.7">switches, routers</text>
+    </g>
+    <g>
+      <rect x="700" y="180" width="180" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="790" y="210" text-anchor="middle" font-size="14" font-weight="600">Vault or OpenBao</text>
+      <text x="790" y="229" text-anchor="middle" font-size="11" opacity="0.7">credentials</text>
+    </g>
+    <g>
+      <rect x="700" y="300" width="180" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="790" y="330" text-anchor="middle" font-size="14" font-weight="600">NetBox</text>
+      <text x="790" y="349" text-anchor="middle" font-size="11" opacity="0.7">declared intent</text>
+    </g>
+    <g>
+      <rect x="700" y="420" width="180" height="70" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="790" y="450" text-anchor="middle" font-size="14" font-weight="600">Grafana</text>
+      <text x="790" y="469" text-anchor="middle" font-size="11" opacity="0.7">dashboards, weather map</text>
+    </g>
+
+    <!-- relations, left side -->
+    <g stroke="currentColor" stroke-width="1.4" fill="none" marker-end="url(#ah)">
+      <polyline points="200,105 265,105 265,240 326,240"/>
+      <line x1="200" y1="275" x2="326" y2="275"/>
+      <polyline points="200,445 265,445 265,310 326,310"/>
+    </g>
+    <g font-size="11" text-anchor="middle" opacity="0.85">
+      <text x="263" y="97">declares perimeters, triggers runs,</text>
+      <text x="263" y="111">reads the graph and the findings</text>
+      <text x="263" y="266">asks the topology, with provenance</text>
+      <text x="263" y="437">posts the configuration as YAML</text>
+    </g>
+
+    <!-- relations, right side -->
+    <g stroke="currentColor" stroke-width="1.4" fill="none" marker-end="url(#ah)">
+      <polyline points="564,240 630,240 630,95 696,95"/>
+      <polyline points="564,262 650,262 650,215 696,215"/>
+      <polyline points="696,335 650,335 650,300 564,300"/>
+      <polyline points="696,455 630,455 630,325 564,325"/>
+    </g>
+    <g font-size="11" text-anchor="middle" opacity="0.85">
+      <text x="632" y="150">SSH and SNMP,</text>
+      <text x="632" y="164">read-only commands</text>
+      <text x="640" y="206">resolves credentials</text>
+      <text x="632" y="292">imports intent</text>
+      <text x="628" y="408">reads the stored data</text>
+      <text x="628" y="422">directly, read-only</text>
+    </g>
+
+  </g>
+</svg>

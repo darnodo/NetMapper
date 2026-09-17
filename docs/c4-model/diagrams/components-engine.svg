@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" role="img" aria-label="Components of the engine: a scheduler and a job runner drive resolution, projection, the publication gate, diffs and reconciliation, while replay and maintenance work on stored data.">
+  <defs>
+    <marker id="e-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g font-family="IBM Plex Sans, system-ui, sans-serif" fill="currentColor">
+
+    <rect x="40" y="40" width="660" height="470" rx="10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="6 5" opacity="0.5"/>
+    <text x="56" y="64" font-size="12" letter-spacing="0.08em" opacity="0.7">ENGINE</text>
+
+    <!-- drivers -->
+    <g>
+      <rect x="66" y="86" width="170" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="151" y="112" text-anchor="middle" font-size="13" font-weight="600">Scheduler</text>
+      <text x="151" y="130" text-anchor="middle" font-size="10" opacity="0.7">cron, one run per perimeter</text>
+    </g>
+    <g>
+      <rect x="66" y="172" width="170" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="151" y="198" text-anchor="middle" font-size="13" font-weight="600">Job runner</text>
+      <text x="151" y="216" text-anchor="middle" font-size="10" opacity="0.7">states, progress, retries</text>
+    </g>
+    <g>
+      <rect x="66" y="284" width="170" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="151" y="310" text-anchor="middle" font-size="13" font-weight="600">Replay</text>
+      <text x="151" y="328" text-anchor="middle" font-size="10" opacity="0.7">new parse generation</text>
+    </g>
+    <g>
+      <rect x="66" y="370" width="170" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="151" y="396" text-anchor="middle" font-size="13" font-weight="600">Maintenance</text>
+      <text x="151" y="414" text-anchor="middle" font-size="10" opacity="0.7">eviction, sweep, partitions</text>
+    </g>
+
+    <!-- computation -->
+    <g>
+      <rect x="300" y="86" width="196" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="398" y="112" text-anchor="middle" font-size="13" font-weight="600">Identity resolver</text>
+      <text x="398" y="130" text-anchor="middle" font-size="10" opacity="0.7">claims to entities</text>
+    </g>
+    <g>
+      <rect x="300" y="164" width="196" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="398" y="190" text-anchor="middle" font-size="13" font-weight="600">Graph projector</text>
+      <text x="398" y="208" text-anchor="middle" font-size="10" opacity="0.7">vertices, edges, evidence</text>
+    </g>
+    <g>
+      <rect x="300" y="242" width="196" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="398" y="268" text-anchor="middle" font-size="13" font-weight="600">Snapshot gate</text>
+      <text x="398" y="286" text-anchor="middle" font-size="10" opacity="0.7">coverage, three outcomes</text>
+    </g>
+    <g>
+      <rect x="300" y="320" width="196" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="398" y="346" text-anchor="middle" font-size="13" font-weight="600">Diff engine</text>
+      <text x="398" y="364" text-anchor="middle" font-size="10" opacity="0.7">two snapshots compared</text>
+    </g>
+    <g>
+      <rect x="300" y="398" width="196" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="398" y="424" text-anchor="middle" font-size="13" font-weight="600">Reconciler</text>
+      <text x="398" y="442" text-anchor="middle" font-size="10" opacity="0.7">observed against intent</text>
+    </g>
+
+    <!-- findings sink -->
+    <g>
+      <rect x="546" y="242" width="130" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <text x="611" y="268" text-anchor="middle" font-size="13" font-weight="600">Findings</text>
+      <text x="611" y="286" text-anchor="middle" font-size="10" opacity="0.7">from every step</text>
+    </g>
+
+    <!-- outside -->
+    <g>
+      <rect x="756" y="86" width="180" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="846" y="112" text-anchor="middle" font-size="13" font-weight="600">NetBox</text>
+      <text x="846" y="130" text-anchor="middle" font-size="10" opacity="0.7">intent</text>
+    </g>
+    <g>
+      <rect x="756" y="196" width="180" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="846" y="222" text-anchor="middle" font-size="13" font-weight="600">PostgreSQL</text>
+    </g>
+    <g>
+      <rect x="756" y="306" width="180" height="58" rx="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <text x="846" y="332" text-anchor="middle" font-size="13" font-weight="600">Object store</text>
+      <text x="846" y="350" text-anchor="middle" font-size="10" opacity="0.7">raw output</text>
+    </g>
+
+    <!-- arrows -->
+    <g stroke="currentColor" stroke-width="1.4" fill="none" marker-end="url(#e-ah)">
+      <line x1="151" y1="148" x2="151" y2="168"/>
+      <polyline points="236,190 268,190 268,115 296,115"/>
+      <line x1="398" y1="148" x2="398" y2="160"/>
+      <line x1="398" y1="226" x2="398" y2="238"/>
+      <line x1="398" y1="304" x2="398" y2="316"/>
+      <polyline points="496,275 542,275"/>
+      <polyline points="496,349 520,349 520,290 542,290"/>
+      <polyline points="496,427 520,427 520,300 542,300"/>
+      <polyline points="236,313 268,313 268,427 296,427"/>
+      <polyline points="236,399 700,399 700,250 752,250"/>
+      <polyline points="752,115 720,115 720,427 496,427"/>
+      <polyline points="152,284 152,262 704,262 704,225 752,225"/>
+      <polyline points="236,300 690,300 690,330 752,330"/>
+    </g>
+
+    <g font-size="10" text-anchor="middle" opacity="0.85">
+      <text x="196" y="163">enqueues</text>
+      <text x="268" y="176">closes a run</text>
+      <text x="268" y="410">rebuilds</text>
+      <text x="530" y="238">raises</text>
+      <text x="620" y="120">imports</text>
+      <text x="470" y="385">reads and writes</text>
+      <text x="628" y="322">reads raw</text>
+      <text x="612" y="392">evicts and vacuums</text>
+    </g>
+
+  </g>
+</svg>
