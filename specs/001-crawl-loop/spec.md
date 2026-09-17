@@ -29,8 +29,8 @@ other part of the system is needed to read.
 
 1. **Given** a perimeter, a credential set and one reachable seed inside it, **When** the engineer
    triggers a run, **Then** the run reaches the seed, reaches every neighbour inside the perimeter
-   that the seed and its neighbours reported, and closes with a snapshot containing one observation
-   per fact family attempted per device.
+   that the seed and its neighbours reported, and leaves behind a closed snapshot, awaiting the
+   coverage judgement, containing one observation per fact family attempted per device.
 2. **Given** a device reachable through two management addresses, **When** both are queued, **Then**
    it is identified once and collected once.
 3. **Given** a neighbour reported outside the perimeter, **When** the crawl reaches that point,
@@ -46,7 +46,7 @@ other part of the system is needed to read.
 
 The engineer opens a finished run and sees, per device, which fact families came back, which came
 back empty, which are unsupported on that platform, which failed to parse, and which devices refused
-the credentials or never answered. No silence is left unexplained.
+every credential or never answered. No silence is left unexplained.
 
 **Why this priority**: A crawl that reports only its successes is unusable for the product's main
 question. A device missing from the graph must be distinguishable from a device that was there and
@@ -60,8 +60,9 @@ with a distinct, correct status.
 
 1. **Given** a target inside the perimeter that does not answer, **When** the run ends, **Then** the
    snapshot records it as unreachable rather than omitting it.
-2. **Given** a device that answers but rejects the credentials, **When** the run ends, **Then** it is
-   recorded as denied, distinct from unreachable.
+2. **Given** a device that answers but rejects every credential set covering its perimeter, **When**
+   the run ends, **Then** it is recorded as denied, distinct from unreachable, and a compliance
+   finding cites the evidence that it answered.
 3. **Given** a device whose platform matches no loaded pack, **When** the run ends, **Then** it is
    recorded as an unidentified platform and raised as a finding, and the crawl continues elsewhere.
 4. **Given** a command whose output no longer matches its template, **When** the run ends, **Then**
@@ -95,28 +96,6 @@ the run finishes with the same result as an uninterrupted run, with no device vi
 
 ---
 
-### User Story 4 - Run it on schedule and watch it (Priority: P3)
-
-The engineer schedules a nightly run on a perimeter and, while one is going, sees how far it has got:
-how many targets are known, done, failed and still queued.
-
-**Why this priority**: Useful, and needed before the product is operated rather than demonstrated,
-but the first three stories are what make a snapshot exist at all.
-
-**Independent Test**: Schedule a run, observe it start unattended, and read its progress while it is
-in flight.
-
-**Acceptance Scenarios**:
-
-1. **Given** a schedule on a perimeter, **When** its time arrives and no run is active on that
-   perimeter, **Then** a run starts.
-2. **Given** a run already active on a perimeter, **When** the schedule fires, **Then** the
-   occurrence is skipped rather than queued.
-3. **Given** a run in progress, **When** the engineer asks for its state, **Then** counts of
-   discovered, collected, failed and pending targets are returned.
-
----
-
 ### Edge Cases
 
 - A device reports itself as its own neighbour, or two devices report each other. The crawl must not
@@ -130,8 +109,10 @@ in flight.
 - A device returns a very large table. The run must not be prevented from finishing by one device.
 - A target appears in the queue both as a seed and as a neighbour of something else.
 - The perimeter is empty or the seed falls outside it. The run must refuse to start and say why.
-- A credential set resolves to no value at collection time. Affected devices are recorded as denied,
-  and the run does not abort.
+- A credential set resolves to no value at collection time. The next covering set is tried, and the
+  run does not abort. A device left with no set that resolves is recorded as denied.
+- A credential set is nearly out of attempts on a device that is still refusing it. The remaining
+  sets are tried, and no set exceeds its own configured attempt budget on that device.
 - Two devices are reported under the same name in different parts of the network. Both are collected
   and both sets of identifiers are recorded, and the disambiguation is left to resolution.
 
@@ -139,16 +120,18 @@ in flight.
 
 ### Functional Requirements
 
-- **FR-001**: A run MUST refuse to start without a perimeter, at least one seed inside it, and a
-  credential set covering that perimeter, and MUST state which of these was missing.
+- **FR-001**: A run MUST refuse to start without a perimeter, at least one seed inside it, and at
+  least one credential set covering that perimeter, and MUST state which of these was missing.
 - **FR-002**: Every target MUST be checked against the active perimeter before any packet is sent to
   it, including targets learned from a neighbour table.
 - **FR-003**: The system MUST identify a device before collecting from it, recording the platform and
   the strong identifiers the device reported.
 - **FR-004**: The system MUST record identifiers at identification time and use them to ensure a
   device reachable through several addresses is identified and collected once per run.
-- **FR-005**: The system MUST queue a device's neighbours as soon as it is identified, without
-  waiting for its collection to finish.
+- **FR-005**: The system MUST queue a device's neighbours as soon as it is identified, and MUST
+  queue the collection work for that same device at the same moment, as separate work that runs
+  independently. Identification of the topology MUST NOT wait on how long any one device takes to
+  collect.
 - **FR-006**: The system MUST select what to collect from a device according to its platform and OS
   version, drawn only from loaded platform packs.
 - **FR-007**: The system MUST store the output of every command exactly as the device returned it,
@@ -166,20 +149,29 @@ in flight.
   twice.
 - **FR-014**: A target that fails MUST be retried a bounded number of times before being recorded as
   failed with its last error.
-- **FR-015**: A device that cannot be identified, a command whose output no longer parses, and a
-  device that refuses credentials MUST each raise a finding, and none of them MUST stop the run.
-- **FR-016**: A run MUST end in bounded time, closing its snapshot even if some targets never
-  answered.
+- **FR-015**: A device that cannot be identified and a command whose output no longer parses MUST
+  each raise a data quality finding, and neither MUST stop the run.
+- **FR-016**: A run MUST end in bounded time: the queue empties, a final retry pass runs over the
+  targets that failed, and the snapshot leaves its open state, even if some targets never answered.
 - **FR-017**: Credentials MUST be resolved from a reference at collection time and MUST NOT be stored
   or returned anywhere.
-- **FR-018**: Every command sent to a device MUST be recorded in the audit trail with its target and
+- **FR-018**: Several credential sets MAY cover one perimeter. They MUST be tried against a device
+  in a defined, repeatable order.
+- **FR-019**: Each credential set MUST have its own bounded number of attempts per device,
+  configurable per set rather than shared by all of them, because consecutive failures against a
+  centralised authentication service can lock the account being used.
+- **FR-020**: A device that answered its transport and rejected every covering credential set MUST be
+  recorded as denied.
+- **FR-021**: A denied device MUST raise a finding in a compliance domain, distinct from the data
+  quality findings raised by parse failures and unidentified platforms. A device reachable inside the
+  perimeter but outside the declared authentication regime is a governance observation, not only a
+  collection failure.
+- **FR-022**: That finding MUST cite the evidence that the device answered, so that denied stays
+  distinguishable from unreachable.
+- **FR-023**: Every command sent to a device MUST be recorded in the audit trail with its target and
   its result.
-- **FR-019**: Only read-only commands MUST be sent. No device configuration is changed.
-- **FR-020**: At most one run MUST be active per perimeter; a scheduled occurrence that overlaps an
-  active run is skipped.
-- **FR-021**: The progress of a run MUST be observable while it is in flight, as counts of
-  discovered, collected, failed and pending targets.
-- **FR-022**: A run MUST be cancellable, and a cancelled run MUST keep what it had already collected.
+- **FR-024**: Only read-only commands MUST be sent. No device configuration is changed.
+- **FR-025**: A run MUST be cancellable, and a cancelled run MUST keep what it had already collected.
 
 ### Key Entities
 
@@ -189,7 +181,8 @@ in flight.
 - **Run**: one execution of a discovery, with a state, a start, an end, and counters.
 - **Task**: one unit of work in a run, either identifying a target or collecting from it. Carries its
   target, its state, its owner while claimed, and its attempt count.
-- **Snapshot**: everything one run collected, frozen when the run ends.
+- **Snapshot**: everything one run collected. It leaves its open state once the run's task queue is
+  exhausted, and is not modified afterwards.
 - **Observation**: one statement from one source about one device at one moment, with its outcome and
   its link to the raw output it came from.
 - **Raw output**: the bytes a device returned, stored once per distinct content.
@@ -198,15 +191,17 @@ in flight.
 - **Fact family**: a named unit of meaning such as the neighbour table or the MAC table, with a
   stable shape independent of platform.
 - **Platform pack**: the data describing how to recognise a platform and what to run on it.
-- **Finding**: something worth reporting from the run: an unidentified platform, a template that
-  stopped matching, a device that refused credentials.
+- **Finding**: something worth reporting from the run, carrying a domain and its evidence. Data
+  quality covers an unidentified platform or a template that stopped matching; compliance covers a
+  device that answered inside the perimeter and refused every credential set.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: Starting from one seed, a run reaches every device on a 50-device lab network that is
-  inside the perimeter and reachable, with no device collected more than once.
+- **SC-001**: Starting from one seed, a run reaches every device that is inside the perimeter,
+  reachable, and reported by something the crawl already reached, and collects none of them more
+  than once.
 - **SC-002**: No device outside the declared perimeter receives a single packet during any run.
 - **SC-003**: Every device the run attempted appears in the result with an outcome, so an engineer
   can account for 100% of attempted targets without consulting logs.
@@ -214,10 +209,9 @@ in flight.
   visit, and the run still finishes.
 - **SC-005**: Every collected fact can be traced to the exact device output it came from, and that
   output is retrievable after the run.
-- **SC-006**: A crawl of 500 devices completes within one hour without adding hardware.
-- **SC-007**: An engineer can run a discovery on a new platform by adding pack data alone, with no
+- **SC-006**: An engineer can run a discovery on a new platform by adding pack data alone, with no
   change to the crawl itself.
-- **SC-008**: No credential value is retrievable from any stored record or any interface after a run.
+- **SC-007**: No credential value is retrievable from any stored record or any interface after a run.
 
 ## Assumptions
 
@@ -229,12 +223,19 @@ in flight.
   This feature discovers devices that can be logged into; qualifying leaf endpoints is separate work.
 - A run collects a fixed set of fact families per platform, taken from the packs. Choosing a subset
   per run is out of scope for this feature.
-- The credential set covering a perimeter is tried against every device in it. Per-device credential
-  rules are out of scope.
+- Credential sets are declared as covering a perimeter, not as belonging to a device. Which set
+  opens a given device is discovered by trying them in order, and the order is part of the
+  configuration rather than something this feature invents.
+- Scheduling a run, the rule that only one run is active per perimeter at a time, and reading a run's
+  progress while it is in flight are separate work. They belong with the scheduler and the job
+  runner, not with the crawl.
 - Devices that never answer are expected to be a normal fraction of a real perimeter, so a run's
   success is not defined as reaching everything.
 - Turning collected facts into entities, a graph, or a diff is out of scope. This feature ends when
   the snapshot closes.
+- Judging the result is out of scope with it. Measuring coverage and deciding whether a closed
+  snapshot is published, degraded or quarantined is the next feature's work. This one hands over a
+  snapshot that is closed and nothing more.
 - Raw output is retained at least as long as its snapshot. Retention and eviction policy is separate
   work.
 - A seed is given as an address or hostname that resolves to one inside the perimeter.
