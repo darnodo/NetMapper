@@ -122,7 +122,7 @@ internal/
 ├── pack/                     # registry, loader, read-only lint
 ├── parse/                    # textfsm, SNMP column mapping, field mapping, name normalisation
 ├── fact/                     # fact family schemas (identity, neighbours, interfaces)
-├── store/                    # observations, claims, findings, audit (pgx COPY); raw objects (minio-go)
+├── store/                    # observations, claims, findings (pgx batch); audit rows before and after each command; raw objects (minio-go)
 └── jobrunner/                # engine: final retry pass, failed sweep, snapshot close, cancel
 
 migrations/                   # goose SQL, embedded

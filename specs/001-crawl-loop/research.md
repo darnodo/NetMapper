@@ -79,12 +79,34 @@ considered.
 
 ## R6. Fingerprinting and transports
 
-- Decision: SNMP first (`sysObjectID`, `sysDescr` via `github.com/gosnmp/gosnmp`, v2c and v3, GET,
-  GETNEXT and GETBULK only), SSH second (`github.com/scrapli/scrapligo`, one fingerprint command per
+- Decision: SNMP first (via `github.com/gosnmp/gosnmp`, v2c and v3, GET, GETNEXT and GETBULK only),
+  SSH second (`github.com/scrapli/scrapligo`, one fingerprint command per
   pack rule, tried in pack order). A transport that is silent is not a device failure while another
   transport answered. The target is `unreachable` only when every transport was silent, and `denied`
-  when at least one transport answered and every credential set was rejected on all transports that
-  answered.
+  only when at least one transport answered and every covering credential set was presented and
+  rejected. If any covering set never resolved, the device was not refused by every set: the task
+  fails under FR-014 and writes no observation. `denied` is never used on an uncertain basis, because
+  it raises a compliance finding: a compliance signal that is a vault misconfiguration half the time
+  stops being read. `last_error` separates the two cases:
+  - `credential_unresolved: <sets>`: no covering set resolved, nothing was presented. A problem on our
+    side only.
+  - `credential_partial: rejected <sets>; unresolved <sets>`: the device answered and refused every
+    set it was shown, and at least one set was never tried. It is not `denied`, since an untested set
+    might have opened it, but it may be the shadow IT case the product exists to find, so the
+    collector also logs it at warn level. The rejections themselves are in `audit_log`
+    (`ssh.auth`/`snmp.auth` rows with result `auth_failed`).
+- The SNMP probe OIDs are not in code. Principle IV requires every command sent to a device to come
+  from a loaded pack, and the probe runs before any platform is known, so the vendor-neutral probe
+  (`sysObjectID` 1.3.6.1.2.1.1.2.0, `sysDescr` 1.3.6.1.2.1.1.1.0) lives in a base pack,
+  `packs/_base/pack.yaml`, loaded by the registry like any other. SSH fingerprint commands already
+  come from each pack's `fingerprint.ssh` rules.
+- Audit before send (FR-023): the session writes an `audit_log` row with result `sent` in its own
+  statement before each command or request leaves, then a second row with the same `ref` carrying
+  the result. A crash between the two leaves a `sent` row with no result, which is the truth.
+  Buffering audit rows until the task's batch would lose the record of commands a device actually
+  received, and the constitution forbids collector state that a crash would lose.
+- Known limit: with SNMP v2c a wrong community gets no reply, so a device reachable only over v2c with
+  a bad community is recorded `unreachable`, not `denied`. v3 reports authentication errors.
 - Rationale: matches the container doc. scrapligo handles prompts, paging and platform-neutral
   command sends without shipping vendor logic into our code (vendor prompt patterns come from the
   pack as scrapligo platform definitions, which are YAML). gosnmp is the standard Go SNMP client.
@@ -96,12 +118,18 @@ considered.
 - Decision: credential sets covering the target's perimeter are tried in the order they appear in the
   configuration document. Each set has a required `max_attempts_per_device` (at least 1, no default, because a wrong value
   locks accounts on the central authentication service). Per-device, per-set
-  attempt counts live in `task.cred_attempts jsonb`, updated before each attempt, so a restart never
-  resets a budget. A reference that resolves to nothing moves to the next set and is logged, not
+  attempt state lives in `task.cred_attempts jsonb` as `{"<credential_set_id>": {"n": <int>, "ok": <bool>}}`.
+  `n` is incremented in its own statement before each attempt, so a restart never resets a budget.
+  When a set opens a session, `ok` is set to true. On a retry after a crash, a set with `ok = true` is
+  tried first and its attempt does not consume budget unless it fails, in which case `ok` becomes
+  false and `n` is incremented. Without this, a task that logged in and then crashed would find the
+  working set's budget spent, skip it, and record a false `denied` with a compliance finding. A reference that resolves to nothing moves to the next set and is logged, not
   counted as a device attempt. Secrets are resolved just before `Open` and dropped when the session
   closes. `SecretBackend` has two implementations: `vault` (Vault and OpenBao KV v2 via
   `github.com/hashicorp/vault/api`) and `env` (reference `env:NAME`, for labs and tests).
-- Rationale: counting before the attempt errs on the safe side of an account lockout. Storing counts
+- Rationale: counting before the attempt errs on the safe side of an account lockout. Ceiling: a
+  crash during a retry with an `ok` set can leave one uncounted failure, bounded by
+  `max_task_attempts`. Storing counts
   in the task row keeps crash state out of process memory, as the constitution requires.
 - Alternatives: a per-device credential cache across runs (out of scope, and it is state that would
   outlive the run).
@@ -155,13 +183,29 @@ Consequence for `docs/c4-model/04-data-model.md`: drop `raw_object.refcount` or 
 `identifier_claim.first_seen` and `last_seen` become per-row collection times, with ranges computed at
 resolution.
 
-## R11. Immutability enforcement (FR-010)
+## R11. Roles and grants (FR-010)
 
-- Decision: a dedicated PostgreSQL role `netmapper_collector` with `SELECT, INSERT` on the collected
-  zone, `finding`, `finding_evidence` and `audit_log`, and `SELECT, INSERT, UPDATE` on `task`. It has no
-  `UPDATE` or `DELETE` on `observation`, `observation_raw`, `raw_object` or `identifier_claim`.
-  The engine role gets `UPDATE` on `snapshot` and `job` only.
-- Rationale: a grant is one line and makes a bug fail loudly instead of rewriting history.
+- Decision: four PostgreSQL roles, one per kind of process. `netmapper_owner` runs `migrate`, owns
+  every table and function, and is used by nothing else. The partition functions below are
+  `SECURITY DEFINER` and owned by it, because creating a partition requires owning the parent table.
+
+  | Table or object | `netmapper_operator` (`run`, `cancel`) | `netmapper_collector` | `netmapper_engine` |
+  |---|---|---|---|
+  | `config_version`, `perimeter`, `credential_set`, `seed_set` | SELECT, INSERT | SELECT | SELECT |
+  | `job` | SELECT, INSERT, UPDATE (`cancel`) | SELECT | SELECT, UPDATE |
+  | `task` | SELECT, INSERT | SELECT, INSERT, UPDATE | SELECT, UPDATE |
+  | `snapshot`, `parse_generation` | SELECT, INSERT | SELECT | SELECT, UPDATE (`snapshot` only) |
+  | `observation`, `observation_raw`, `raw_object`, `identifier_claim` | none | SELECT, INSERT | SELECT |
+  | `finding`, `finding_evidence` | none | SELECT, INSERT | SELECT |
+  | `audit_log` | none | INSERT | SELECT |
+  | `create_task_partition(job_id)`, `create_snapshot_partitions(snapshot_id)` | EXECUTE | none | none |
+  | `claim_lock_key` | none | EXECUTE | EXECUTE |
+
+  No role other than the owner has `UPDATE` or `DELETE` on the collected zone or `audit_log`.
+  Each process connects with its own role through `NETMAPPER_DSN`.
+- Rationale: a grant is one line and makes a bug fail loudly instead of rewriting history. The engine
+  needs `UPDATE` on `task` for the final retry pass and cancellation; the collector needs to read the
+  configuration its tasks refer to.
 
 ## R12. Run lifecycle and closing the snapshot (FR-016, FR-025)
 

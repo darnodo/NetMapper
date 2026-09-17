@@ -45,6 +45,25 @@ interface_names:                # spelling -> canonical, applied by the parser
   - { match: '^Et(\d.*)$', replace: 'Ethernet$1' }
 ```
 
+## packs/_base/pack.yaml
+
+The probe sent to a target before its platform is known. It is a pack like any other, so every
+command the collector sends comes from pack data (principle IV). It names no vendor and has no
+recipes.
+
+```yaml
+name: _base
+version: 1
+read_only: []                   # the base pack sends no CLI command
+probe:
+  snmp:
+    - { name: sys_object_id, oid: 1.3.6.1.2.1.1.2.0 }
+    - { name: sys_descr,     oid: 1.3.6.1.2.1.1.1.0 }
+```
+
+The registry matches the probe results against every pack's `fingerprint.snmp` rules. When SNMP is
+silent, the SSH fingerprint commands of the loaded packs are tried in pack order.
+
 ## recipes/<family>.yaml
 
 ```yaml
@@ -74,3 +93,4 @@ steps merges rows on the keys listed in `merge_on`.
 - Every referenced template exists and compiles.
 - Every `map` target is a field of the family schema in [fact-families.md](fact-families.md).
 - `name` is unique across loaded packs.
+- Exactly one loaded pack declares `probe`, and it is named `_base`.
