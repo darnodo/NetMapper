@@ -28,29 +28,45 @@ considered.
   (state='pending' OR (state='claimed' AND lease_expires < now())) ORDER BY id
   LIMIT $5 FOR UPDATE SKIP LOCKED) RETURNING ...`.
   The worker renews its lease every lease/3. A task whose `attempts` reaches the job's
-  `max_attempts` (default 3) moves to `failed` with `last_error` instead of being claimed again.
+  `max_attempts` moves to `failed` with `last_error` instead of being claimed again. Lease duration,
+  batch size and `max_attempts` come from configuration (see R16).
 - Rationale: an expired lease is how a killed collector gives its work back (FR-012, US3). SKIP LOCKED
   keeps two collectors off the same row (FR-013). Counting attempts at claim time counts a crash as an
   attempt, which is what bounds a device that crashes the worker.
 - Alternatives: advisory locks (lost on disconnect with no record of attempts), LISTEN/NOTIFY for
-  wake-up (skipped: polling every second is enough; add it when idle polling shows up in load).
+  wake-up (skipped: polling at a configured interval is enough; add it when idle polling shows up
+  in load).
 
 ## R4. One device, several addresses (FR-004, US1 scenario 2)
 
-- Decision: a `crawl_key` table in the control plane, `UNIQUE (job_id, kind, value)`. A `find` task
-  that has fingerprinted a device inserts one row per strong identifier (serial, chassis MAC, as the
-  pack defines them) in the same transaction that writes its identifier claims and enqueues work. If
-  any insert conflicts, the transaction rolls back to a savepoint, the claims and the `identity`
-  observation are still written, and the task ends as `duplicate` without queuing a scrape or
-  neighbours. Before contacting a neighbour at all, the find checks whether the chassis ID the
-  neighbour table already reported is present in `crawl_key`, and skips the packet when it is.
-- Rationale: `identifier_claim` is append only and holds many rows per identifier, so it cannot carry
-  the uniqueness itself. A separate key table gives an atomic "first find wins" in PostgreSQL rather
-  than in memory. "Identified once" means one identity and one collection per device. A second
-  address may still be contacted once when no neighbour gave its chassis ID in advance.
-- Alternatives: a unique index on `identifier_claim` (breaks append only), in-memory seen-set (lost on
-  restart, not shared across collectors), dedup on a single "primary" identifier (breaks when SNMP and
-  SSH expose different identifiers).
+- Decision: `identifier_claim` is the deduplication index, as `docs/c4-model/04-data-model.md` intends.
+  Uniqueness comes from a transaction-scoped advisory lock per strong identifier, not from a
+  constraint. A `find` runs in three steps, and the lock is never held across network I/O:
+  1. Network, no transaction open: fingerprint the target and extract its identifiers.
+  2. Short transaction, no network: compute the lock key of every strong identifier with the SQL
+     function `claim_lock_key(snapshot_id, kind, value)` (defined once in a migration), sort the
+     keys, take `pg_advisory_xact_lock` on each in that order, then look for a strong claim with the
+     same kind and value in this snapshot whose `identity` observation is `collected` and belongs to
+     another task. Write the `identity` observation and this find's claims in either case. If such a
+     claim exists, mark the task `duplicate` and commit: no neighbours, no scrape. Otherwise commit;
+     the claims now mark the device as taken by this task. The locks are released at commit.
+  3. Network again, then a second short transaction: read the neighbour table, write the
+     `neighbours` observation, enqueue neighbour finds and the scrape, and mark the task `done`.
+  A find reclaimed after a crash between steps 2 and 3 redoes step 1, finds its own claims in step 2
+  (same task, so not a duplicate; the observation insert is `ON CONFLICT DO NOTHING`), and continues.
+- Rationale: holding a lock while waiting on a slow device would serialize every find that shares a
+  hash bucket with it and hold a pool connection for a device timeout. Sorting keys avoids deadlocks
+  when two devices share one identifier out of several. A hash collision in `claim_lock_key` only
+  serializes two unrelated finds; it never merges them, since the check compares kind and value.
+- Invariant, recorded in `docs/c4-model/04-data-model.md`: every path that writes strong identifier
+  claims takes these locks, through `claim_lock_key`, in sorted order, in the transaction that inserts.
+  Identity resolution will write claims too and is bound by the same rule.
+- "Identified once" means one identity and one collection per device. A second address of the same
+  device still receives the fingerprint of step 1 before step 2 can recognise it.
+- Alternatives: a unique index on `identifier_claim` (breaks append only); a separate key table with a
+  unique constraint (works, but duplicates the index the data model already names); an in-memory
+  seen-set (lost on restart, not shared across collectors); dedup on one "primary" identifier (breaks
+  when SNMP and SSH expose different identifiers).
 
 ## R5. Find reads neighbours; scrape reads the rest
 
@@ -78,7 +94,8 @@ considered.
 ## R7. Credentials, order and attempt budgets (FR-017 to FR-022)
 
 - Decision: credential sets covering the target's perimeter are tried in the order they appear in the
-  configuration document. Each set has `max_attempts_per_device` (default 1). Per-device, per-set
+  configuration document. Each set has a required `max_attempts_per_device` (at least 1, no default, because a wrong value
+  locks accounts on the central authentication service). Per-device, per-set
   attempt counts live in `task.cred_attempts jsonb`, updated before each attempt, so a restart never
   resets a budget. A reference that resolves to nothing moves to the next set and is logged, not
   counted as a device attempt. Secrets are resolved just before `Open` and dropped when the session
@@ -92,17 +109,23 @@ considered.
 ## R8. Perimeter check (FR-002, SC-002)
 
 - Decision: `perimeter.Allowed(netip.Addr) bool` using `net/netip` prefixes, include then exclude.
-  It is called inside the single dial function that every transport uses, after DNS resolution and
-  before the socket opens. Transports have no other way to dial. A refused target gets an observation
-  with the `identity` family, status `unreachable`, and `detail = out_of_perimeter`, and the task ends
-  as `skipped`.
-- Rationale: one chokepoint that a test can assert on. `netip` is stdlib and allocation free.
-- Alternatives: checking at enqueue time only (misses hostname seeds that resolve late and future
-  callers).
-
-Open point: FR-009 lists six statuses and has no "skipped". Recording an out-of-perimeter target as
-`unreachable` with a detail keeps the enum closed. The alternative is a seventh status, which needs a
-constitution amendment. The plan takes the detail approach.
+  It is applied in two places:
+  - when a find enqueues neighbours: an address outside the perimeter becomes a `find` task inserted
+    directly in state `skipped` with `skip_reason = 'out_of_perimeter'` and `parent_task_id` pointing
+    to the find whose neighbour table reported it;
+  - inside the single dial function that every transport uses, after DNS resolution and before the
+    socket opens. Transports have no other way to dial. A target refused there ends `skipped` the
+    same way.
+  No observation is written for a skipped target. No packet was sent, so there is nothing to observe.
+  The six observation statuses stay as they are.
+- Rationale: one chokepoint that a test can assert on, plus an early check so out-of-perimeter
+  neighbours never enter the queue as work. The skip stays traceable: the `neighbours` observation
+  holds the row that named the address, and the job records the config version whose perimeter
+  refused it.
+- Alternatives: an `identity` observation with status `unreachable` and a detail (a false statement,
+  since nothing was attempted); a seventh status (needs a constitution amendment for something that is
+  not an observation outcome); recording the neighbour's identifiers as claims (the spec defines a
+  claim as what a device reports about itself).
 
 ## R9. Parsing
 
@@ -135,7 +158,7 @@ resolution.
 ## R11. Immutability enforcement (FR-010)
 
 - Decision: a dedicated PostgreSQL role `netmapper_collector` with `SELECT, INSERT` on the collected
-  zone, `finding`, `finding_evidence` and `audit_log`, and `SELECT, INSERT, UPDATE` on `task` and `crawl_key`. It has no
+  zone, `finding`, `finding_evidence` and `audit_log`, and `SELECT, INSERT, UPDATE` on `task`. It has no
   `UPDATE` or `DELETE` on `observation`, `observation_raw`, `raw_object` or `identifier_claim`.
   The engine role gets `UPDATE` on `snapshot` and `job` only.
 - Rationale: a grant is one line and makes a bug fail loudly instead of rewriting history.
@@ -153,8 +176,8 @@ resolution.
   once, which bounds run time.
 - Consequence: `snapshot.state` needs a `closed` value meaning "closed, not yet judged", since the
   gate is the next feature. Update the data model doc accordingly.
-- Bound on one device (edge case "very large table"): per step timeout (default 120 s) and per step
-  output cap (default 64 MiB). Exceeding either records the family as `parse_failed` with detail
+- Bound on one device (edge case "very large table"): a per step timeout and a per step output cap,
+  both configurable with a default (R16). Exceeding either records the family as `parse_failed` with detail
   `truncated` or times out the step, and the scrape continues with the next family.
 
 ## R13. Starting a run without the API
@@ -188,8 +211,25 @@ resolution.
 - Alternatives: testcontainers-go (fine, but compose also serves the quickstart), Nokia SR Linux
   (freely pullable, but no ntc-templates coverage).
 
-## R16. Scale assumptions
+## R16. Scale and limits
 
-Not in the spec, set here so the design has targets: up to 10,000 devices per run, 64 concurrent
-sessions per collector by default (`--workers`), claim batch of 16, lease 5 minutes. Observations are
-written with `COPY` per task.
+The spec gives no throughput or size target, and nothing has been measured yet, so the project commits
+to no performance figure. The design is bounded, every bound is configurable, and the operational
+bounds ship with defaults so a first crawl can start without tuning. The defaults are starting points
+chosen by judgement, not measured values, and an operator overrides them after running the tool:
+
+| Bound | Setting | Default |
+|---|---|---|
+| concurrent device sessions per collector | `--workers` | 64 |
+| lease duration | `discovery.lease` | 5m |
+| tasks claimed per batch | `discovery.claim_batch` | 16 |
+| frontier poll interval | `discovery.poll_interval` | 1s |
+| attempts per task | `discovery.max_task_attempts` | 3 |
+| per step timeout | `discovery.step_timeout` | 120s |
+| per step output cap | `discovery.step_output_limit` | 64MiB |
+
+`credential_sets[].max_attempts_per_device` has no default and must be stated. A wrong value locks
+accounts on a central authentication service, a consequence that lands outside the tool, so the
+operator has to choose it (R7).
+
+Observations are written with `COPY` per task.

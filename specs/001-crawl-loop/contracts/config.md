@@ -26,10 +26,13 @@ seed_sets:
   - name: lab-seeds
     targets: [172.20.20.2]
 
-discovery:                  # optional, defaults shown
+discovery:                  # optional; values shown are the defaults
   max_task_attempts: 3
   step_timeout: 120s
   step_output_limit: 64MiB
+  lease: 5m
+  claim_batch: 16
+  poll_interval: 1s
 ```
 
 ## Validation
@@ -41,6 +44,9 @@ discovery:                  # optional, defaults shown
 - `kind: ssh` requires `username`; `snmp_v3` requires `username` and a `secret_ref` whose secret holds
   `auth` and `priv` fields.
 - Names are unique within their list.
+- `credential_sets[].max_attempts_per_device` is required and at least 1.
+- `discovery` and each of its keys are optional. Defaults are starting points, not measured values
+  (research R16); override them once the tool has run on your network.
 
 ## Reference formats
 

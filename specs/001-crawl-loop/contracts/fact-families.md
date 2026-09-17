@@ -6,8 +6,9 @@ mapper.
 
 ## identity
 
-Written by every `find`, including the ones that fail. Never needs a pack to exist, so an unreachable,
-denied or unidentified target always has one observation.
+Written by every `find` that attempted the target, including the ones that fail. Never needs a pack to
+exist, so an unreachable, denied or unidentified target always has one observation. A target skipped
+as out of perimeter has none: it is a `skipped` task, not an observation.
 
 | Field               | Type     | Notes                                                 |
 | ------------------- | -------- | ----------------------------------------------------- |
@@ -16,11 +17,10 @@ denied or unidentified target always has one observation.
 | sys_object_id       | string   | when SNMP answered                                    |
 | sys_descr           | string   |                                                       |
 | transports_answered | string[] | `ssh`, `snmp`                                         |
-| duplicate_of_task   | int      | set when `crawl_key` already held a strong identifier |
+| duplicate_of_task   | int      | set when another task already holds a strong claim with the same identifier |
 
 Status mapping: `collected` when a pack matched; `unsupported` with detail `unknown_platform` when a
-transport answered and no pack matched; `denied`; `unreachable` (with detail `out_of_perimeter` when
-no packet was sent).
+transport answered and no pack matched; `denied`; `unreachable` when every transport was silent.
 
 ## neighbours
 
@@ -35,9 +35,9 @@ no packet was sent).
 
 A row without `remote_mgmt_address` (or whose name does not resolve) is kept in the observation and
 queues nothing: known but not collected (spec edge case). A row whose address is outside the
-perimeter queues no task. The find writes an `identity` observation for that address with status
-`unreachable` and detail `out_of_perimeter` in the same transaction, so US1 scenario 3 is visible per
-target. The dial check still refuses the address if anything else ever tries to reach it.
+perimeter is inserted as a `find` task in state `skipped` with `skip_reason = 'out_of_perimeter'`, in
+the same transaction that writes this observation. No observation is written for it, since no packet
+was sent. The dial check still refuses the address if anything else ever tries to reach it.
 
 ## interfaces
 

@@ -36,7 +36,7 @@ carried back into it.
 | kind                    | text         | `ssh`, `snmp_v2c`, `snmp_v3`                                                           |
 | username                | text null    | not a secret                                                                           |
 | secret_ref              | text         | a reference such as `vault:kv/net/ro#password` or `env:LAB_PW`. Never a value (FR-017) |
-| max_attempts_per_device | int          | **(delta)** >= 1, default 1 (FR-019)                                                   |
+| max_attempts_per_device | int          | **(delta)** required, >= 1 (FR-019)                                                    |
 | perimeter_ids           | bigint[]     | at least one                                                                           |
 
 ### seed_set
@@ -82,7 +82,7 @@ A run that fails FR-001 is never inserted: `netmapper run` exits non-zero and na
 | id             | bigserial PK     |                                                                       |
 | job_id         | bigint FK        | partition key (list partition per job)                                |
 | kind           | text             | `find` or `scrape`                                                    |
-| target         | inet             | resolved address, already inside the perimeter                        |
+| target         | inet             | resolved address; inside the perimeter unless the task is `skipped`   |
 | target_name    | text null        | hostname or neighbour-reported name                                   |
 | platform       | text null        | set on `scrape`, copied from the find                                 |
 | state          | text             | see transitions                                                       |
@@ -92,12 +92,14 @@ A run that fails FR-001 is never inserted: `netmapper run` exits non-zero and na
 | cred_attempts  | jsonb            | **(delta)** `{"<credential_set_id>": n}`, per device per set (FR-019) |
 | last_error     | text null        |                                                                       |
 | parent_task_id | bigint null      | **(delta)** which find reported this neighbour, for audit             |
+| skip_reason    | text null        | **(delta)** `out_of_perimeter`; set only on `skipped` tasks           |
 
 `UNIQUE (job_id, kind, target)` so the same address queued as seed and as neighbour becomes one task.
 
 State transitions:
 
 ```text
+(insert)          -> skipped   (neighbour address outside the perimeter; never claimed)
 pending -> claimed -> done | duplicate | skipped
 claimed -> claimed        (lease expired, reclaimed, attempts+1)
 claimed -> failed         (attempts reached max_attempts; last_error kept)
@@ -111,17 +113,10 @@ the task before it could record an outcome (crash, timeout of the whole task). W
 the job runner writes an `unreachable` observation with detail `task_failed: <last_error>` for every
 target still `failed`, so FR-009 holds for every attempted target.
 
-### crawl_key **(delta, new)**
-
-| Column  | Type   | Rule                                          |
-| ------- | ------ | --------------------------------------------- |
-| job_id  | bigint |                                               |
-| kind    | text   | identifier kind, e.g. `serial`, `chassis_mac` |
-| value   | text   | normalised by the pack                        |
-| task_id | bigint | the find that won                             |
-
-`PRIMARY KEY (job_id, kind, value)`. Frontier state, not collected data: dropped with the job's
-partitions.
+A `skipped` task has no observation: no packet was sent, so nothing was attempted and FR-009 does not
+apply. The task row is the record that the target was skipped (US1 scenario 3). Task rows live as
+long as their job, and the skip can also be rederived from the `neighbours` observation that named
+the address and the perimeter of the job's `config_version`.
 
 ### audit_log
 
@@ -163,7 +158,7 @@ Append only (FR-023). Written in the same batch as the task's observations.
 | recipe_id           | text null     | `<pack>/<family>@<recipe version>`                                                                                      |
 | fact_family         | text          | `identity`, `neighbours`, or a pack family                                                                              |
 | status              | text NOT NULL | `collected`, `empty`, `unsupported`, `parse_failed`, `unreachable`, `denied` (CHECK)                                    |
-| detail              | text null     | **(delta)** machine-readable reason: `out_of_perimeter`, `unknown_platform`, `truncated`, `timeout`, `task_failed: ...` |
+| detail              | text null     | **(delta)** machine-readable reason: `unknown_platform`, `truncated`, `timeout`, `task_failed: ...`                     |
 | parse_generation_id | bigint FK     | generation 1 is created with the snapshot                                                                               |
 | parsed              | jsonb null    | rows in the fact family schema, null unless `collected`                                                                 |
 
@@ -215,6 +210,13 @@ committed its batch does not write twice.
 Rows are written for every find that identified a device, duplicates included. Two devices with the
 same hostname produce two sets of claims with different strong identifiers; nothing merges them here.
 
+This table is also the deduplication index during a crawl (research R4). No constraint enforces
+uniqueness, since the table is append only. Instead, **invariant**: every path that writes strong
+claims takes `pg_advisory_xact_lock(claim_lock_key(snapshot_id, kind, value))` for each strong
+identifier, keys sorted, inside the transaction that inserts, and checks for an existing strong claim
+before deciding. The transaction does no network I/O: the fingerprint is complete before it opens.
+Index: `(snapshot_id, kind, value) WHERE strength = 'strong'`.
+
 ## Reported
 
 ### finding
@@ -240,8 +242,8 @@ raw output holds the banner or authentication response proving the device answer
 | Rule                                        | Where enforced                                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | FR-001 perimeter, seed inside, covering set | `netmapper run` before inserting the job                                                      |
-| FR-002 perimeter before any packet          | the shared dial function (research R8)                                                        |
+| FR-002 perimeter before any packet          | neighbour enqueue and the shared dial function (research R8); refused targets become `skipped` tasks |
 | FR-009 status never absent                  | NOT NULL + CHECK, plus the close-time sweep over `failed` tasks                               |
 | FR-010 immutable facts                      | role grants (research R11)                                                                    |
 | FR-017 no secret stored                     | only `secret_ref` columns exist; a test greps the schema and audit rows for known lab secrets |
-| No double collection                        | `crawl_key` PK, `task` unique target, `observation` unique per task                           |
+| No double collection                        | advisory lock + strong claim check (R4), `task` unique target, `observation` unique per task  |

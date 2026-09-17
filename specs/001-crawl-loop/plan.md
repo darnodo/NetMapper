@@ -9,9 +9,10 @@
 Build the collector's core loop in Go. A run starts from `netmapper run`, which validates the
 configuration and puts one `find` task per seed on a PostgreSQL frontier. Collectors claim tasks with
 `FOR UPDATE SKIP LOCKED` under a lease. A `find` checks the perimeter, fingerprints the device over
-SNMP then SSH, writes identifier claims, deduplicates through a `crawl_key` table, reads the neighbour
-table, and in one transaction enqueues a `find` per in-perimeter neighbour and a `scrape` for the
-device. A `scrape` runs the pack recipes for that platform and version, stores raw output in Garage
+SNMP then SSH with no transaction open, then in a short transaction takes an advisory lock per strong
+identifier and writes its identifier claims, which are the crawl's deduplication index. It then reads
+the neighbour table and, in a second short transaction, enqueues a `find` per in-perimeter neighbour,
+a `skipped` task per out-of-perimeter one, and a `scrape` for the device. A `scrape` runs the pack recipes for that platform and version, stores raw output in Garage
 by SHA-256, and writes one observation per fact family with a non-null status. The engine's job runner
 does one final retry pass when the queue empties, then closes the snapshot. Details and trade-offs are
 in [research.md](research.md).
@@ -33,14 +34,18 @@ fake `Transport` replaying recorded output; containerlab with two Arista cEOS no
 
 **Project Type**: single Go binary with role subcommands (service + operator CLI)
 
-**Performance Goals**: up to 10,000 devices per run; 64 concurrent device sessions per collector by
-default; topology discovery not blocked by collection time (FR-005)
+**Performance Goals**: none measured yet. Topology discovery must not wait on collection time
+(FR-005). Concurrency, lease, batch size, poll interval, attempts, step timeout and output cap are
+bounded and configurable, with defaults that are starting points rather than measured values.
+`max_attempts_per_device` has no default, because a wrong value locks accounts (research R16)
 
 **Constraints**: no packet outside the perimeter; no secret at rest; no crash state in collector memory;
-per step timeout 120 s and output cap 64 MiB so one device cannot stall a run
+a per step timeout and output cap so one device cannot stall a run; no lock held across network I/O
 
 **Scale/Scope**: one pack shipped (`arista_eos`), three fact families (`identity`, `neighbours`,
-`interfaces`), four subcommands plus `migrate`
+`interfaces`), four subcommands plus `migrate`. Shipping only Arista cEOS is a deliberate narrowing of
+the v1 scope for this slice, chosen because it runs in containerlab and ntc-templates covers it. It is
+not the final platform list; further platforms arrive as packs
 
 ## Constitution Check
 
@@ -49,19 +54,20 @@ per step timeout 120 s and output cap 64 MiB so one device cannot stall a run
 | Principle / constraint                                        | Status               | How this plan holds it                                                                                                                                                                                                                                          |
 | ------------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | I. Evidence travels with the answer                           | Pass (partial scope) | No interface serves graph data here. Every observation carries target, command or OID, time, raw hash and parser version (FR-008), which is what later answers will cite                                                                                        |
-| II. Observations immutable, rest rebuildable                  | Pass                 | Collected zone is insert only, enforced by role grants. `raw_object.refcount` and `identifier_claim.last_seen` are not updated in place; both become derived. `crawl_key` and `task` are control plane and disposable                                           |
+| II. Observations immutable, rest rebuildable                  | Pass                 | Collected zone is insert only, enforced by role grants. `raw_object.refcount` and `identifier_claim.last_seen` are not updated in place; both become derived. `task` is control plane; a `skipped` task is also rederivable from the `neighbours` observation and the job's config version                                           |
 | III. Credentials and reach stay in the collector              | Pass                 | Only `collector` loads packs, resolves `secret_ref` and dials. `run`, `cancel`, `engine`, `migrate` never do. One dial function applies the perimeter check. Config rejects literal secrets                                                                     |
 | IV. Read only, outward                                        | Pass                 | SNMP client exposes no SET; SSH sends only recipe commands; pack loader enforces the pack's `read_only` prefixes and tests lint shipped packs                                                                                                                   |
 | V. Vendor specifics are data                                  | Pass                 | Fingerprint rules, identifier extraction, scrapligo platform definitions, recipes, templates and interface naming live in `packs/`. Fact family schemas are neutral. A test pack in `internal/pack/testdata` proves a platform can be added without code change |
 | One binary, three roles                                       | Pass                 | `collector`, `engine`, plus operator subcommands `migrate`, `run`, `cancel` (no new role, no network listener)                                                                                                                                                  |
 | Frontier in PostgreSQL, SKIP LOCKED, no crash state in memory | Pass                 | Lease, attempts and per-set credential counters are all task columns                                                                                                                                                                                            |
 | Raw output in object store by hash                            | Pass                 |                                                                                                                                                                                                                                                                 |
-| Status enum closed and non-null                               | Pass, with a note    | Out-of-perimeter targets use `unreachable` + detail rather than a new status (research R8)                                                                                                                                                                      |
+| Status enum closed and non-null                               | Pass                 | The six statuses are unchanged. An out-of-perimeter target is a `skipped` task with no observation, since no packet was sent (research R8)                                                                                                                      |
 | Config YAML posted whole, versioned, recorded on run          | Pass, sequencing     | Stored whole as `config_version` by `netmapper run` until the API config service exists; `job.config_version` set on every run                                                                                                                                  |
 | Workflow: open questions go to `docs/`                        | Action               | The deltas listed below must be carried into `docs/c4-model/04-data-model.md` in this branch                                                                                                                                                                    |
 
-Post-design re-check: still passes. The design added `crawl_key`, `task.cred_attempts`,
-`observation.detail`, `observation_raw.command` and a `closed` snapshot state. None crosses the
+Post-design re-check: still passes. The design added `task.cred_attempts`, `task.skip_reason`,
+`observation.detail`, `observation_raw.command`, the `claim_lock_key` SQL function and a `closed`
+snapshot state. None crosses the
 collected/computed boundary or moves a credential.
 
 Principles touched by this feature: II, III, IV, V.
@@ -69,8 +75,11 @@ Principles touched by this feature: II, III, IV, V.
 ## Documentation deltas to carry into `docs/c4-model/04-data-model.md`
 
 - `snapshot.state` gains `closed` (closed, not yet judged by the gate).
-- New `crawl_key` table in the control plane.
-- `task` gains `cred_attempts`, `last_error`, `parent_task_id`, `platform`, `target_name`.
+- Invariant on `identifier_claim`: every writer of strong claims takes the sorted advisory locks in
+  the inserting transaction, with no network I/O inside it. **Done** in this branch.
+- `claim_lock_key(snapshot_id, kind, value)` SQL function, the single definition of the lock key.
+- `task` gains `cred_attempts`, `last_error`, `parent_task_id`, `platform`, `target_name`,
+  `skip_reason`.
 - `credential_set` gains `config_version`, `position`, `max_attempts_per_device`; `seed_set` loses
   `credential_set_id`.
 - `observation` gains `task_id`, `platform`, `detail`; `observation_raw` gains `command`.
@@ -130,5 +139,5 @@ doc (`Transport`, `Session`, `Parser`, `SecretBackend`, `PackRegistry`); everyth
 
 | Addition                                                    | Why needed                                                                                         | Simpler alternative rejected because                                                               |
 | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `crawl_key` table                                           | atomic "first find wins" for a device reached on several addresses, across collectors and restarts | a unique index on `identifier_claim` breaks append only; an in-memory set breaks FR-012 and FR-013 |
+| Advisory lock on `identifier_claim` instead of a constraint | a device reached on several addresses is identified once, across collectors and restarts, while the table stays append only | a unique index breaks append only; a separate key table duplicates the index the data model already names; an in-memory set breaks FR-012 and FR-013 |
 | `netmapper run` / `cancel` writing to the database directly | a run must be triggerable before the API exists                                                    | waiting on the API feature blocks every test of this one; the API will call the same function      |
