@@ -9,14 +9,14 @@ mapper.
 Written by every `find`, including the ones that fail. Never needs a pack to exist, so an unreachable,
 denied or unidentified target always has one observation.
 
-| Field | Type | Notes |
-|---|---|---|
-| platform | string | pack name, absent when unidentified |
-| os_version | string | |
-| sys_object_id | string | when SNMP answered |
-| sys_descr | string | |
-| transports_answered | string[] | `ssh`, `snmp` |
-| duplicate_of_task | int | set when `crawl_key` already held a strong identifier |
+| Field               | Type     | Notes                                                 |
+| ------------------- | -------- | ----------------------------------------------------- |
+| platform            | string   | pack name, absent when unidentified                   |
+| os_version          | string   |                                                       |
+| sys_object_id       | string   | when SNMP answered                                    |
+| sys_descr           | string   |                                                       |
+| transports_answered | string[] | `ssh`, `snmp`                                         |
+| duplicate_of_task   | int      | set when `crawl_key` already held a strong identifier |
 
 Status mapping: `collected` when a pack matched; `unsupported` with detail `unknown_platform` when a
 transport answered and no pack matched; `denied`; `unreachable` (with detail `out_of_perimeter` when
@@ -24,14 +24,14 @@ no packet was sent).
 
 ## neighbours
 
-| Field | Type | Required |
-|---|---|---|
-| protocol | string | yes |
-| local_interface | string | yes, canonical |
-| remote_chassis_id | string | no |
-| remote_system_name | string | no |
-| remote_interface | string | no |
-| remote_mgmt_address | string | no |
+| Field               | Type   | Required       |
+| ------------------- | ------ | -------------- |
+| protocol            | string | yes            |
+| local_interface     | string | yes, canonical |
+| remote_chassis_id   | string | no             |
+| remote_system_name  | string | no             |
+| remote_interface    | string | no             |
+| remote_mgmt_address | string | no             |
 
 A row without `remote_mgmt_address` (or whose name does not resolve) is kept in the observation and
 queues nothing: known but not collected (spec edge case). A row whose address is outside the
@@ -41,15 +41,15 @@ target. The dial check still refuses the address if anything else ever tries to 
 
 ## interfaces
 
-| Field | Type | Required |
-|---|---|---|
-| name | string | yes, canonical |
-| description | string | no |
-| admin_state | string | `up`, `down` |
-| oper_state | string | `up`, `down`, `other` |
-| speed_bps | int | no |
-| mtu | int | no |
-| mac | string | no, normalised lowercase colon form |
+| Field       | Type   | Required                            |
+| ----------- | ------ | ----------------------------------- |
+| name        | string | yes, canonical                      |
+| description | string | no                                  |
+| admin_state | string | `up`, `down`                        |
+| oper_state  | string | `up`, `down`, `other`               |
+| speed_bps   | int    | no                                  |
+| mtu         | int    | no                                  |
+| mac         | string | no, normalised lowercase colon form |
 
 Other families (`mac_table`, `arp_table`, ...) follow the same rule: added here first, then in packs.
 This feature ships `identity`, `neighbours` and `interfaces`.
