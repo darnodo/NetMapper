@@ -169,13 +169,20 @@ func (l *Lab) Outcomes(job int64) []string {
 		FROM observation o JOIN job j ON j.snapshot_id = o.snapshot_id WHERE j.id = $1 ORDER BY 1`, job)
 }
 
-// FakeOS is a device of the fakeos test pack. Neighbours are "<local port> <name> <address>".
+// FakeOS is a device of the fakeos test pack. Neighbours are "<local port> <name> <address>",
+// where the address is an IP, a MAC or "-" for none; its fakeos type is derived from it.
 func FakeOS(name, serial string, neighbours ...string) *fake.Device {
 	mac := fmt.Sprintf("aa:bb:cc:00:00:%s", serial[len(serial)-2:])
 	var nb strings.Builder
 	for _, n := range neighbours {
 		f := strings.Fields(n)
-		fmt.Fprintf(&nb, "%s %s %s %s\n", f[0], f[1], f[2], "aa:bb:cc:ff:ff:ff")
+		typ := "mac"
+		if a, err := netip.ParseAddr(f[2]); err == nil {
+			typ = map[bool]string{true: "ip4", false: "ip6"}[a.Is4()]
+		} else if f[2] == "-" {
+			typ = "-"
+		}
+		fmt.Fprintf(&nb, "%s %s %s %s %s\n", f[0], f[1], typ, f[2], "aa:bb:cc:ff:ff:ff")
 	}
 	return &fake.Device{
 		CLI: map[string]string{

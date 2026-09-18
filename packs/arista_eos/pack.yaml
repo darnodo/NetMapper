@@ -1,5 +1,5 @@
 name: arista_eos
-version: 1                      # bump on any template or recipe change
+version: 3                      # bump on any template or recipe change
 read_only: ["show "]            # every CLI command in the pack must start with one of these
 fingerprint:
   snmp:

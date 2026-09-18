@@ -19,6 +19,9 @@ type Field struct {
 	Canonical bool // an interface name, canonicalised by the pack's naming rules
 	MAC       bool // normalised to lowercase colon form
 	Enum      []string
+	// TypedBy names the field that says what kind of value this one holds. It is required
+	// whenever this field is present, and a value typed mac is normalised like a MAC field.
+	TypedBy string
 }
 
 var Families = map[string][]Field{
@@ -36,7 +39,8 @@ var Families = map[string][]Field{
 		{Name: "remote_chassis_id", Type: String},
 		{Name: "remote_system_name", Type: String},
 		{Name: "remote_interface", Type: String},
-		{Name: "remote_mgmt_address", Type: String},
+		{Name: "remote_mgmt_address", Type: String, TypedBy: "remote_mgmt_address_type"},
+		{Name: "remote_mgmt_address_type", Type: String, Enum: []string{"ipv4", "ipv6", "mac", "other"}},
 	},
 	"interfaces": {
 		{Name: "name", Type: String, Required: true, Canonical: true},
@@ -75,8 +79,12 @@ func Validate(family string, rows []map[string]any) error {
 			}
 		}
 		for _, f := range Families[family] {
-			if _, ok := row[f.Name]; f.Required && !ok {
+			_, ok := row[f.Name]
+			if f.Required && !ok {
 				return fmt.Errorf("%s row %d: required field %q missing", family, i, f.Name)
+			}
+			if _, typed := row[f.TypedBy]; ok && f.TypedBy != "" && !typed {
+				return fmt.Errorf("%s row %d: %q needs %q beside it", family, i, f.Name, f.TypedBy)
 			}
 		}
 	}

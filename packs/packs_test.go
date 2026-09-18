@@ -3,6 +3,7 @@
 package packs_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -13,7 +14,29 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/darnodo/NetMapper/internal/pack"
+	"github.com/darnodo/NetMapper/internal/parse"
 )
+
+// An EOS switch with LLDP on and no neighbour is empty, not a parse failure. The sample is
+// written by hand until a cEOS recording replaces it (T045).
+func TestNoLLDPNeighbourIsEmpty(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "neighbours", "4.30.1F")[0]
+	none := "Interface Ethernet1 detected 0 LLDP neighbors:\n\nInterface Ethernet2 detected 0 LLDP neighbors:\n\n"
+	some, _ := os.ReadFile("arista_eos/testdata/ntc/show_lldp_neighbors_detail.raw")
+	for _, c := range []struct{ name, out, want string }{
+		{"no neighbour", none, parse.Empty},
+		{"some interfaces without a neighbour", none + string(some), parse.Collected},
+		{"reworded", "Interface Ethernet1 has no LLDP neighbor\n", parse.ParseFailed},
+	} {
+		if got, _, err := parse.Parse(reg, "arista_eos", "neighbours", im, [][]byte{[]byte(c.out)}); got != c.want {
+			t.Errorf("%s: %s (%v), want %s", c.name, got, err, c.want)
+		}
+	}
+}
 
 func TestPacks(t *testing.T) {
 	reg, err := pack.LoadRoot(".")
@@ -88,5 +111,28 @@ func parseRecorded(t *testing.T, p *pack.Pack, raw string) {
 	}
 	if !reflect.DeepEqual(got, want.Parsed) {
 		t.Errorf("%s:\n got %v\nwant %v", raw, got, want.Parsed)
+	}
+}
+
+// The management address is stored with its LLDP subtype, so an IP and a MAC are never confused.
+func TestLLDPAddressKeepsItsType(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "neighbours", "4.30.1F")[0]
+	out, _ := os.ReadFile("arista_eos/testdata/ntc/show_lldp_neighbors_detail.raw")
+	status, rows, err := parse.Parse(reg, "arista_eos", "neighbours", im, [][]byte{out})
+	if status != parse.Collected {
+		t.Fatalf("%s %v", status, err)
+	}
+	seen := map[string]bool{}
+	for _, r := range rows {
+		seen[fmt.Sprint(r["remote_mgmt_address_type"], " ", r["remote_mgmt_address"])] = true
+	}
+	for _, want := range []string{"mac 2c:c2:60:81:ea:f9", "ipv4 10.0.0.31", "ipv6 fe80::250:56ff:feac:4cd9"} {
+		if !seen[want] {
+			t.Errorf("missing %q in %v", want, seen)
+		}
 	}
 }

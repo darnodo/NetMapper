@@ -75,6 +75,7 @@ implementations:                # first one whose version and transport fit wins
     steps:
       - command: show lldp neighbors detail
         template: show_lldp_neighbors_detail.textfsm
+        empty_lines: ['^Interface \S+ detected 0 LLDP neighbors:$']   # nothing to report
     map:                        # template field -> fact family field
       local_interface: LOCAL_INTERFACE
       remote_chassis_id: CHASSIS_ID
@@ -86,6 +87,10 @@ implementations:                # first one whose version and transport fit wins
 
 SNMP steps use `walk: <oid>` and map column OIDs instead of template fields. A recipe with several
 steps merges rows on the keys listed in `merge_on`.
+
+A step's `empty_lines` lists the lines its command prints when it has nothing to report. Output
+whose every non-blank line matches one of them is `empty`; anything else that yields no row is
+`parse_failed` (research R9). A step without `empty_lines` counts only blank output as empty.
 
 A device's spelling of a value can be translated into the schema's with `values`, per field, with
 `'*'` as the fallback. The same template field may feed several fact fields:

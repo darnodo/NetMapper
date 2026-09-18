@@ -31,10 +31,20 @@ transport answered and no pack matched; `denied`; `unreachable` when every trans
 | remote_chassis_id   | string | no             |
 | remote_system_name  | string | no             |
 | remote_interface    | string | no             |
-| remote_mgmt_address | string | no             |
+| remote_mgmt_address | string | no; if present, `remote_mgmt_address_type` is required beside it |
+| remote_mgmt_address_type | string | `ipv4`, `ipv6`, `mac`, `other`: the LLDP management address subtype, translated by the pack |
 
-A row without `remote_mgmt_address` (or whose name does not resolve) is kept in the observation and
-queues nothing: known but not collected (spec edge case). A row whose address is outside the
+The address is stored as the device reported it, with its type. A `mac` value is normalised to the
+lowercase colon form; an IP is left as given. A consumer reads the type, never guesses it from the
+value.
+
+Only a row whose address is typed `ipv4` or `ipv6` queues a `find`. A row with no address, or with
+a MAC or another kind of address, is kept in the observation and queues nothing: known but not
+collected (spec edge case). Names are never resolved. A system name is what the neighbour declares,
+not an address it is reachable at; a lookup could point at the wrong machine, would send a query
+about a device that may be outside the perimeter, and would make two identical runs differ with the
+state of a DNS zone. Matching the name against an entity discovered elsewhere is identity
+resolution's job. A row whose address is outside the
 perimeter is inserted as a `find` task in state `skipped` with `skip_reason = 'out_of_perimeter'`, in
 the same transaction that writes this observation. No observation is written for it, since no packet
 was sent. The dial check still refuses the address if anything else ever tries to reach it.

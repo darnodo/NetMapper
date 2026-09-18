@@ -135,6 +135,12 @@ test/lab/                     # containerlab topology and lab config
 code (`_test.go`); lab assets live in `test/lab/`. Interfaces are limited to the five in the data model
 doc (`Transport`, `Session`, `Parser`, `SecretBackend`, `PackRegistry`); everything else is concrete.
 
+## Known test debt
+
+| Behaviour | Why it is untested | Closed when |
+| --------- | ------------------ | ----------- |
+| A reclaimed `scrape` skips the families it already wrote, so the device is not asked the same command twice (SC-004) | The shipped families leave `scrape` with one family (`interfaces`), so no scrape can stop after writing one family and before finishing. Deliberately removing the skip leaves every test green. The `UNIQUE (snapshot_id, target, fact_family, task_id)` constraint still prevents a second row; what goes unchecked is the repeated read-only command | A second scrape family exists (for example `mac_table`): add it to the `fakeos` test pack and extend `internal/collector/resume_test.go` with a crash after the first family is written, asserting that its command reaches the device once |
+
 ## Complexity Tracking
 
 | Addition                                                    | Why needed                                                                                                                  | Simpler alternative rejected because                                                                                                                 |

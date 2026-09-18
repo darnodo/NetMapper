@@ -89,6 +89,9 @@ type Step struct {
 	Command  string `yaml:"command"`
 	Template string `yaml:"template"`
 	Walk     string `yaml:"walk"`
+	// EmptyLines are the lines this command prints when it has nothing to report. Output whose
+	// every non-blank line matches one of them is empty, not a parse failure (research R9).
+	EmptyLines []string `yaml:"empty_lines"`
 }
 
 // Registry is the set of loaded packs, in load order.
@@ -234,6 +237,9 @@ func loadPack(dir string) (*Pack, error) {
 				fail("%s: no steps", where)
 			}
 			for _, s := range im.Steps {
+				for _, re := range s.EmptyLines {
+					compiles(where+" empty_lines", re)
+				}
 				if s.Command != "" {
 					readOnly(where, s.Command)
 					src, ok := p.Templates[s.Template]

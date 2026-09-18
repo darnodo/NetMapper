@@ -46,12 +46,24 @@ func TestOutcomes(t *testing.T) {
 	if s, _, _ := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("\n  \n")}); s != Empty {
 		t.Errorf("blank output: %s", s)
 	}
+	// The pack's empty lines say "nothing here"; any other line is drift.
+	if s, _, err := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("No neighbours\n\n")}); s != Empty || err != nil {
+		t.Errorf("declared empty output: %s %v", s, err)
+	}
+	if s, _, _ := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("No neighbours\nNeighbour table v2\n")}); s != ParseFailed {
+		t.Errorf("empty line plus drift: %s", s)
+	}
 	if s, _, err := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("Neighbour table v2\n---\n")}); s != ParseFailed || err == nil {
 		t.Errorf("drift: %s %v", s, err)
 	}
-	s, rows, err := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("p1 sw2 10.0.0.2 aa:bb:cc:00:00:02\n")})
+	s, rows, err := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("p1 sw2 ip4 10.0.0.2 aa:bb:cc:00:00:02\np2 sw3 mac AABB.CCDD.EEFF aa:bb:cc:00:00:03\n")})
 	if s != Collected || err != nil || rows[0]["protocol"] != "lldp" || rows[0]["local_interface"] != "port1" {
 		t.Errorf("neighbours: %s %v %v", s, rows, err)
+	}
+	// The address keeps its type; a MAC is normalised, an IP is left as given.
+	if rows[0]["remote_mgmt_address_type"] != "ipv4" || rows[0]["remote_mgmt_address"] != "10.0.0.2" ||
+		rows[1]["remote_mgmt_address_type"] != "mac" || rows[1]["remote_mgmt_address"] != "aa:bb:cc:dd:ee:ff" {
+		t.Errorf("typed addresses: %v", rows)
 	}
 }
 

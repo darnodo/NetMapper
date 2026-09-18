@@ -38,3 +38,18 @@ func TestParseDrift(t *testing.T) {
 		t.Errorf("job %s", s[0])
 	}
 }
+
+// A device with nothing to report is not drift: no parse_failed, no finding.
+func TestNothingToReportIsNotDrift(t *testing.T) {
+	env(t)
+	sw := FakeOS("sw1", "S001")
+	sw.CLI["display neighbours"] = "No neighbours\n"
+	l := NewLab(t, &fake.Network{Devices: map[netip.Addr]*fake.Device{Addr("10.0.0.1"): sw}})
+	job := l.Crawl(Doc)
+	if got := l.Outcomes(job); len(got) != 3 || got[2] != "10.0.0.1 neighbours empty" {
+		t.Errorf("%v", got)
+	}
+	if n := l.Int(`SELECT count(*) FROM finding`); n != 0 {
+		t.Errorf("%d findings for a device with no neighbour", n)
+	}
+}

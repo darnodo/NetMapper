@@ -87,9 +87,13 @@ func (c *Collector) find(ctx context.Context, j *job, t *frontier.Task) error {
 	}
 	var found []neighbour
 	for _, r := range nb.Parsed {
-		// A row without a usable address is kept in the observation and queues nothing.
+		// Only an IP address is somewhere to go. A row with a MAC, another kind of address or none
+		// is kept in the observation and queues nothing: known but not collected. Names are never
+		// looked up: a system name is what the neighbour declares, not an address it can be
+		// reached at, and a lookup would make the run depend on a DNS zone.
 		s, _ := r["remote_mgmt_address"].(string)
-		if a, err := netip.ParseAddr(s); err == nil {
+		typ, _ := r["remote_mgmt_address_type"].(string)
+		if a, err := netip.ParseAddr(s); err == nil && (typ == "ipv4" || typ == "ipv6") {
 			name, _ := r["remote_system_name"].(string)
 			found = append(found, neighbour{a.Unmap(), name})
 		}

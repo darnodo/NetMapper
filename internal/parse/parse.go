@@ -4,8 +4,9 @@
 package parse
 
 import (
-	"bytes"
 	"fmt"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -32,7 +33,8 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 		switch {
 		case st.Walk != "":
 			raw, err = walkRows(outputs[i], im.Map)
-		case len(bytes.TrimSpace(outputs[i])) > 0:
+		case nothing(st.EmptyLines, outputs[i]):
+		default:
 			raw, err = textFSM(p.Templates[st.Template], outputs[i])
 			if err == nil && len(raw) == 0 {
 				err = fmt.Errorf("%s: template %s yielded no row", st.Command, st.Template)
@@ -62,6 +64,22 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 		return ParseFailed, nil, err
 	}
 	return Collected, rows, nil
+}
+
+// nothing reports whether out says there is nothing to report: it is blank, or every non-blank
+// line is one of the step's empty lines. Every line must match, so drift, such as a new header or
+// a reworded message, still reaches the template and fails there.
+func nothing(emptyLines []string, out []byte) bool {
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if !slices.ContainsFunc(emptyLines, func(re string) bool { return regexp.MustCompile(re).MatchString(line) }) {
+			return false
+		}
+	}
+	return true
 }
 
 func textFSM(template string, out []byte) ([]map[string]any, error) {
@@ -128,6 +146,9 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, raw map[s
 			} else if t, ok := tr["*"]; ok {
 				s = t
 			}
+			if s == "" { // the device's way of saying "none"
+				continue
+			}
 		}
 		f, _ := fact.Lookup(family, field)
 		if f.Canonical {
@@ -145,6 +166,11 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, raw map[s
 			continue
 		}
 		row[field] = s
+	}
+	for field := range row {
+		if f, _ := fact.Lookup(family, field); f.TypedBy != "" && row[f.TypedBy] == "mac" {
+			row[field] = pack.NormaliseMAC(row[field].(string))
+		}
 	}
 	return row, nil
 }

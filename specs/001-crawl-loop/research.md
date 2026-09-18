@@ -159,13 +159,24 @@ considered.
 
 - Decision: TextFSM templates via `github.com/sirikothe/gotextfsm`, followed by a pack-declared field
   mapping into the fact family schema. SNMP tables map columns to fields directly, with no template.
-  A template that yields zero rows on non-empty output is `parse_failed`; empty output is `empty`; a
-  family the pack has no recipe for on this platform and version is `unsupported`.
+  A recipe step may declare `empty_lines`: the lines its command prints when there is nothing to
+  report (EOS: `Interface Ethernet1 detected 0 LLDP neighbors:`). Output that is blank, or whose
+  every non-blank line matches one of them, is `empty`. Otherwise a template that yields zero rows
+  is `parse_failed`. A family the pack has no recipe for on this platform and version is
+  `unsupported`.
+- Why `empty_lines`: "zero rows" alone cannot tell "the template no longer matches" from "there is
+  nothing to match", and an access switch with no LLDP neighbour is normal. Raising a data quality
+  finding for it would bury the real ones. Only the pack knows what "nothing" looks like on its
+  platform. Requiring every line to match, rather than any, keeps drift visible: a reworded
+  message or a new header line still reaches the template and fails there.
 - Rationale: TextFSM is the de facto format for network CLI parsing and lets packs reuse
   ntc-templates. Keeping the mapping in the pack satisfies principle V.
 - Alternatives: regex-only recipes (reinvents TextFSM), TTP (Python only).
 
 Parse failure detection has a ceiling: a template that matches partially still reports `collected`.
+The opposite ceiling: if a platform rewords its "nothing here" message, a device with nothing to
+report reads as `parse_failed` until the pack's `empty_lines` is updated. That errs toward a
+visible finding, not a silent `empty`.
 Replay (FR-011) is the correction path.
 
 ## R10. Raw output storage (FR-007, FR-011)

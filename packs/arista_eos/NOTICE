@@ -8,4 +8,8 @@ Changes:
 - templates/show_interfaces_status.textfsm: renamed from arista_eos_show_interfaces_status.textfsm;
   the NAME value `(\S.*(?<!\s))` became `(\S.*\S|\S)`, because Go regular expressions have no
   lookbehind.
+- templates/show_lldp_neighbors_detail.textfsm: added the MGMT_ADDRESS_SUBTYPE value, so the
+  management address is stored with its LLDP subtype.
+- testdata/ntc/show_lldp_neighbors_detail.yml: each row gained mgmt_address_subtype, read from the
+  "Management Address Subtype" line of the same neighbour in the .raw file.
 - testdata/ntc/: test fixtures renamed without the arista_eos_ prefix.

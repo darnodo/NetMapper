@@ -6,10 +6,16 @@ implementations:                # first one whose version and transport fit wins
     steps:
       - command: show lldp neighbors detail | no-more
         template: show_lldp_neighbors_detail.textfsm
+        # An interface with LLDP on and nobody at the other end. Wording to be confirmed against
+        # a recorded cEOS output (T045).
+        empty_lines: ['^Interface \S+ detected 0 LLDP neighbors:$']
     map:                        # template field -> fact family field
       local_interface: LOCAL_INTERFACE
       remote_chassis_id: CHASSIS_ID
       remote_system_name: NEIGHBOR_NAME
       remote_interface: NEIGHBOR_INTERFACE
       remote_mgmt_address: MGMT_ADDRESS
+      remote_mgmt_address_type: MGMT_ADDRESS_SUBTYPE
       protocol: '=lldp'           # literal
+    values:
+      remote_mgmt_address_type: { IPv4: ipv4, IPv6: ipv6, Ethernet: mac, '*': other }
