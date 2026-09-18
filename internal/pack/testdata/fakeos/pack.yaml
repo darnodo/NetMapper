@@ -1,0 +1,27 @@
+# A platform that does not exist. It proves a platform is added with data alone (SC-006).
+name: fakeos
+version: 1
+read_only: ["display "]
+fingerprint:
+  snmp:
+    - sys_object_id_prefix: 1.3.6.1.4.1.99999
+      version_regex: 'FakeOS (?P<version>\S+)'
+  ssh:
+    - command: display version
+      match: 'FakeOS'
+      version_regex: 'FakeOS (?P<version>\S+)'
+identifiers:
+  - kind: serial
+    strength: strong
+    ssh: { command: display version, regex: 'Serial: (?P<value>\S+)' }
+    snmp: { oid: 1.3.6.1.4.1.99999.2.1.0 }
+  - kind: chassis_mac
+    strength: strong
+    normalise: mac
+    ssh: { command: display version, regex: 'MAC: (?P<value>\S+)' }
+  - kind: hostname
+    strength: weak
+    ssh: { command: display version, regex: 'Hostname: (?P<value>\S+)' }
+    snmp: { oid: 1.3.6.1.2.1.1.5.0 }
+interface_names:
+  - { match: '^p(\d+)$', replace: 'port$1' }

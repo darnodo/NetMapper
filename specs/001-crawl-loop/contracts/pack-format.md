@@ -87,6 +87,26 @@ implementations:                # first one whose version and transport fit wins
 SNMP steps use `walk: <oid>` and map column OIDs instead of template fields. A recipe with several
 steps merges rows on the keys listed in `merge_on`.
 
+A device's spelling of a value can be translated into the schema's with `values`, per field, with
+`'*'` as the fallback. The same template field may feed several fact fields:
+
+```yaml
+    map:
+      admin_state: STATUS
+      oper_state: STATUS
+    values:
+      admin_state: { disabled: down, '*': up }
+      oper_state: { connected: up, notconnect: down, '*': other }
+```
+
+## scrapli.yaml
+
+The scrapligo platform definition is used as given, with two rules for a read-only collector:
+no `on-open` or `on-close` commands (they would reach the device without going through a recipe or
+the audit log), and privilege levels that never escalate. Paging is turned off in the recipe
+command itself where the platform allows it (`| no-more` on EOS). While a target is not yet
+identified, the fingerprint session uses scrapligo's generic driver.
+
 ## Load-time checks (collector refuses to start if any fails)
 
 - Every `command` starts with an entry of `read_only`.

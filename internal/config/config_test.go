@@ -1,0 +1,90 @@
+package config
+
+import (
+	"strings"
+	"testing"
+	"time"
+)
+
+const valid = `
+perimeters:
+  - name: lab
+    include: [172.20.20.0/24]
+    exclude: [172.20.20.1/32]
+credential_sets:
+  - name: ro-snmp
+    kind: snmp_v2c
+    secret_ref: env:LAB_SNMP_COMMUNITY
+    max_attempts_per_device: 1
+    perimeters: [lab]
+  - name: ro-ssh
+    kind: ssh
+    username: netmapper
+    secret_ref: vault:kv/data/netmapper/lab#password
+    max_attempts_per_device: 2
+    perimeters: [lab]
+seed_sets:
+  - name: lab-seeds
+    targets: [172.20.20.2]
+future_key: kept but ignored
+`
+
+func TestValid(t *testing.T) {
+	d, err := Parse([]byte(valid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(d.Raw) != valid {
+		t.Error("raw document changed")
+	}
+	if d.Discovery != Defaults {
+		t.Errorf("defaults: got %+v", d.Discovery)
+	}
+	want := Discovery{3, 60 * time.Second, 30 * time.Minute, 5 * time.Minute, 16, time.Second}
+	if Defaults != want {
+		t.Errorf("Defaults = %+v, research R16 says %+v", Defaults, want)
+	}
+	if d.CredentialSets[1].Name != "ro-ssh" || d.CredentialSets[1].MaxAttemptsPerDevice != 2 {
+		t.Errorf("credential sets out of order: %+v", d.CredentialSets)
+	}
+}
+
+func TestDiscoveryOverrides(t *testing.T) {
+	d, err := Parse([]byte(valid + "discovery:\n  lease: 30s\n  claim_batch: 4\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Discovery.Lease != 30*time.Second || d.Discovery.ClaimBatch != 4 || d.Discovery.StepDeadline != 30*time.Minute {
+		t.Errorf("got %+v", d.Discovery)
+	}
+}
+
+func TestInvalid(t *testing.T) {
+	for _, c := range []struct{ name, old, new, want string }{
+		{"empty include", "include: [172.20.20.0/24]", "include: []", `perimeter "lab" has no include range`},
+		{"literal secret", "secret_ref: env:LAB_SNMP_COMMUNITY", "secret_ref: public", "secret_ref must be a reference, not a value"},
+		{"unknown perimeter", "    perimeters: [lab]\n  - name: ro-ssh", "    perimeters: [nope]\n  - name: ro-ssh", `perimeter "nope" not found`},
+		{"ssh without username", "    username: netmapper\n", "", "kind ssh requires username"},
+		{"v3 without username", "kind: snmp_v2c", "kind: snmp_v3", "kind snmp_v3 requires username"},
+		{"bad kind", "kind: snmp_v2c", "kind: telnet", "kind must be"},
+		{"missing budget", "    max_attempts_per_device: 1\n", "", "max_attempts_per_device is required"},
+		{"zero budget", "max_attempts_per_device: 1", "max_attempts_per_device: 0", "max_attempts_per_device is required"},
+		{"duplicate set", "name: ro-ssh", "name: ro-snmp", `credential set "ro-snmp" is declared twice`},
+		{"duplicate seed set", "seed_sets:\n  - name: lab-seeds\n", "seed_sets:\n  - name: lab-seeds\n  - name: lab-seeds\n", `seed set "lab-seeds" is declared twice`},
+		{"negative lease", "future_key", "discovery: {lease: -1s}\nfuture_key", "must be positive"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			doc := strings.Replace(valid, c.old, c.new, 1)
+			if doc == valid {
+				t.Fatal("test did not change the document")
+			}
+			_, err := Parse([]byte(doc))
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("got %v, want %q", err, c.want)
+			}
+		})
+	}
+	if _, err := Parse([]byte(strings.Replace(valid, "172.20.20.0/24", "172.20.20.0/33", 1))); err == nil {
+		t.Error("invalid CIDR accepted")
+	}
+}

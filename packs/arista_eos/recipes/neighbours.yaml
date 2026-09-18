@@ -1,0 +1,15 @@
+family: neighbours
+implementations:                # first one whose version and transport fit wins
+  - id: lldp-cli
+    versions: '>=4.20'
+    transport: ssh
+    steps:
+      - command: show lldp neighbors detail | no-more
+        template: show_lldp_neighbors_detail.textfsm
+    map:                        # template field -> fact family field
+      local_interface: LOCAL_INTERFACE
+      remote_chassis_id: CHASSIS_ID
+      remote_system_name: NEIGHBOR_NAME
+      remote_interface: NEIGHBOR_INTERFACE
+      remote_mgmt_address: MGMT_ADDRESS
+      protocol: '=lldp'           # literal

@@ -1,3 +1,20 @@
 .claude/
 .DS_Store
 docs/.DS_Store
+
+# Go
+/netmapper
+*.exe
+*.test
+*.out
+vendor/
+
+# Editors and OS
+Thumbs.db
+*.swp
+*.tmp
+.idea/
+.vscode/
+
+# Local environment
+.env*

@@ -1,0 +1,27 @@
+name: arista_eos
+version: 1                      # bump on any template or recipe change
+read_only: ["show "]            # every CLI command in the pack must start with one of these
+fingerprint:
+  snmp:
+    - sys_object_id_prefix: 1.3.6.1.4.1.30065
+      version_regex: 'EOS version (?P<version>\S+)'   # applied to sysDescr
+  ssh:
+    - command: show version
+      match: 'Arista'
+      version_regex: 'Software image version: (?P<version>\S+)'
+identifiers:                    # extracted during find, written as identifier claims
+  - kind: serial
+    strength: strong
+    ssh: { command: show version, regex: 'Serial number:\s+(?P<value>\S+)' }
+    snmp: { oid: 1.3.6.1.2.1.47.1.1.1.1.11.1 }
+  - kind: chassis_mac
+    strength: strong
+    normalise: mac
+    ssh: { command: show version, regex: 'System MAC address:\s+(?P<value>\S+)' }
+  - kind: hostname
+    strength: weak
+    snmp: { oid: 1.3.6.1.2.1.1.5.0 }
+interface_names:                # spelling -> canonical, applied by the parser
+  - { match: '^Et(\d.*)$', replace: 'Ethernet$1' }
+  - { match: '^Ma(\d.*)$', replace: 'Management$1' }
+  - { match: '^Po(\d.*)$', replace: 'Port-Channel$1' }

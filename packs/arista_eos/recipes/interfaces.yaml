@@ -1,0 +1,16 @@
+family: interfaces
+implementations:
+  - id: status-cli
+    versions: '>=4.20'
+    transport: ssh
+    steps:
+      - command: show interfaces status | no-more
+        template: show_interfaces_status.textfsm
+    map:
+      name: PORT
+      description: NAME
+      admin_state: STATUS
+      oper_state: STATUS
+    values:
+      admin_state: { disabled: down, '*': up }
+      oper_state: { connected: up, notconnect: down, disabled: down, errdisabled: down, inactive: down, '*': other }

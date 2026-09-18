@@ -1,0 +1,7 @@
+name: _base
+version: 1
+read_only: []                   # the base pack sends no CLI command
+probe:
+  snmp:
+    - { name: sys_object_id, oid: 1.3.6.1.2.1.1.2.0 }
+    - { name: sys_descr,     oid: 1.3.6.1.2.1.1.1.0 }

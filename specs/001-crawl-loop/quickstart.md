@@ -11,8 +11,9 @@ in [contracts/cli.md](contracts/cli.md), configuration in [contracts/config.md](
 ## 1. Automated checks (no lab)
 
 ```sh
-docker compose -f deploy/compose.yaml up -d          # PostgreSQL + Garage
+docker compose -f deploy/compose.yaml up -d          # PostgreSQL + Garage (+ one-shot bucket setup)
 export NETMAPPER_TEST_DSN=postgres://netmapper:netmapper@localhost:5432/netmapper?sslmode=disable
+export NETMAPPER_TEST_S3_ENDPOINT=localhost:3900     # without it the crawl tests skip
 go test ./...
 ```
 
@@ -38,6 +39,9 @@ Expected: all pass. The crawl tests use the fake transport and must include at l
 sudo containerlab deploy -t test/lab/two-switch.clab.yaml     # sw1, sw2, LLDP between them, plus
                                                              # an unused address and a wrong-password host
 export NETMAPPER_DSN=postgres://netmapper:netmapper@localhost:5432/netmapper?sslmode=disable
+export NETMAPPER_S3_ENDPOINT=localhost:3900 NETMAPPER_S3_BUCKET=netmapper NETMAPPER_S3_INSECURE=1 \
+       NETMAPPER_S3_ACCESS_KEY=GK0123456789abcdef01234567 \
+       NETMAPPER_S3_SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 export LAB_SNMP_COMMUNITY=public LAB_SSH_PASSWORD=admin
 netmapper migrate
 netmapper engine &
@@ -100,3 +104,21 @@ Expected: `seed "10.99.0.1" is outside perimeter "lab"` on stderr, exit code 2, 
 
 Start a run, then `netmapper cancel $JOB`. Expected: job ends `cancelled`, snapshot `closed`, the
 observations written before the cancel are still there, and no task is left `pending`.
+
+## Divergences recorded during implementation (2026-09-18)
+
+- Section 1: the tests also need `NETMAPPER_TEST_S3_ENDPOINT`; without it every test that
+  touches the object store is skipped, not failed. The dev S3 key and bucket are created by the
+  `garage-init` service of `deploy/compose.yaml`.
+- Section 2: the collector needs the `NETMAPPER_S3_*` variables above. The unused address
+  (172.20.20.9) and the wrong-password host (sw3, 172.20.20.4) are seeds in `lab-seeds`, since
+  LLDP never reports an unused address. **Not yet run**: the implementation machine had neither
+  containerlab nor a cEOS image, so the lab scenarios and the recording of real cEOS output into
+  `packs/arista_eos/testdata/lab/` (T045) are still to do. Without the lab, the same binary was
+  run against 172.20.20.0/24 with nothing answering: every seed ended `identity unreachable`,
+  the job `succeeded`, and SIGTERM stopped the collector cleanly.
+- Section 3: covered without the lab by `internal/collector/resume_test.go` and `multi_test.go`.
+- Section 4: checked with the binary: `seed "10.99.0.1" is outside perimeter "lab"` on stderr,
+  exit 2, no job row.
+- Section 5: covered without the lab by `internal/jobrunner/cancel_test.go`; `netmapper cancel`
+  on a job that is not running exits 2.

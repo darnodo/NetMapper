@@ -1,0 +1,14 @@
+family: neighbours
+implementations:
+  - id: nbr-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display neighbours
+        template: display_neighbours.textfsm
+    map:
+      local_interface: LOCAL
+      remote_system_name: NAME
+      remote_mgmt_address: ADDRESS
+      remote_chassis_id: CHASSIS
+      protocol: '=lldp'

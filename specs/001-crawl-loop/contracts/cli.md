@@ -30,10 +30,12 @@ to the lease duration, and exits. Tasks it did not finish return to the frontier
 expires.
 
 Also reads: `NETMAPPER_S3_ENDPOINT`, `NETMAPPER_S3_BUCKET`, `NETMAPPER_S3_ACCESS_KEY`,
-`NETMAPPER_S3_SECRET_KEY`, and `VAULT_ADDR` / `VAULT_TOKEN` when a `vault:` reference is used.
+`NETMAPPER_S3_SECRET_KEY`, optionally `NETMAPPER_S3_REGION` (default `garage`) and
+`NETMAPPER_S3_INSECURE` (any value: plain HTTP), and `VAULT_ADDR` / `VAULT_TOKEN` when a `vault:`
+reference is used. Exits 2 at start if an `NETMAPPER_S3_*` variable is missing.
 Exits 2 at start if any pack fails to load or fails the read-only lint.
 
-## netmapper engine
+## netmapper engine [--interval 2s]
 
 Runs the job runner: final retry pass, `failed` target sweep, snapshot close, cancellation. Never
 reads S3 credentials, Vault variables or packs.

@@ -1,0 +1,49 @@
+# PostgreSQL and Garage for development and integration tests.
+#   docker compose -f deploy/compose.yaml up -d
+# S3 access: endpoint localhost:3900, bucket netmapper, key below (dev only).
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: netmapper
+      POSTGRES_PASSWORD: netmapper
+      POSTGRES_DB: netmapper
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "netmapper"]
+      interval: 2s
+      retries: 30
+
+  garage:
+    image: dxflrs/garage:v2.1.0
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage:/var/lib/garage
+    ports: ["3900:3900", "3903:3903"]
+
+  # One shot: assign the single-node layout, create the bucket and the access key.
+  # Garage's image has no shell, so this drives its admin API instead.
+  garage-init:
+    image: curlimages/curl:8.11.1
+    depends_on: [garage]
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        api() { curl -sf -H "Authorization: Bearer netmapper-dev-admin-token" -H "Content-Type: application/json" "http://garage:3903/v2/$$1" $${2:+-d "$$2"}; }
+        until api GetClusterStatus >/dev/null; do sleep 1; done
+        node=$$(api GetClusterStatus | tr -d " \n" | sed 's/.*"nodes":\[{"id":"\([0-9a-f]*\)".*/\1/')
+        if ! api GetClusterLayout | tr -d " \n" | grep -q '"roles":\[{'; then
+          api UpdateClusterLayout "{\"roles\":[{\"id\":\"$$node\",\"zone\":\"dc1\",\"capacity\":1000000000,\"tags\":[]}]}" >/dev/null
+          api ApplyClusterLayout '{"version":1}' >/dev/null
+        fi
+        api ImportKey '{"accessKeyId":"GK0123456789abcdef01234567","secretAccessKey":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","name":"netmapper"}' >/dev/null || true
+        api "UpdateKey?id=GK0123456789abcdef01234567" '{"allow":{"createBucket":true}}' >/dev/null
+        api CreateBucket '{"globalAlias":"netmapper"}' >/dev/null || true
+        bucket=$$(api "GetBucketInfo?globalAlias=netmapper" | tr -d " \n" | sed 's/^{"id":"\([0-9a-f]*\)".*/\1/')
+        api AllowBucketKey "{\"bucketId\":\"$$bucket\",\"accessKeyId\":\"GK0123456789abcdef01234567\",\"permissions\":{\"read\":true,\"write\":true,\"owner\":true}}" >/dev/null
+        echo garage ready
+
+volumes:
+  garage:

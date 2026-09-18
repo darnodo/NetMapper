@@ -1,0 +1,27 @@
+# scrapligo platform definition for EOS, reduced for a read-only collector:
+# - one privilege level matching both the '>' and '#' prompts, so the driver never sends
+#   `enable`, `disable` or `configure terminal`;
+# - no on-open or on-close commands, so nothing reaches the device unless a recipe sends it and
+#   the audit log records it. Paging is avoided with `| no-more` in the recipes instead of
+#   `terminal length 0`.
+platform-type: 'arista_eos'
+default:
+  driver-type: 'network'
+  privilege-levels:
+    exec:
+      name: 'exec'
+      pattern: '(?im)^[\w.\-@()/: ]{1,63}[>#]\s?$'
+      previous-priv:
+      deescalate:
+      escalate:
+      escalate-auth: false
+      escalate-prompt:
+  default-desired-privilege-level: 'exec'
+  failed-when-contains:
+    - "% Ambiguous command"
+    - "% Error"
+    - "% Incomplete command"
+    - "% Invalid input"
+    - "% Unavailable command"
+  network-on-open: []
+  network-on-close: []

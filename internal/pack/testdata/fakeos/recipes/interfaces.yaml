@@ -1,0 +1,17 @@
+family: interfaces
+implementations:
+  - id: if-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display interfaces
+        template: display_interfaces.textfsm
+    map:
+      name: NAME
+      admin_state: ADMIN
+      oper_state: OPER
+      mtu: MTU
+      mac: MAC
+      description: DESC
+    values:
+      oper_state: { up: up, down: down, '*': other }
