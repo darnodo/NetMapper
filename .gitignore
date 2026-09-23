@@ -1,7 +1,7 @@
 .claude/
 .DS_Store
 docs/.DS_Store
-
+test/lab/clab-netmapper
 # Go
 /netmapper
 *.exe
@@ -18,3 +18,4 @@ Thumbs.db
 
 # Local environment
 .env*
+test/lab/two-switch.clab.yaml.annotations.json
