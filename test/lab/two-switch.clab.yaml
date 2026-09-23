@@ -12,12 +12,12 @@ mgmt:
 
 topology:
   kinds:
-    ceos:
+    arista_ceos:
       image: ceos:latest
   nodes:
-    sw1: {kind: ceos, mgmt-ipv4: 172.20.20.2, startup-config: sw1.cfg}
-    sw2: {kind: ceos, mgmt-ipv4: 172.20.20.3, startup-config: sw2.cfg}
-    sw3: {kind: ceos, mgmt-ipv4: 172.20.20.4, startup-config: sw3.cfg}
+    sw1: {kind: arista_ceos, mgmt-ipv4: 172.20.20.2, startup-config: sw1.cfg}
+    sw2: {kind: arista_ceos, mgmt-ipv4: 172.20.20.3, startup-config: sw2.cfg}
+    sw3: {kind: arista_ceos, mgmt-ipv4: 172.20.20.4, startup-config: sw3.cfg}
   links:
     - endpoints: ["sw1:eth1", "sw2:eth1"]
     - endpoints: ["sw2:eth2", "sw3:eth1"]
