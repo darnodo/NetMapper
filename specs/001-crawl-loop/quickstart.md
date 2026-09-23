@@ -7,6 +7,9 @@ in [contracts/cli.md](contracts/cli.md), configuration in [contracts/config.md](
 
 - Go (version in `go.mod`), Docker with compose.
 - For the lab scenarios: containerlab and an Arista cEOS image imported as `ceos:latest`.
+  On macOS, open the repo in the devcontainer (`.devcontainer/devcontainer.json`, OrbStack or
+  Docker Desktop) which ships containerlab and Go; on Apple Silicon use the cEOS ARM64 image
+  (`docker import cEOSarm-lab-<version>.tar.xz ceos:latest`).
 
 ## 1. Automated checks (no lab)
 

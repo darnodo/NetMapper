@@ -1,0 +1,27 @@
+// Lab environment for quickstart.md sections 2 and 3 (containerlab on macOS via OrbStack).
+// Docker-outside-of-docker: containerlab in this container drives the OrbStack Docker daemon,
+// so the cEOS nodes, PostgreSQL and Garage all run side by side in the OrbStack VM.
+// The workspace is mounted at the same path as on the Mac because containerlab passes
+// bind-mount paths (startup configs, lab directory) to that daemon.
+// Keep the image tag equal to the containerlab version you want.
+{
+    "name": "netmapper-lab",
+    "image": "ghcr.io/srl-labs/containerlab/devcontainer-dood-slim:0.79.0",
+    "runArgs": [
+        "--network=host",
+        "--pid=host",
+        "--privileged"
+    ],
+    "mounts": [
+        "type=bind,src=/run/docker/netns,dst=/run/docker/netns",
+        "type=bind,src=/var/lib/docker,dst=/var/lib/docker",
+        "type=bind,src=/lib/modules,dst=/lib/modules"
+    ],
+    "workspaceFolder": "${localWorkspaceFolder}",
+    "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind",
+    "features": {
+        "ghcr.io/devcontainers/features/go:1": {
+            "version": "1.27.1"
+        }
+    }
+}
