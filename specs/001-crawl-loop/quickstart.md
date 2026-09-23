@@ -22,19 +22,19 @@ go test ./...
 
 Expected: all pass. The crawl tests use the fake transport and must include at least these cases:
 
-| Test | Proves |
-|---|---|
-| perimeter excludes before dial | FR-002, SC-002 |
-| seed plus two neighbours, one reporting the other | US1-1, no loop |
-| one device on two addresses | US1-2, FR-004 |
-| neighbour outside perimeter | US1-3 |
-| unreachable, denied, unknown platform, template drift | US2-1..4, FR-009 |
-| credential budgets per set, unresolvable reference | FR-018, FR-019, edge cases |
-| kill worker mid-scrape, second worker resumes | US3-1, US3-2 |
-| two workers on one job | US3-3, FR-013 |
-| collector role cannot UPDATE observation | FR-010 |
-| no lab secret found in any table or audit row | FR-017, SC-007 |
-| every shipped pack passes the read-only lint | FR-024 |
+| Test                                                  | Proves                     |
+| ----------------------------------------------------- | -------------------------- |
+| perimeter excludes before dial                        | FR-002, SC-002             |
+| seed plus two neighbours, one reporting the other     | US1-1, no loop             |
+| one device on two addresses                           | US1-2, FR-004              |
+| neighbour outside perimeter                           | US1-3                      |
+| unreachable, denied, unknown platform, template drift | US2-1..4, FR-009           |
+| credential budgets per set, unresolvable reference    | FR-018, FR-019, edge cases |
+| kill worker mid-scrape, second worker resumes         | US3-1, US3-2               |
+| two workers on one job                                | US3-3, FR-013              |
+| collector role cannot UPDATE observation              | FR-010                     |
+| no lab secret found in any table or audit row         | FR-017, SC-007             |
+| every shipped pack passes the read-only lint          | FR-024                     |
 
 ## 2. Lab run
 
