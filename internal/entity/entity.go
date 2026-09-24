@@ -136,7 +136,7 @@ func resolveIn(ctx context.Context, tx pgx.Tx, s snapshot) (Result, error) {
 	}
 
 	components, conflicts := group(groups, reg, dec)
-	entities, keyed := assignKeys(s, components, reg)
+	entities, keyed := assignKeys(s, components, reg, dec)
 	conflicts = append(conflicts, keyed...)
 
 	if err := write(ctx, tx, s, entities, materialise(entities, conflicts), reg, dec.highest); err != nil {

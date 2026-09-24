@@ -114,6 +114,9 @@ func group(groups []ClaimGroup, reg *registry, dec decisions) ([]component, []pe
 			if a == b || dec.forbids(keys[a], keys[b]) {
 				continue
 			}
+			if !t.byKey && dec.silences(t.token, keys[a], keys[b]) {
+				continue
+			}
 			u.union(a, b)
 			root := u.find(a)
 			for _, k := range []int{a, b} {
@@ -344,6 +347,10 @@ func anchorOf(groups []ClaimGroup) string {
 type tokenMembers struct {
 	token   string
 	members []int
+	// byKey is true when the link is a device key both sides already resolve to rather than an
+	// identifier they both carry. A split detaches an identifier, so it silences only the latter: a
+	// device key can be spelled like an identifier and must not be silenced by accident.
+	byKey bool
 }
 
 // sortedKeys lists every device key the registry already resolves a claim group to, with the groups
@@ -359,7 +366,7 @@ func sortedKeys(keys []map[string]bool) []tokenMembers {
 	for _, k := range slices.Sorted(maps.Keys(byKey)) {
 		members := byKey[k]
 		slices.Sort(members)
-		out = append(out, tokenMembers{token: k, members: members})
+		out = append(out, tokenMembers{token: k, members: members, byKey: true})
 	}
 	return out
 }

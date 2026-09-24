@@ -169,3 +169,87 @@ func TestLastDecisionOnAPairGoverns(t *testing.T) {
 		t.Errorf("%d decisions, want every one of them still readable", n)
 	}
 }
+
+// T071, FR-012/FR-024 and the edge case "kept apart by a split or a never-merge decision although
+// they share a strong identifier": once an identifier is detached from a device it stops being a
+// reason to call two claim groups one device, so they stay two entities under two distinct keys
+// inside a single snapshot.
+func TestSplitKeepsTwoEntitiesApartInOneSnapshot(t *testing.T) {
+	l, doc := lab(t, map[string]*fake.Device{
+		"10.0.0.1": FakeOS("a", "S001"),
+		"10.0.0.2": nil,
+	})
+	delete(l.Net.Devices, Addr("10.0.0.2"))
+	known := keysOf(l, snapshotOf(l, l.Crawl(doc)))
+	if len(known) != 1 {
+		t.Fatalf("entities %v, want the one device that was there", known)
+	}
+
+	// Another chassis, re-using that serial, answering beside the first.
+	l.Net.Devices[Addr("10.0.0.2")] = FakeOSShaped("b", "S001", Shape{Serial: true})
+	snap := snapshotOf(l, l.Crawl(doc))
+	if got := keysOf(l, snap); len(got) != 1 || got[0] != known[0] {
+		t.Fatalf("entities %v, want the shared serial to have made them one before the split", got)
+	}
+
+	decide(l, "split", []string{known[0]}, map[string]string{"kind": "serial", "value": "S001"})
+	resolve(l, snap)
+
+	got := keysOf(l, snap)
+	if len(got) != 2 || got[0] == got[1] {
+		t.Fatalf("entities %v, want two under two distinct keys", got)
+	}
+	if got[0] != known[0] || got[1] != "serial:S001" {
+		t.Errorf("entities %v, want %q kept and the detached serial naming a device of its own",
+			got, known[0])
+	}
+
+	// And the decision is not undone by the resolution that applied it.
+	resolve(l, snap)
+	if again := keysOf(l, snap); len(again) != 2 || again[0] != got[0] || again[1] != got[1] {
+		t.Errorf("entities %v then %v, want the split to hold", got, again)
+	}
+}
+
+// T072, SC-006 and FR-012: a decision recorded once keeps applying to every later run of the
+// perimeter, not only to a recomputation of the snapshot it was recorded against. Here a merge and a
+// split are both still in force on a third run, with no further operator action.
+func TestSplitAndMergeBothApplyOnALaterRun(t *testing.T) {
+	l, doc := lab(t, map[string]*fake.Device{
+		"10.0.0.1": FakeOS("a", "S001"),
+		"10.0.0.2": FakeOS("b", "S002"),
+		"10.0.0.3": nil,
+	})
+	delete(l.Net.Devices, Addr("10.0.0.3"))
+	keys := keysOf(l, snapshotOf(l, l.Crawl(doc)))
+	if len(keys) != 2 {
+		t.Fatalf("entities %v, want the two chassis of the first run", keys)
+	}
+
+	// A third chassis re-using the first one's serial.
+	l.Net.Devices[Addr("10.0.0.3")] = FakeOSShaped("c", "S001", Shape{Serial: true})
+	second := snapshotOf(l, l.Crawl(doc))
+	if got := keysOf(l, second); len(got) != 2 {
+		t.Fatalf("entities %v, want the re-used serial to have merged into the first device", got)
+	}
+
+	decide(l, "merge", []string{keys[0], keys[1]}, nil)
+	decide(l, "split", []string{keys[0]}, map[string]string{"kind": "serial", "value": "S001"})
+
+	// A third run of the perimeter, nobody asked for anything.
+	third := snapshotOf(l, l.Crawl(doc))
+
+	got := keysOf(l, third)
+	if len(got) != 2 {
+		t.Fatalf("entities %v, want the merge to have made two chassis one and the split to have freed the third", got)
+	}
+	if got[0] != keys[0] {
+		t.Errorf("first entity %q, want the merge to keep naming it %q", got[0], keys[0])
+	}
+	if got[1] != "serial:S001" {
+		t.Errorf("second entity %q, want the detached serial to name its own device", got[1])
+	}
+	if n := l.Int(`SELECT count(*) FROM finding WHERE snapshot_id = $1 AND category = 'identity_conflict'`, third); n != 0 {
+		t.Errorf("%d collision findings, want none: both answers are already recorded", n)
+	}
+}

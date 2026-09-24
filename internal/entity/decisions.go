@@ -142,6 +142,24 @@ func (d decisions) detaches(key, token string) bool {
 	return d.detached[key+"|"+token]
 }
 
+// silences reports whether a split took this identifier away from a device either side already
+// resolves to. The identifier is then no longer a reason to call the two one device: the operator has
+// said it does not belong to that box, and saying it again from the other end would undo the
+// decision (FR-012, research R7).
+func (d decisions) silences(token string, a, b map[string]bool) bool {
+	if len(d.detached) == 0 {
+		return false
+	}
+	for _, set := range []map[string]bool{a, b} {
+		for k := range set {
+			if d.detaches(k, token) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func pairOf(a, b string) [2]string {
 	if a > b {
 		a, b = b, a

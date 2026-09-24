@@ -437,3 +437,31 @@ T021 perimeter scope
 - [P] means a different file and no dependency on an unfinished task
 - Commit after each task or logical group
 - A divergence found while implementing belongs in quickstart.md, not in a silent edit of the plan
+
+---
+
+## Phase 7: Convergence
+
+- [x] T071 Make a `split` keep two claim groups of one snapshot apart. The detached identifier is
+  consulted only in internal/entity/registry.go (`loadRegistry`), so internal/entity/group.go still
+  links two groups carrying it: they merge into one entity and the second device never gets a key of
+  its own. Suppress the detached identifier as a link for the named device's groups, the way a
+  never-merge suppresses a bridging one, and add the case quickstart.md section 1 lists as "a
+  never-merge and a split leave two entities under two distinct keys" for the split half
+  per FR-012, FR-024 and the spec edge case "kept apart by a split or a never-merge decision
+  although they share a strong identifier" (partial)
+- [x] T072 Add the third-run test quickstart.md section 1 lists as "a split survives, and the merge
+  keeps applying, on a third run": crawl the perimeter a third time with a split and a merge already
+  recorded, and confirm both still apply with no further operator action. T054 and T055 only
+  re-resolve one snapshot, so the "every later run of that perimeter" half of SC-006 is untested
+  per SC-006 and FR-012 (missing)
+
+---
+
+## Phase 8: Convergence
+
+- [ ] T073 Name the registry as the exception in docs/c4-model/04-data-model.md: the "What was
+  computed" section opens with "Every row carries the snapshot it belongs to and the observations it
+  came from", which `device` and `device_identifier` do not, being the one cross-snapshot state of the
+  zone. Say so in the preamble rather than leaving two rows contradicting it
+  per plan: documentation deltas (partial)

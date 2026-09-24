@@ -85,7 +85,7 @@ func loadRegistry(ctx context.Context, db store.DB, perimeter string, groups []C
 // assignKeys gives every component the key that names its device, matching it on any of its strong
 // identifiers or minting one from its anchor. Components are taken in the order group left them, so
 // the same snapshot always mints in the same sequence (FR-021, FR-013, research R5).
-func assignKeys(s snapshot, comps []component, reg *registry) ([]Entity, []pending) {
+func assignKeys(s snapshot, comps []component, reg *registry, dec decisions) ([]Entity, []pending) {
 	var entities []Entity
 	var conflicts []pending
 
@@ -141,6 +141,11 @@ func assignKeys(s snapshot, comps []component, reg *registry) ([]Entity, []pendi
 		// device: one identifier belongs to one device, and moving it is an operator's call.
 		for _, t := range tokens {
 			if k, ok := reg.keyOf[t]; ok && k != key {
+				continue
+			}
+			if dec.detaches(key, t) {
+				// The operator said this identifier is not this device's. Attributing it again would
+				// undo the split the next time the snapshot is resolved.
 				continue
 			}
 			kind, value, _ := strings.Cut(t, ":")
