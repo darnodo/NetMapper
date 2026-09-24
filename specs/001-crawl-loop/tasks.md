@@ -179,8 +179,8 @@ Integration tests use `internal/testutil` and skip when `NETMAPPER_TEST_DSN` (Po
 - [X] T067 [P] Secret leak test: run a crawl with known lab secret values, then search every text and jsonb column of every table, the audit log and captured slog output for them and assert zero hits (FR-017, SC-007), in internal/collector/secrets_test.go
 - [X] T068 [P] Audit test: every command the fake transport received has a `sent` row written before the fake saw it (the fake checks the row exists when the command arrives) and a result row with the same `ref`; killing the worker while a command blocks leaves the `sent` row in place (FR-023), in internal/collector/audit_test.go
 - [X] T069 [P] Carry the documentation deltas listed in plan.md into docs/c4-model/04-data-model.md (`closed` snapshot state, `claim_lock_key`, task and credential set columns, `observation.detail`, `observation_raw.command`, derived `refcount`, `collected_at` on claims)
-- [ ] T070 Run quickstart.md sections 1 to 5 against the lab and record any divergence in specs/001-crawl-loop/quickstart.md
-  - Divergences recorded; sections 1, 4 and 5 checked without the lab. Open: sections 2 and 3 on the lab.
+- [X] T070 Run quickstart.md sections 1 to 5 against the lab and record any divergence in specs/001-crawl-loop/quickstart.md
+  - Divergences recorded; sections 1, 4 and 5 checked without the lab. Sections 2 and 3 now run against the real lab (2026-09-24): section 2 found and fixed an LLDP parsing bug in the Arista EOS pack, section 3 passed both sub-cases (single-collector resume, two collectors on one job).
 
 ---
 

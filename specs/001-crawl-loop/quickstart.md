@@ -125,3 +125,26 @@ observations written before the cancel are still there, and no task is left `pen
   exit 2, no job row.
 - Section 5: covered without the lab by `internal/jobrunner/cancel_test.go`; `netmapper cancel`
   on a job that is not running exits 2.
+
+## Divergences recorded during implementation (2026-09-24)
+
+Sections 2 and 3 run against the real lab (containerlab, `arista_ceos`/cEOS, two-switch topology)
+for the first time, closing the items left open above.
+
+- Section 2: found a real bug, not caught by `go test ./...` since no test exercised the
+  `testdata/lab/` fixtures. Arista cEOS renders `Management Address Subtype` as a Python tuple
+  repr, e.g. `('IPv4 ',)`, instead of the plain `IPv4` the template expected. `MGMT_ADDRESS_SUBTYPE`
+  stayed empty, so `remote_mgmt_address_type` was dropped from the row while `remote_mgmt_address`
+  stayed set; `fact.Validate`'s `TypedBy` check then rejected the row, `neighbours` came back
+  `parse_failed`, and sw2 (reachable only through LLDP from sw1, per `lab-seeds`) was never
+  discovered. Fixed in `packs/arista_eos/templates/show_lldp_neighbors_detail.textfsm`: the
+  subtype value is now read tolerant of surrounding `(` `'` `,` `)` and of the numeric suffix
+  form (`IPv4 (1)`) already present in `testdata/ntc/`. Re-run after the fix: sw1 and sw2 both
+  `identity`/`interfaces`/`neighbours` `collected`, sw3 `identity denied`, 172.20.20.9
+  `identity unreachable`, snapshot `closed` — matches US1-1/SC-001 as specified.
+- Section 3: both sub-cases pass on the real lab. Killing the collector with `-9` right after the
+  first `scrape` task on sw1 reached `claimed` (caught by polling `task` for `kind='scrape' AND
+  state='claimed'`), then restarting it with the same `--id c1`: the job still reached `succeeded`
+  with zero rows in the `GROUP BY ... HAVING count(*) > 1` duplicate check. Running `c1` and `c2`
+  together against a fresh job: same zero-duplicate result, and `SELECT DISTINCT claimed_by FROM
+  task` showed both ids.
