@@ -139,6 +139,13 @@ thresholds and confirm it lands in a different classification for each.
 - The judging side stops between a snapshot closing and its judgement being written, or is down
   entirely while several snapshots close. Each of them must end up judged once it comes back, and a
   snapshot interrupted mid-judgement must not end up with two active judgements or a half-written one.
+- A loss is left unfixed and the perimeter runs again. Because a snapshot is measured against the run
+  before it, the second run compares the reduced device set against itself and is published: the
+  gate reports a change, not a standing state, so it says a device went missing once and then stops
+  saying it. An operator who ignores a quarantined verdict is not told again by the next run.
+- The gate is switched on for the first time on a database that already holds closed snapshots. Every
+  one of them is judged, oldest first, since none carries a verdict yet: history is judged in one
+  pass rather than left in a state no consumer can read.
 
 ## Requirements *(mandatory)*
 
@@ -178,8 +185,11 @@ thresholds and confirm it lands in a different classification for each.
 - **FR-011**: A quarantined snapshot MUST remain fully readable like any other closed snapshot; this
   feature MUST NOT delete, hide, or lock it. It carries its classification for any later feature to
   read before deciding whether to treat it as current.
-- **FR-012**: A re-judge over the same snapshot, the same baseline and the same thresholds MUST
-  produce the same classification and figures as the judgement it supersedes (FR-007).
+- **FR-012**: A re-judge over the same snapshot, the same baseline, the same threshold and the same
+  version of the calculation MUST produce the same classification and figures as the judgement it
+  supersedes (FR-007). A re-judge after the calculation itself was corrected is expected to differ,
+  and is the reason FR-009 keeps the superseded verdict readable: the two rows together are what says
+  what changed and why.
 - **FR-013**: A re-judge MUST happen only when an operator asks for it on a named snapshot. The
   system MUST NOT re-judge a snapshot on its own, whatever changed since: not a threshold change, not
   a newer judgement of another snapshot, not a corrected calculation.

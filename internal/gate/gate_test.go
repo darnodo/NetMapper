@@ -92,3 +92,50 @@ func TestConcurrentJudgementsLeaveOneActive(t *testing.T) {
 		t.Errorf("%d active judgements after two engines judged at once, want 1", n)
 	}
 }
+
+// FR-011: a quarantined snapshot is labelled, not locked. Everything a consumer could read before
+// the verdict is still there afterwards, and judging it again leaves its collected zone alone
+// (FR-008). Without this, nothing would catch a later feature deciding that "quarantined" means
+// "hide it".
+func TestQuarantinedSnapshotStaysReadable(t *testing.T) {
+	l, j := twoDevicesLosingOne(t, Doc)
+	if j.Classification != gate.Quarantined {
+		t.Fatalf("classification %s, want quarantined for this test to mean anything", j.Classification)
+	}
+	ctx := context.Background()
+	snap := j.SnapshotID
+
+	// The snapshot row itself is untouched: still closed, still carrying its closing time.
+	if got := l.Strings(`SELECT state || ' ' || (closed_at IS NOT NULL) FROM snapshot WHERE id = $1`, snap); got[0] != "closed true" {
+		t.Errorf("snapshot reads %q, want \"closed true\"", got[0])
+	}
+	// And it is still listed among closed snapshots, not filtered out of sight.
+	if n := l.Int(`SELECT count(*) FROM snapshot WHERE id = $1 AND state = 'closed'`, snap); n != 1 {
+		t.Errorf("quarantined snapshot no longer lists as closed")
+	}
+
+	// Its collected zone reads through the engine's own grants, like any other snapshot's.
+	fingerprint := func() string {
+		var s string
+		err := l.Engine.QueryRow(ctx, `
+			SELECT count(*) || ' obs, ' ||
+			       (SELECT count(*) FROM observation_raw WHERE snapshot_id = $1) || ' raw, ' ||
+			       (SELECT count(*) FROM identifier_claim WHERE snapshot_id = $1) || ' claims'
+			FROM observation WHERE snapshot_id = $1`, snap).Scan(&s)
+		if err != nil {
+			t.Fatalf("reading a quarantined snapshot: %v", err)
+		}
+		return s
+	}
+	before := fingerprint()
+	if before[:1] == "0" {
+		t.Fatalf("quarantined snapshot holds nothing to read: %s", before)
+	}
+
+	if _, err := gate.Judge(ctx, l.Engine, snap); err != nil {
+		t.Fatal(err)
+	}
+	if after := fingerprint(); after != before {
+		t.Errorf("collected zone reads %q after re-judging, was %q", after, before)
+	}
+}

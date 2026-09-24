@@ -132,8 +132,12 @@ testable rather than aspirational. Everything else extends a file that already e
 | Point                                                 | Why it is open                                                                                                                   | Closed when                                                                                                      |
 | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | A judgement's figures are readable only through SQL   | No interface serves them yet; the spec puts presentation out of scope, and `api` does not exist as a role                        | The API feature ships and reads `snapshot_judgement` alongside the snapshot                                      |
-| `gate_version` is bumped by hand                      | Nothing detects that the calculation changed; the failure mode is re-judging more snapshots than strictly needed (R9)            | A second calculation version actually exists and the bump is exercised once                                      |
 | Weak-claim-only devices fall back to address matching | 001's shipped pack gives every reachable device a strong claim (serial, chassis MAC), so the fallback is unexercised in practice | A pack ships a platform where no strong identifier can be read, and a test covers a renumbering of such a device |
+
+Closed since: `gate_version` is bumped by hand and nothing detects that the calculation changed. The
+lab run of 2026-09-24 exercised it: version 2 replaced the two crossed thresholds with one, and the
+affected snapshot was re-judged rather than re-crawled. The failure mode of forgetting a bump remains
+what it always was, re-judging more snapshots than strictly needed.
 
 ## Complexity Tracking
 
