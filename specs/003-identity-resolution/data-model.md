@@ -50,7 +50,7 @@ current entity set.
 | ------------------ | --------------------------------------------- | -------------------------------------------------------------------- |
 | `snapshot_id`      | `bigint PRIMARY KEY REFERENCES snapshot`      | one current set per snapshot, by the primary key alone (FR-015)     |
 | `resolver_version` | `integer NOT NULL`                            | which grouping produced it (R9)                                     |
-| `decisions_applied`| `bigint NOT NULL`                             | highest `entity_decision.id` applied, so a result can be explained   |
+| `decisions_applied`| `bigint NOT NULL`                             | highest `entity_decision.id` read for the perimeter, 0 when it has none, so a result can be explained |
 | `entities`         | `integer NOT NULL`                            | how many, so "resolved to nothing" reads as a fact and not a gap     |
 | `computed_at`      | `timestamptz NOT NULL DEFAULT now()`          |                                                                      |
 

@@ -94,9 +94,10 @@ one entity carrying all of them, with no crawl, no graph and no diff involved.
 ### User Story 2 - A contradicted identity is reported, never guessed (Priority: P2)
 
 Two devices come back with the same serial, because a chassis was replaced without clearing the
-inventory, or because two lab VMs were cloned from the same image. Merging them would produce one
-entity with two hostnames, two management addresses and a graph that draws links through a device that
-does not exist. Refusing to say anything would hide the problem. The system keeps them apart and raises
+inventory, or because a chassis was cloned and kept its serial while carrying its own MAC. Merging
+them would produce one entity with two hostnames, two management addresses and a graph that draws links
+through a device that does not exist. Refusing to say anything would hide the problem. The system keeps
+them apart and raises
 a finding that names both subjects and the identifier they collide on.
 
 **Why this priority**: A wrong merge is worse than no merge, because it corrupts every edge and every
@@ -163,8 +164,14 @@ touching anything.
   device reached through several protocols splits into as many entities as it has identifier kinds.
 - A device produced no strong identifier at all. It is still an entity, marked as weakly identified, and
   it never merges with another on a weak identifier alone, however unique that hostname looks.
-- Two different devices genuinely share a strong identifier (cloned VM, re-used serial). No merge, a
-  finding, both entities readable.
+- Two different devices contradict each other on a strong identifier, sharing one kind while disagreeing
+  on another (a re-used serial on a chassis carrying its own MAC). No merge, a finding, both entities
+  readable.
+- Two devices carry identical strong identifiers and nothing else to tell them apart (a VM cloned whole).
+  Their evidence is indistinguishable from one device answering on two addresses, which must merge, so
+  resolution cannot separate them and does not try. The crawl's live deduplication already ends the
+  second as a duplicate of the first (001), and separating them afterwards is an operator split
+  decision.
 - A merge decision and a never-merge decision name the same pair of subjects. The most recently recorded
   decision governs, and the earlier one stays readable so the history of the disagreement survives.
 - A decision names a subject that no longer resolves to anything in the snapshot being computed. It is
@@ -255,7 +262,9 @@ touching anything.
 - **FR-017**: An operator MUST be able to ask for a named snapshot to be resolved again, and the system
   MUST NOT decide on its own to re-resolve a snapshot it has already resolved, whatever changed since.
 - **FR-018**: The system MUST let an engineer retrieve, for any resolved snapshot, its entities with the
-  claims and observations behind each, and the collision findings raised while resolving it.
+  claims and observations behind each, and the collision findings raised while resolving it. For this
+  feature that retrieval is SQL against the computed tables, which the queries of quickstart.md
+  section 2 exercise; serving it through an interface belongs to the API feature (see Assumptions).
 - **FR-019**: Resolution MUST read only the claims of the snapshot's active parse generation.
 - **FR-020**: An entity MUST NOT be derived from anything but the collected zone and the recorded
   decisions, so that losing every computed row costs a recomputation and never a re-crawl.

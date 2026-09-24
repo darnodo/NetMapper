@@ -54,6 +54,9 @@ include at least these cases:
 | resolution writes nothing in the collected zone                           | FR-014, Principle II   |
 | the engine cannot UPDATE or DELETE an entity_decision                     | FR-009, R12            |
 | wiping every computed row and replaying restores the same keys and set    | SC-008, FR-020         |
+| an entity carries the first and last collected_at of its own evidence     | FR-006, Principle I    |
+| a device that changed every strong identifier mints a new key             | FR-023                 |
+| a never-merge and a split leave two entities under two distinct keys      | FR-024                 |
 
 The last one is the test that actually proves Principle II for this feature, so it runs the whole
 sequence: resolve two snapshots, delete `entity`, `entity_claim`, `resolution`, `device` and
@@ -108,8 +111,11 @@ Then renumber a switch's management address in the lab and run again: same keys,
 
 ## 4. A contradiction (US2)
 
-Give the lab two devices with the same serial. The cheapest way is a second cEOS node cloned from the
-same image with its serial unchanged, on an address inside the perimeter, seeded directly:
+Give the lab two devices that contradict each other on a strong identifier. The cheapest way is a second
+cEOS node whose serial is set to sw1's while it keeps its own chassis MAC, on an address inside the
+perimeter, seeded directly. The MACs must differ: two nodes identical in every strong identifier are
+indistinguishable from one node answering on two addresses, and 001's live deduplication ends the second
+as a duplicate before resolution ever sees it.
 
 ```sql
 SELECT subject_ref, detail FROM finding WHERE category = 'identity_conflict' AND snapshot_id = :SNAP;

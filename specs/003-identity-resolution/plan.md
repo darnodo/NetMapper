@@ -43,8 +43,11 @@ in-memory union-find over a few hundred devices, one write transaction, once per
 **Constraints**: no device contacted and no secret resolved (FR-014); nothing in the collected zone
 modified (FR-014, FR-020); no decision rewritten in place, enforced by withheld grants rather than by
 convention (FR-009); the whole entity set replaced in one transaction under an advisory lock, so no
-consumer ever reads a partial set (FR-015); resolution stays out of the snapshot-closing transaction, so
-a failing grouping can never keep a job from finishing
+consumer ever reads a partial set (FR-015); that lock is per snapshot, so it does not serialize the
+registry between two snapshots resolving at once, and a concurrent mint conflicts on
+`device_identifier`'s primary key, fails that transaction and is retried on the next tick rather than
+upserted over; resolution stays out of the snapshot-closing transaction, so a failing grouping can never
+keep a job from finishing
 
 **Scale/Scope**: six new tables, one migration, two new subcommands, one new package
 (`internal/entity`), plus the resolving step in `internal/jobrunner`. Three decision kinds, two conflict
@@ -152,6 +155,9 @@ FR-013 (same inputs, same grouping) testable rather than aspirational. Splitting
 files is not architecture, it is four topics that each fit on a screen: the grouping, the registry, the
 decisions and the write.
 
+A note on vocabulary: what spec.md calls a claim set is what this plan, the research and the code call a
+claim group, `ClaimGroup` in `internal/entity`. The same thing read at two altitudes.
+
 ## Known open points
 
 | Point                                                              | Why it is open                                                                                                                                             | Closed when                                                                                       |
@@ -160,7 +166,6 @@ decisions and the write.
 | The registry accumulates identifiers forever                       | Nothing evicts `device` or `device_identifier`, and nothing needs to at homelab scale: a few hundred rows that outlive the snapshots they were minted from | Eviction becomes a feature, at which point a device with no surviving snapshot is a candidate     |
 | A weakly identified device keys on the address it answered on      | Clarified on 2026-09-24: a hostname is not unique, so the address is the only handle left. A renumbered weak device reads as a replacement                    | A pack yields a strong identifier for such a platform, or the case is settled once with a merge decision |
 | A device that loses every strong identifier between runs           | It mints a new key and reads as a replacement, which is FR-023 working as decided. In a lab where SNMP sometimes returns nothing, this may prove noisy     | The lab runs long enough to say whether it happens; the answer is either a pack fix or a decision |
-| Weak-only devices key on hostname and address                      | 001's shipped pack gives every reachable device a strong claim, so the weak path is exercised by tests and not by the lab, the same gap 002 recorded        | A pack ships a platform where no strong identifier can be read                                    |
 
 ## Complexity Tracking
 

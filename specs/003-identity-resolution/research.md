@@ -57,7 +57,10 @@ up. Each entry gives the decision, why, and what else was considered.
   permanently. Refusing to merge the whole component, rather than trying to find the minimum set of
   links to cut, keeps the rule explainable in one sentence: "a component that disagrees with itself is
   not merged." Components are two or three claim groups in practice, so the blast radius of that
-  bluntness is small.
+  bluntness is small. The rule has a floor worth stating: two devices whose strong identifiers are
+  identical in every kind produce no contradiction and merge. Their evidence is the same as one device
+  answering on two addresses, which must merge, so the two cases cannot be told apart here. 001's live
+  deduplication catches that pair at crawl time, and an operator split separates them afterwards.
 - Alternatives: merging anyway and recording the conflict as an attribute (the merge is exactly what
   must not happen); cutting the minimum number of links to make the component consistent (a small
   graph problem whose answer is often not unique, so FR-013 reproducibility would rest on a tie-break
@@ -128,6 +131,10 @@ up. Each entry gives the decision, why, and what else was considered.
 - Decision: a `resolution` row per snapshot (`UNIQUE (snapshot_id)`), carrying `resolver_version` and
   `computed_at`, upserted; the snapshot's entities are deleted and rewritten in the same transaction,
   which takes `pg_advisory_xact_lock` on the snapshot id first.
+- The lock covers one snapshot, not the registry. An operator `resolve` running beside the engine's sweep
+  can try to mint the same identifier for two snapshots at once; the loser hits `device_identifier`'s
+  primary key, its transaction fails and the sweep retries it on the next tick. That is the intended
+  outcome: a failed resolution is repairable, a swallowed upsert is not.
 - Rationale: the sweep needs a marker that tells an unresolved snapshot from one that legitimately
   resolved to zero entities (the empty snapshot edge case), and the transaction is what gives FR-015 its
   "never a partially written set". The advisory lock is the same idiom 001 uses for claims and settles
@@ -204,6 +211,15 @@ up. Each entry gives the decision, why, and what else was considered.
 - Alternatives: a `--resolve` flag on `netmapper run` (conflates a crawl with a recomputation); recording
   decisions by hand in SQL (an undocumented contract, and no validation that the subjects exist).
 
+## R14. Scale and cost
+
+- Decision: no performance work. One read of a snapshot's identity observations and claims, an in-memory
+  grouping, one write transaction, once per closed snapshot on the existing tick.
+- Rationale: the lab is two switches and a real perimeter here is tens of devices. 002 measured nothing
+  for the same reason and that was right.
+- Revisit when: a snapshot holds more than a few thousand devices, at which point the claim read and the
+  entity rewrite are the two places to look, in that order.
+
 ## R15. Attribute values when grouped observations disagree
 
 - Decision: an entity's weak attributes (`hostname`, `platform`) come from the observation that stands
@@ -215,12 +231,3 @@ up. Each entry gives the decision, why, and what else was considered.
 - Alternatives: keeping every value as a list (hides nothing, but every consumer then has to choose, so
   the problem moves one level up); raising a finding on disagreement (a short name against an FQDN is
   the normal case, not a defect, and it would fire on every run).
-
-## R14. Scale and cost
-
-- Decision: no performance work. One read of a snapshot's identity observations and claims, an in-memory
-  grouping, one write transaction, once per closed snapshot on the existing tick.
-- Rationale: the lab is two switches and a real perimeter here is tens of devices. 002 measured nothing
-  for the same reason and that was right.
-- Revisit when: a snapshot holds more than a few thousand devices, at which point the claim read and the
-  entity rewrite are the two places to look, in that order.
