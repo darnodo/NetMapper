@@ -128,7 +128,9 @@ func group(groups []ClaimGroup, reg *registry, dec decisions) ([]component, []pe
 	}
 
 	// Components in a deterministic order: by the lowest token of each, so the same snapshot always
-	// mints and takes keys in the same sequence (FR-013).
+	// mints and takes keys in the same sequence (FR-013). Stable, because two components share their
+	// lowest token whenever the link between them was dropped by a never-merge or silenced by a split,
+	// and an unstable sort would then let them swap which one keeps the matched key.
 	roots := map[int][]ClaimGroup{}
 	for i, g := range groups {
 		r := u.find(i)
@@ -138,7 +140,7 @@ func group(groups []ClaimGroup, reg *registry, dec decisions) ([]component, []pe
 	for _, r := range slices.Sorted(maps.Keys(roots)) {
 		comps = append(comps, component{groups: roots[r]})
 	}
-	slices.SortFunc(comps, func(a, b component) int {
+	slices.SortStableFunc(comps, func(a, b component) int {
 		return cmp.Compare(anchorOf(a.groups), anchorOf(b.groups))
 	})
 
@@ -158,7 +160,7 @@ func group(groups []ClaimGroup, reg *registry, dec decisions) ([]component, []pe
 		for _, g := range c.groups {
 			pieces = append(pieces, component{groups: []ClaimGroup{g}})
 		}
-		slices.SortFunc(pieces, func(a, b component) int {
+		slices.SortStableFunc(pieces, func(a, b component) int {
 			return cmp.Compare(anchorOf(a.groups), anchorOf(b.groups))
 		})
 		p := pending{sort: "within_snapshot", kind: kind, values: values}

@@ -115,9 +115,12 @@ func Resolve(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (Result, e
 // inside it because a consumer must never see a partial set and because the registry a component is
 // matched against must not change under it while it is being matched (FR-015, research R8).
 func resolveIn(ctx context.Context, tx pgx.Tx, s snapshot) (Result, error) {
-	// Two resolutions of one snapshot wait for each other here rather than interleaving. The lock
-	// covers this snapshot, not the registry: two snapshots minting the same identifier at once
-	// conflict on device_identifier's primary key and the loser is retried (research R8).
+	// Two resolutions of one snapshot wait for each other here rather than interleaving. The lock covers
+	// this snapshot, not the registry: two snapshots of one perimeter resolving at once can each attribute
+	// an identifier the other has just claimed, and the write takes the first (ON CONFLICT DO NOTHING in
+	// writeRegistry, which the ordinary re-attribution of a known identifier needs). The loser is not
+	// retried, so the two snapshots can key one device two ways until either is resolved again. The sweep
+	// is sequential, so this needs an operator resolve racing it (research R8).
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, s.id); err != nil {
 		return Result{}, err
 	}

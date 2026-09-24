@@ -129,19 +129,20 @@ func (l *Lab) Crawl(doc string) int64 {
 	stopC := l.RunCollector(l.Collector("c1"))
 	stopE := l.RunEngine()
 	l.Wait(job, "succeeded", "failed", "cancelled")
-	l.settle(job)
+	l.Settle(job)
 	stopE()
 	stopC()
 	return job
 }
 
-// settle waits for the verdict and the entity set of the snapshot this job closed.
+// Settle waits for the verdict and the entity set of the snapshot this job closed. Crawl calls it; a
+// test that builds its own crawl, to start a job on another perimeter for instance, has to call it too.
 //
 // A job reaches succeeded inside the tick that closes its snapshot, before that same tick judges and
 // resolves it, so Wait returning is not the engine being done. Without this, stopping the engine can
 // cancel the sweep mid-way and a test reads a snapshot that closed but was never judged or resolved.
 // It gives up at once on a snapshot that did not close, since nothing will sweep it.
-func (l *Lab) settle(job int64) {
+func (l *Lab) Settle(job int64) {
 	ctx := context.Background()
 	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		var state string

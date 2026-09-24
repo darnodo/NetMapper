@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strings"
 
 	"github.com/darnodo/NetMapper/internal/store"
 )
@@ -48,8 +49,8 @@ func readDecisions(ctx context.Context, db store.DB, perimeter string) (decision
 
 	// The last decision on a pair wins, so the pairs are collected first and read afterwards.
 	type winner struct {
-		kind     string
-		subjects []string
+		id   int64
+		kind string
 	}
 	pairs := map[[2]string]winner{}
 	var all []decisionRow
@@ -70,28 +71,70 @@ func readDecisions(ctx context.Context, db store.DB, perimeter string) (decision
 		return d, err
 	}
 
+	// A row whose subjects do not match its kind cannot be acted on. The CHECK constraints reject one
+	// today, so this only catches a row written before they did, and skipping it is the only option:
+	// nothing but the owner may delete a decision, so failing here would block the perimeter for good.
 	for _, r := range all {
 		d.highest = max(d.highest, r.id)
+		want := 2
+		if r.kind == "split" {
+			want = 1
+		}
+		if len(r.subjects) != want {
+			continue
+		}
 		switch r.kind {
 		case "split":
 			d.detached[r.subjects[0]+"|"+r.identifier.Kind+":"+r.identifier.Value] = true
 		case "merge", "never_merge":
-			pairs[pairOf(r.subjects[0], r.subjects[1])] = winner{kind: r.kind, subjects: r.subjects}
+			pairs[pairOf(r.subjects[0], r.subjects[1])] = winner{id: r.id, kind: r.kind}
 		}
 	}
 
+	// In id order, not map order: two merges can name the same key, as `merge a,c` then `merge b,c` do,
+	// and both write the same entry. Reading them in the order they were recorded makes the later one
+	// govern; reading them in map order would give a different answer on every run and break FR-013.
 	merged := map[string]string{}
-	for pair, w := range pairs {
-		if w.kind == "never_merge" {
+	for _, r := range all {
+		if r.kind == "split" || len(r.subjects) != 2 {
+			continue
+		}
+		pair := pairOf(r.subjects[0], r.subjects[1])
+		if pairs[pair].id != r.id {
+			continue // superseded by a later decision on the same pair
+		}
+		if r.kind == "never_merge" {
 			d.forbidden[pair] = true
 			continue
 		}
 		// The first subject is the key the device keeps, which is what the operator named first.
-		merged[w.subjects[1]] = w.subjects[0]
+		merged[r.subjects[1]] = r.subjects[0]
 	}
 	for from := range merged {
 		d.canon[from] = follow(merged, from)
 	}
+
+	// A never-merge and a split name the keys the operator typed, but the key sets a resolution compares
+	// them against have already been through the merges. Without canonicalising them here, a merge that
+	// renames one of a never-merge's subjects silently retires that never-merge (FR-009, FR-012).
+	forbidden := map[[2]string]bool{}
+	for pair := range d.forbidden {
+		a, b := d.resolve(pair[0]), d.resolve(pair[1])
+		if a != b {
+			forbidden[pairOf(a, b)] = true
+		}
+		// a == b means a later merge declared the two to be one device, and a device cannot be
+		// forbidden from itself. The merge was recorded last, so it governs.
+	}
+	d.forbidden = forbidden
+
+	detached := map[string]bool{}
+	for k := range d.detached {
+		key, token, _ := strings.Cut(k, "|")
+		detached[d.resolve(key)+"|"+token] = true
+	}
+	d.detached = detached
+
 	return d, nil
 }
 

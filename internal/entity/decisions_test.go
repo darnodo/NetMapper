@@ -253,3 +253,130 @@ func TestSplitAndMergeBothApplyOnALaterRun(t *testing.T) {
 		t.Errorf("%d collision findings, want none: both answers are already recorded", n)
 	}
 }
+
+// A malformed decision must not be able to stop a perimeter resolving. Nothing but the owner may delete
+// a decision, so a row the code cannot act on has to be skipped rather than fatal. The CHECK constraints
+// reject these on the way in; this proves the reader survives one that predates them.
+func TestMalformedDecisionsAreRejectedAndSurvivable(t *testing.T) {
+	l, snap, keys := twoDevices(t)
+	ctx := context.Background()
+
+	// The database refuses them: an empty subjects array used to pass, because array_length('{}', 1) is
+	// NULL and a NULL CHECK passes.
+	for _, q := range []string{
+		`INSERT INTO entity_decision (perimeter_name, kind, subjects, actor) VALUES ('lab', 'merge', '{}', 't')`,
+		`INSERT INTO entity_decision (perimeter_name, kind, subjects, actor) VALUES ('lab', 'never_merge', '{}', 't')`,
+		`INSERT INTO entity_decision (perimeter_name, kind, subjects, identifier, actor)
+		 VALUES ('lab', 'split', '{}', '{"kind":"serial","value":"S"}', 't')`,
+		`INSERT INTO entity_decision (perimeter_name, kind, subjects, actor)
+		 VALUES ('lab', 'merge', ARRAY['a', NULL], 't')`,
+	} {
+		if _, err := l.DB.Exec(ctx, q); err == nil {
+			t.Errorf("accepted a malformed decision: %s", q)
+		}
+	}
+
+	// And one already in the table, written before the constraints existed, is skipped rather than fatal.
+	if _, err := l.DB.Exec(ctx, `
+		ALTER TABLE entity_decision DROP CONSTRAINT entity_decision_subject_count`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.DB.Exec(ctx, `
+		INSERT INTO entity_decision (perimeter_name, kind, subjects, actor)
+		VALUES ('lab', 'merge', '{}', 'legacy')`); err != nil {
+		t.Fatal(err)
+	}
+	decide(l, "merge", []string{keys[0], keys[1]}, nil)
+
+	r := resolve(l, snap)
+	if r.Entities != 1 {
+		t.Errorf("%d entities, want the good decision applied and the malformed one ignored", r.Entities)
+	}
+}
+
+// FR-013 and FR-011: two merges naming the same key both write the same entry, so the reduction has to
+// read them in the order they were recorded. Reading them in map order gives a different answer per run.
+func TestOverlappingMergesReduceInIDOrder(t *testing.T) {
+	l, doc := lab(t, map[string]*fake.Device{
+		"10.0.0.1": FakeOS("a", "S001"),
+		"10.0.0.2": FakeOS("b", "S002"),
+		"10.0.0.3": FakeOS("c", "S003"),
+	})
+	snap := snapshotOf(l, l.Crawl(doc))
+	keys := keysOf(l, snap)
+	if len(keys) != 3 {
+		t.Fatalf("entities %v, want three devices", keys)
+	}
+
+	// Both merges name keys[2], so both write the same entry in the reduction. Only the third device
+	// moves: the later decision governs, so it joins keys[1] and not keys[0].
+	decide(l, "merge", []string{keys[0], keys[2]}, nil)
+	decide(l, "merge", []string{keys[1], keys[2]}, nil)
+
+	// Which entity absorbed the third device is the thing a map-ordered reduction flips on, so that is
+	// what this asserts, over enough resolutions that a coin toss would show.
+	cites := func(key string) int {
+		return l.Int(`
+			SELECT count(DISTINCT c.observation_id)
+			FROM entity e JOIN entity_claim ec ON ec.entity_id = e.id
+			JOIN identifier_claim c ON c.snapshot_id = ec.snapshot_id AND c.id = ec.identifier_claim_id
+			WHERE e.snapshot_id = $1 AND e.device_key = $2`, snap, key)
+	}
+	for i := range 10 {
+		resolve(l, snap)
+		got := keysOf(l, snap)
+		if len(got) != 2 || got[0] != keys[0] || got[1] != keys[1] {
+			t.Fatalf("resolution %d: entities %v, want %q and %q", i, got, keys[0], keys[1])
+		}
+		if a, b := cites(keys[0]), cites(keys[1]); a != 1 || b != 2 {
+			t.Fatalf("resolution %d: %q cites %d observations and %q cites %d, want 1 and 2: the later merge governs",
+				i, keys[0], a, keys[1], b)
+		}
+	}
+}
+
+// FR-009 and FR-012: a never-merge names the keys the operator typed, and a later merge can rename one
+// of them. The pair has to be canonicalised, or the never-merge silently retires.
+func TestNeverMergeSurvivesAMergeOnItsSubject(t *testing.T) {
+	// Two chassis agreeing on their MAC and disagreeing on their serial, plus a third device that will
+	// be merged into one of them later.
+	l, doc := lab(t, map[string]*fake.Device{
+		"10.0.0.1": FakeOSShaped("a", "S001", Both),
+		"10.0.0.2": FakeOSShaped("b", "X001", Both),
+		"10.0.0.3": nil,
+	})
+	delete(l.Net.Devices, Addr("10.0.0.3"))
+	snap := snapshotOf(l, l.Crawl(doc))
+	keys := keysOf(l, snap)
+	if len(keys) != 2 {
+		t.Fatalf("entities %v, want the collision to have left two", keys)
+	}
+	decide(l, "never_merge", []string{keys[0], keys[1]}, nil)
+	resolve(l, snap)
+	if got := keysOf(l, snap); len(got) != 2 {
+		t.Fatalf("entities %v, want the never-merge holding before anything renames its subjects", got)
+	}
+
+	// The third device appears, and the operator merges it into one of the never-merge's subjects, which
+	// renames that subject for every later resolution.
+	l.Net.Devices[Addr("10.0.0.3")] = FakeOS("c", "S003")
+	second := snapshotOf(l, l.Crawl(doc))
+	var other string
+	for _, k := range keysOf(l, second) {
+		if k != keys[0] && k != keys[1] {
+			other = k
+		}
+	}
+	if other == "" {
+		t.Fatalf("entities %v, want a third key to merge with", keysOf(l, second))
+	}
+	decide(l, "merge", []string{other, keys[0]}, nil)
+
+	resolve(l, snap)
+	if got := keysOf(l, snap); len(got) != 2 {
+		t.Errorf("entities %v, want the never-merge still holding after its subject was renamed", got)
+	}
+	if n := l.Int(`SELECT count(*) FROM finding WHERE snapshot_id = $1 AND category = 'identity_conflict'`, snap); n != 0 {
+		t.Errorf("%d collision findings, want the never-merge still suppressing it", n)
+	}
+}

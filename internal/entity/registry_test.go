@@ -157,6 +157,7 @@ func TestPerimetersDoNotShareDevices(t *testing.T) {
 		stopC := l.RunCollector(l.Collector("c1"))
 		stopE := l.RunEngine()
 		l.Wait(job, "succeeded", "failed", "cancelled")
+		l.Settle(job) // as Crawl does: stopping the engine before the sweep runs is a race
 		stopE()
 		stopC()
 		return snapshotOf(l, job)

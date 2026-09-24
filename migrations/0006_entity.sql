@@ -78,8 +78,16 @@ CREATE TABLE entity_decision (
     actor          text NOT NULL,
     at             timestamptz NOT NULL DEFAULT now(),
     note           text NULL,
-    CHECK ((kind = 'split') = (identifier IS NOT NULL)),
-    CHECK (array_length(subjects, 1) = CASE WHEN kind = 'split' THEN 1 ELSE 2 END)
+    CONSTRAINT entity_decision_identifier_for_split
+        CHECK ((kind = 'split') = (identifier IS NOT NULL)),
+    -- cardinality, not array_length: array_length('{}', 1) is NULL, a NULL CHECK passes, and an empty
+    -- subjects array then makes every resolution of that perimeter panic on a row no role but the owner
+    -- can delete. cardinality('{}') is 0, which this rejects. Named, so it can be referred to.
+    CONSTRAINT entity_decision_subject_count
+        CHECK (cardinality(subjects) = CASE WHEN kind = 'split' THEN 1 ELSE 2 END),
+    -- A NULL subject would pass the count and then fail to scan into a string.
+    CONSTRAINT entity_decision_subjects_not_null
+        CHECK (array_position(subjects, NULL) IS NULL)
 );
 
 -- A collision is a data quality problem in the same sense a parse failure is, so it goes on the

@@ -58,9 +58,13 @@ include at least these cases:
 | a device that changed every strong identifier mints a new key             | FR-023                |
 | a never-merge and a split leave two entities under two distinct keys      | FR-024                |
 | a weakly identified device renumbered mints a new key                     | FR-022, edge case     |
+| a malformed decision is refused, and an old one is skipped                | FR-009, review        |
+| two merges naming one key reduce in the order recorded                    | FR-011, FR-013        |
+| a never-merge survives a merge that renames its subject                   | FR-009, FR-012        |
+| resolution works as netmapper_operator, not only as the engine            | contracts/cli.md      |
 
-The last one is the test that actually proves Principle II for this feature, so it runs the whole
-sequence: resolve two snapshots, delete `entity`, `entity_claim`, `resolution`, `device` and
+The wipe-and-replay case is the one that actually proves Principle II for this feature, so it runs the
+whole sequence: resolve two snapshots, delete `entity`, `entity_claim`, `resolution`, `device` and
 `device_identifier`, resolve both again in closing order, compare.
 
 ## 2. Lab run: one device, one entity

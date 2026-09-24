@@ -2,6 +2,8 @@ package jobrunner
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,10 +34,14 @@ func resolveStep(ctx context.Context, db *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
+	// Every snapshot is attempted, and the errors are reported together. Stopping at the first one would
+	// let a single snapshot that always fails block every snapshot closed after it, for ever, which is
+	// the opposite of the self-repair FR-016 asks for.
+	var errs []error
 	for _, id := range ids {
 		if _, err := entity.Resolve(ctx, db, id); err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("snapshot %d: %w", id, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }

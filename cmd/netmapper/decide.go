@@ -113,7 +113,13 @@ func cmdDecide(ctx context.Context, args []string) int {
 	}
 	fmt.Printf("decision %d recorded\n", id)
 
-	if stale := staleSnapshots(ctx, db, *perimeter, subjects); len(stale) > 0 {
+	stale, err := staleSnapshots(ctx, db, *perimeter, subjects)
+	switch {
+	case err != nil:
+		// The decision is committed, so this is not a failure. Say so rather than leave the operator
+		// thinking there is nothing to resolve.
+		fmt.Fprintf(os.Stderr, "cannot list the snapshots to resolve: %v\n", err)
+	case len(stale) > 0:
 		fmt.Printf("resolve %s to apply\n", join(stale))
 	}
 	return exitOK
@@ -121,7 +127,7 @@ func cmdDecide(ctx context.Context, args []string) int {
 
 // staleSnapshots lists the resolved snapshots carrying one of the subjects, which are the ones whose
 // entity set no longer reflects every recorded decision.
-func staleSnapshots(ctx context.Context, db *pgxpool.Pool, perimeter string, subjects []string) []int64 {
+func staleSnapshots(ctx context.Context, db *pgxpool.Pool, perimeter string, subjects []string) ([]int64, error) {
 	rows, err := db.Query(ctx, `
 		SELECT DISTINCT e.snapshot_id
 		FROM entity e
@@ -130,13 +136,9 @@ func staleSnapshots(ctx context.Context, db *pgxpool.Pool, perimeter string, sub
 		WHERE p.name = $1 AND e.device_key = ANY($2)
 		ORDER BY 1`, perimeter, subjects)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
-	if err != nil {
-		return nil
-	}
-	return ids
+	return pgx.CollectRows(rows, pgx.RowTo[int64])
 }
 
 func osUser() string {
