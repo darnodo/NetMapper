@@ -491,3 +491,17 @@ T021 perimeter scope
   weak device only once, on a single run, so the clause is untested
   per FR-022 and the edge case "A weakly identified device answers on a different address in the next
   run. Its key moves with it and it reads as a new device" (missing)
+
+---
+
+## Phase 11: Convergence
+
+- [x] T076 Deploy the lab from scratch once and confirm the pinned serial survives it. The topology
+  declares `binds: ["ceos-config-sw1:/mnt/flash/ceos-config"]` on sw1 and sw4, and quickstart section 4
+  tells the reader that is how the serial is pinned, but the running nodes carry no such bind: the file
+  was written into the containers by hand after the last deploy. Destroy and deploy, then check that
+  `show version` on sw1 and sw4 both report C059A90B2E33A4028A044312A394CEA3 with their own chassis MACs,
+  that section 4 still produces one collision finding, and that cEOS has not rewritten the bound file in
+  the working tree. If a relative bind path does not resolve the way the topology assumes, fix the
+  topology rather than the note
+  per T068 and quickstart section 4, divergence 12 (partial)

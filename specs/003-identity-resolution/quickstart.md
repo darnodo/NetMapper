@@ -252,10 +252,14 @@ that run. What is still unrun, and why, is at the end.
 12. **cEOS ignores a `SERIALNUMBER` environment variable.** Found while building section 4's clone.
     containerlab passes `env:` into the container, and the variable is there, but cEOS reads its platform
     overrides from `/mnt/flash/ceos-config` and generates a serial per container otherwise. The topology
-    therefore binds a one-line file into sw1 and sw4. Two consequences worth knowing: a node's serial and
-    chassis MAC change on every redeploy unless pinned, so any lab expectation naming a serial is only
-    good until the next `containerlab deploy`; and section 3's renumbering has to be a configuration
-    change on a running node, because recreating it gives a new identity and reads as a replacement.
+    therefore binds a one-line file into sw1 and sw4. Verified from a cold `containerlab destroy` followed
+    by `deploy`: the relative bind path resolves, both nodes come up with the pinned serial and their own
+    chassis MACs, section 4 still raises exactly one collision finding, and cEOS does not rewrite the
+    bound file in the working tree. Two consequences worth knowing: an unpinned serial is generated per
+    container, so a lab expectation naming one is only good until something recreates the node, and the
+    chassis MAC is not guaranteed either, since sw1's changed once during this work, although it survived
+    the destroy and deploy above unchanged; and section 3's renumbering has to be a configuration change
+    on a running node, because recreating it gives a new identity and reads as a replacement.
 
 13. **The collision finding names the kind the two devices differ on, not the one they share.** Section 4
     expected `"kind": "serial"`. On the lab, sw1 and sw4 share the serial and differ on their chassis MAC,
