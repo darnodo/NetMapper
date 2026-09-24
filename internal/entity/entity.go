@@ -115,13 +115,13 @@ func Resolve(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (Result, e
 // inside it because a consumer must never see a partial set and because the registry a component is
 // matched against must not change under it while it is being matched (FR-015, research R8).
 func resolveIn(ctx context.Context, tx pgx.Tx, s snapshot) (Result, error) {
-	// Two resolutions of one snapshot wait for each other here rather than interleaving. The lock covers
-	// this snapshot, not the registry: two snapshots of one perimeter resolving at once can each attribute
-	// an identifier the other has just claimed, and the write takes the first (ON CONFLICT DO NOTHING in
-	// writeRegistry, which the ordinary re-attribution of a known identifier needs). The loser is not
-	// retried, so the two snapshots can key one device two ways until either is resolved again. The sweep
-	// is sequential, so this needs an operator resolve racing it (research R8).
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, s.id); err != nil {
+	// The lock is on the perimeter, not on the snapshot, because the registry is what two resolutions
+	// share: a device key means the same thing across every snapshot of one perimeter, so two of them
+	// resolving at once could each mint a key for one device from the identifiers it happened to read.
+	// Locking the perimeter serialises that, and it covers the same-snapshot case for free. It costs
+	// nothing: the sweep already resolves one snapshot at a time, so the only concurrency this removes
+	// is an operator resolve racing it (research R8).
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, s.perimeter); err != nil {
 		return Result{}, err
 	}
 

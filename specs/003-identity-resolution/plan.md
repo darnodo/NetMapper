@@ -43,11 +43,10 @@ in-memory union-find over a few hundred devices, one write transaction, once per
 **Constraints**: no device contacted and no secret resolved (FR-014); nothing in the collected zone
 modified (FR-014, FR-020); no decision rewritten in place, enforced by withheld grants rather than by
 convention (FR-009); the whole entity set replaced in one transaction under an advisory lock, so no
-consumer ever reads a partial set (FR-015); that lock is per snapshot, so it does not serialize the
-registry between two snapshots resolving at once, and a concurrent mint conflicts on
-`device_identifier`'s primary key, fails that transaction and is retried on the next tick rather than
-upserted over; resolution stays out of the snapshot-closing transaction, so a failing grouping can never
-keep a job from finishing
+consumer ever reads a partial set (FR-015); that lock is on the perimeter, because the registry is what
+two resolutions share, so two snapshots of one perimeter cannot mint a key for the same device at the
+same time, and the same-snapshot case is covered for free; resolution stays out of the snapshot-closing
+transaction, so a failing grouping can never keep a job from finishing
 
 **Scale/Scope**: six new tables, one migration, two new subcommands, one new package
 (`internal/entity`), plus the resolving step in `internal/jobrunner`. Three decision kinds, two conflict

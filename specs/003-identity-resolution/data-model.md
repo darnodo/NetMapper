@@ -184,7 +184,7 @@ a constraint rather than a convention, the same argument 002 made for verdicts.
 5. For each surviving component, look its strong identifiers up in `device_identifier`: no match mints a
    device, one match uses it and records the identifiers it did not yet know, more than one attaches to
    the lowest key and raises a finding (R5, R6).
-6. In one transaction, under `pg_advisory_xact_lock(snapshot_id)`: delete the snapshot's entities and its
+6. In one transaction, under `pg_advisory_xact_lock` on the perimeter name: delete the snapshot's entities and its
    `identity_conflict` findings, insert the new entities with their claims, raise the conflicts that still
    hold, upsert `resolution`, update `device.last_seen` (R8, R11).
 

@@ -287,6 +287,15 @@ that run. What is still unrun, and why, is at the end.
     finding names "the contradicting identifier", so the behaviour is right and the expectation was
     written the wrong way round. Section 4 is corrected.
 
+14. **The resolution lock had to move from the snapshot to the perimeter.** Raised as a known limit and
+    then fixed rather than kept. The registry is what two resolutions share, so locking the snapshot left
+    two snapshots of one perimeter free to mint a different key for the same device, each from the
+    identifiers it happened to read, and `ON CONFLICT DO NOTHING` in the registry write hid it. The lock
+    is now `pg_advisory_xact_lock(hashtextextended(perimeter_name, 0))`, which covers the same-snapshot
+    case as well. It costs nothing: the sweep already resolves one snapshot at a time. Asserting the
+    outcome of the race proved unreliable, since two goroutines usually serialise on their own, so the
+    test asserts the mechanism instead: a resolution waits while anything else holds the perimeter's lock.
+
 ### What the lab confirmed
 
 Sections 2, 3, 4 and 5 all pass against four cEOS nodes. Section 6 stays an integration test, for the

@@ -130,11 +130,15 @@ up. Each entry gives the decision, why, and what else was considered.
 
 - Decision: a `resolution` row per snapshot (`UNIQUE (snapshot_id)`), carrying `resolver_version` and
   `computed_at`, upserted; the snapshot's entities are deleted and rewritten in the same transaction,
-  which takes `pg_advisory_xact_lock` on the snapshot id first.
-- The lock covers one snapshot, not the registry. An operator `resolve` running beside the engine's sweep
-  can try to mint the same identifier for two snapshots at once; the loser hits `device_identifier`'s
-  primary key, its transaction fails and the sweep retries it on the next tick. That is the intended
-  outcome: a failed resolution is repairable, a swallowed upsert is not.
+  which takes `pg_advisory_xact_lock` on the perimeter name first.
+- The lock is on the perimeter rather than on the snapshot, because the registry is the state two
+  resolutions share: a device key means the same thing across every snapshot of one perimeter, so two of
+  them resolving at once could each mint a key for one device from the identifiers it happened to read,
+  and `ON CONFLICT DO NOTHING` in the registry write, which the ordinary re-attribution of a known
+  identifier needs, would hide it. Locking the perimeter serialises that and covers the same-snapshot
+  case too. It costs nothing measurable: the sweep resolves one snapshot at a time, so the only
+  concurrency it removes is an operator `resolve` racing the sweep, which is exactly the case that was
+  wrong.
 - Rationale: the sweep needs a marker that tells an unresolved snapshot from one that legitimately
   resolved to zero entities (the empty snapshot edge case), and the transaction is what gives FR-015 its
   "never a partially written set". The advisory lock is the same idiom 001 uses for claims and settles
