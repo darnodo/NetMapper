@@ -103,9 +103,10 @@ strong claim fall back to matching on `target`.
 observation on any address that device was known by in the baseline. Its `status` is the reason;
 no such observation at any of those addresses means `not_attempted`.
 
-Addresses a baseline device was known by = the `target` of its `identity` observation, plus the
-targets of tasks completed `duplicate` against its claims in that snapshot (001 writes one `identity`
-observation for the winning task and marks the other addresses' tasks `duplicate`).
+Addresses a baseline device was known by = the `target` of its own `identity` observation, plus the
+targets of the snapshot's other `identity` observations whose `parsed` carries `duplicate_of_task`
+pointing at its task. 001 writes one such observation per further address a device answered on, each
+equally `collected`, which is also why a device is counted by its winning observation alone.
 
 ## Baseline selection
 

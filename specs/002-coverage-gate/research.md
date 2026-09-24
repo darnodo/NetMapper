@@ -37,11 +37,11 @@ entry gives the decision, why, and what else was considered.
 ## R3. Attributing a reason to a device that did not carry over (FR-006)
 
 - Decision: for each baseline device missing from the newer snapshot, look in the newer snapshot for
-  an `identity` observation on **any address that device was known by in the baseline** (its
-  identity observation's `target`, plus the targets of the tasks that were completed `duplicate`
-  against its claims). The reason is that observation's `status` (`unreachable`, `denied`,
-  `unsupported`, `parse_failed`); when no such observation exists at any of those addresses, the
-  reason is `not_attempted`.
+  an `identity` observation on **any address that device was known by in the baseline** (its own
+  identity observation's `target`, plus the targets of the baseline's other `identity` observations
+  carrying `duplicate_of_task` pointing at it). The reason is that observation's `status`
+  (`unreachable`, `denied`, `unsupported`, `parse_failed`); when no such observation exists at any of
+  those addresses, the reason is `not_attempted`.
 - Rationale: `not_attempted` is the reason the whole feature exists (SC-006). It is the shape of the
   LLDP parsing bug found while validating 001: sw2 never appeared as unreachable or denied, it simply
   never entered the frontier, so every outcome-based count looked perfect. Reading the newer
@@ -121,13 +121,17 @@ entry gives the decision, why, and what else was considered.
 
 - Decision: before comparing, drop from the baseline device set every device whose addresses all fall
   outside the include/exclude ranges of the perimeter **as declared for the snapshot being judged**.
+  The test is written in SQL, `target <<= ANY (include) AND NOT (target <<= ANY (exclude))`, against
+  the `perimeter` row of the judged snapshot's own `config_version`.
 - Rationale: the spec's edge case is explicit: a deliberately narrowed perimeter must not read as a
-  coverage collapse. The ranges live in the `perimeter` row of the newer snapshot's own
-  `config_version`, and `internal/perimeter` from 001 already answers `Allowed(netip.Addr) bool`, so
-  this is a filter over an existing function, not new logic.
-- Alternatives: comparing unfiltered and explaining the drop in the breakdown (honest, but it makes
-  every intentional scope reduction produce a quarantine that an operator must learn to ignore, which
-  trains people to ignore the gate).
+  coverage collapse. Expressing include-then-exclude in SQL keeps the whole comparison in the single
+  statement R11 asks for, rather than loading the ranges to filter rows the database already holds.
+  It is the same test `perimeter.Allowed` applies in 001, one `ANY` per side.
+- Alternatives: calling `perimeter.Allowed` from Go after loading the ranges (this was the original
+  decision here, changed during implementation: it would have meant reading the baseline devices out
+  of the database only to drop some of them in the caller); comparing unfiltered and explaining the
+  drop in the breakdown (honest, but it makes every intentional scope reduction produce a quarantine
+  that an operator must learn to ignore, which trains people to ignore the gate).
 
 ## R9. Recording which calculation produced a judgement
 
@@ -158,9 +162,10 @@ entry gives the decision, why, and what else was considered.
 
 ## R11. Computing the comparison
 
-- Decision: one SQL statement per judgement, joining the two snapshots' `identity` observations and
-  their strong claims, returning the per-reason breakdown already aggregated. No snapshot is loaded
-  into memory as a whole.
+- Decision: the comparison is one SQL statement, joining the two snapshots' `identity` observations
+  and their strong claims and returning one row per baseline device, already carrying its reason. No
+  snapshot is loaded into memory as a whole. A judgement runs a few statements around it (describe the
+  snapshot, pick the baseline, count what this one reached, write the verdict), each a single query.
 - Rationale: both sides are a few hundred rows of `identity` observations at the scale this tool
   targets, both are indexed by `snapshot_id` through partitioning, and the reasoning (match, then
   attribute a reason) is a join and a `GROUP BY`. Keeping it in one statement also makes the
