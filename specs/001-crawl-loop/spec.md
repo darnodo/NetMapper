@@ -103,14 +103,21 @@ the run finishes with the same result as an uninterrupted run, with no device vi
 - A neighbour is reported by name only, with no reachable address. It must be recorded as known but
   not collected, rather than dropped or invented.
 - A device answers the identification step but times out during collection. The identification is
-  kept; the collection is recorded as failed.
+  kept. If the device stops sending in the middle of a command (idle timeout), that fact family is
+  recorded as unreachable with detail timeout. If the command runs past its total deadline, the task
+  fails under FR-014 and no observation is written for that family.
 - A device answers only one of the two supported transports. The other transport must not be
   reported as a device failure.
 - A device returns a very large table. The run must not be prevented from finishing by one device.
 - A target appears in the queue both as a seed and as a neighbour of something else.
 - The perimeter is empty or the seed falls outside it. The run must refuse to start and say why.
 - A credential set resolves to no value at collection time. The next covering set is tried, and the
-  run does not abort. A device left with no set that resolves is recorded as denied.
+  run does not abort. A device left with a covering set that never resolved is not recorded as
+  denied, since that set was never presented to it: the task fails under FR-014 and no observation is
+  written. The last error says which case it was: credential_unresolved when no set was ever
+  presented, credential_partial when some sets were presented and rejected while others never
+  resolved. The second deserves an operator's attention first, since a device refusing the declared
+  credentials may sit outside the declared authentication regime.
 - A credential set is nearly out of attempts on a device that is still refusing it. The remaining
   sets are tried, and no set exceeds its own configured attempt budget on that device.
 - Two devices are reported under the same name in different parts of the network. Both are collected
@@ -138,8 +145,11 @@ the run finishes with the same result as an uninterrupted run, with no device vi
   and MUST store identical output once regardless of how many devices produced it.
 - **FR-008**: Every stored fact MUST reference the device, the command or OID, the collection time,
   and the stored raw output it was parsed from.
-- **FR-009**: Every attempted fact family MUST carry exactly one outcome from: collected, empty,
-  unsupported, parse failed, unreachable, denied. The outcome MUST never be absent.
+- **FR-009**: Every fact family the collector attempted against a device MUST carry exactly one
+  outcome from: collected, empty, unsupported, parse failed, unreachable, denied. The outcome MUST
+  never be absent. A task that ended before it could record an outcome, because the collector itself
+  failed, records its failure on the task under FR-014 and writes no observation: there is
+  nothing it learned about the device to state.
 - **FR-010**: Collected facts MUST be written and never modified afterwards.
 - **FR-011**: A re-parse of stored output MUST be possible later without contacting any device. This
   feature must store everything such a re-parse would need.
@@ -194,6 +204,8 @@ the run finishes with the same result as an uninterrupted run, with no device vi
 - **Finding**: something worth reporting from the run, carrying a domain and its evidence. Data
   quality covers an unidentified platform or a template that stopped matching; compliance covers a
   device that answered inside the perimeter and refused every credential set.
+- **Audit entry**: one record of a command or request sent to a device, its target, and its result,
+  written before the command leaves and completed after the device answers (FR-023).
 
 ## Success Criteria *(mandatory)*
 

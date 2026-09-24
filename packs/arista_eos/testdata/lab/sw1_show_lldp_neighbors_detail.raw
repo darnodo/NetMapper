@@ -1,0 +1,96 @@
+Interface Ethernet1 detected 1 LLDP neighbors:
+
+  Neighbor 001c.734c.e41f/"Ethernet1", age 24 seconds
+  Discovered 0:01:53 ago; Last changed 0:01:53 ago
+  - Chassis ID type: MAC address (4)
+    Chassis ID     : 001c.734c.e41f
+  - Port ID type: Interface name(5)
+    Port ID     : "Ethernet1"
+  - Time To Live: 120 seconds
+  - System Name: "sw2"
+  - System Description: "Arista Networks EOS version 4.36.0F-47092531.4360F (engineering build) running on an Arista cEOSLab"
+  - System Capabilities : Bridge, Router
+    Enabled Capabilities: Bridge
+  - Management Address Subtype: ('IPv4 ',)
+    Management Address        : 172.20.20.3
+    Interface Number Subtype  : ifIndex (2)
+    Interface Number          : 999000
+    OID String                : 
+  - IEEE802.1 Port VLAN ID: 1
+  - IEEE802.3 Link Aggregation
+    Link Aggregation Status: Capable, Disabled (0x01)
+    Port ID                : 0
+  - IEEE802.3 Maximum Frame Size: 9236 bytes
+  - LLDP-MED Inventory Serial Number TLV: "1A89E075DD525F84C5BABC97D4494686"
+
+Interface Management0 detected 3 LLDP neighbors:
+
+  Neighbor 001c.736d.29e1/"Management0", age 22 seconds
+  Discovered 0:01:54 ago; Last changed 0:01:54 ago
+  - Chassis ID type: MAC address (4)
+    Chassis ID     : 001c.736d.29e1
+  - Port ID type: Interface name(5)
+    Port ID     : "Management0"
+  - Time To Live: 120 seconds
+  - System Name: "sw1"
+  - System Description: "Arista Networks EOS version 4.36.0F-47092531.4360F (engineering build) running on an Arista cEOSLab"
+  - System Capabilities : Bridge, Router
+    Enabled Capabilities: Bridge
+  - Management Address Subtype: ('IPv4 ',)
+    Management Address        : 172.20.20.2
+    Interface Number Subtype  : ifIndex (2)
+    Interface Number          : 999000
+    OID String                : 
+  - IEEE802.1 Port VLAN ID: 0
+  - IEEE802.3 Link Aggregation
+    Link Aggregation Status: Not Capable (0x00)
+    Port ID                : 0
+  - IEEE802.3 Maximum Frame Size: 9232 bytes
+  - LLDP-MED Inventory Serial Number TLV: "C059A90B2E33A4028A044312A394CEA3"
+
+  Neighbor 001c.73e4.4db8/"Management0", age 22 seconds
+  Discovered 0:01:54 ago; Last changed 0:01:54 ago
+  - Chassis ID type: MAC address (4)
+    Chassis ID     : 001c.73e4.4db8
+  - Port ID type: Interface name(5)
+    Port ID     : "Management0"
+  - Time To Live: 120 seconds
+  - System Name: "sw3"
+  - System Description: "Arista Networks EOS version 4.36.0F-47092531.4360F (engineering build) running on an Arista cEOSLab"
+  - System Capabilities : Bridge, Router
+    Enabled Capabilities: Bridge
+  - Management Address Subtype: ('IPv4 ',)
+    Management Address        : 172.20.20.4
+    Interface Number Subtype  : ifIndex (2)
+    Interface Number          : 999000
+    OID String                : 
+  - IEEE802.1 Port VLAN ID: 0
+  - IEEE802.3 Link Aggregation
+    Link Aggregation Status: Not Capable (0x00)
+    Port ID                : 0
+  - IEEE802.3 Maximum Frame Size: 9232 bytes
+  - LLDP-MED Inventory Serial Number TLV: "085F7D5BBD8803B13AA2F003B8FB7559"
+
+  Neighbor 001c.734c.e41f/"Management0", age 22 seconds
+  Discovered 0:01:53 ago; Last changed 0:01:53 ago
+  - Chassis ID type: MAC address (4)
+    Chassis ID     : 001c.734c.e41f
+  - Port ID type: Interface name(5)
+    Port ID     : "Management0"
+  - Time To Live: 120 seconds
+  - System Name: "sw2"
+  - System Description: "Arista Networks EOS version 4.36.0F-47092531.4360F (engineering build) running on an Arista cEOSLab"
+  - System Capabilities : Bridge, Router
+    Enabled Capabilities: Bridge
+  - Management Address Subtype: ('IPv4 ',)
+    Management Address        : 172.20.20.3
+    Interface Number Subtype  : ifIndex (2)
+    Interface Number          : 999000
+    OID String                : 
+  - IEEE802.1 Port VLAN ID: 0
+  - IEEE802.3 Link Aggregation
+    Link Aggregation Status: Not Capable (0x00)
+    Port ID                : 0
+  - IEEE802.3 Maximum Frame Size: 9232 bytes
+  - LLDP-MED Inventory Serial Number TLV: "1A89E075DD525F84C5BABC97D4494686"
+

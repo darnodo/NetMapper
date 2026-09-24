@@ -1,1 +1,21 @@
 .claude/
+.DS_Store
+docs/.DS_Store
+test/lab/clab-netmapper
+# Go
+/netmapper
+*.exe
+*.test
+*.out
+vendor/
+
+# Editors and OS
+Thumbs.db
+*.swp
+*.tmp
+.idea/
+.vscode/
+
+# Local environment
+.env*
+test/lab/two-switch.clab.yaml.annotations.json

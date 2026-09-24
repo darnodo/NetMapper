@@ -1,0 +1,19 @@
+family: neighbours
+implementations:
+  - id: nbr-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display neighbours
+        template: display_neighbours.textfsm
+        empty_lines: ['^No neighbours$']
+    map:
+      local_interface: LOCAL
+      remote_system_name: NAME
+      remote_mgmt_address: ADDRESS
+      remote_mgmt_address_type: TYPE
+      remote_chassis_id: CHASSIS
+      protocol: '=lldp'
+    values:
+      remote_mgmt_address: { '-': '' }   # fakeos prints - when a neighbour gives no address
+      remote_mgmt_address_type: { ip4: ipv4, ip6: ipv6, mac: mac, '-': '', '*': other }

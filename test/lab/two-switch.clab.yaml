@@ -1,0 +1,23 @@
+# containerlab topology for the crawl loop (quickstart.md section 2).
+#   sudo containerlab deploy -t test/lab/two-switch.clab.yaml
+# sw1 and sw2: Arista cEOS (image imported as ceos:latest), LLDP between them, SNMP v2c and SSH
+# for the netmapper user. sw3 answers SSH but has no netmapper user and no SNMP community: it
+# rejects every lab credential set (denied). 172.20.20.9 is inside the perimeter and unused
+# (unreachable).
+name: netmapper
+
+mgmt:
+  network: netmapper-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  kinds:
+    arista_ceos:
+      image: ceos:latest
+  nodes:
+    sw1: {kind: arista_ceos, mgmt-ipv4: 172.20.20.2, startup-config: sw1.cfg}
+    sw2: {kind: arista_ceos, mgmt-ipv4: 172.20.20.3, startup-config: sw2.cfg}
+    sw3: {kind: arista_ceos, mgmt-ipv4: 172.20.20.4, startup-config: sw3.cfg}
+  links:
+    - endpoints: ["sw1:eth1", "sw2:eth1"]
+    - endpoints: ["sw2:eth2", "sw3:eth1"]

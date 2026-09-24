@@ -1,0 +1,11 @@
+Value NAME (\S+)
+Value ADMIN (up|down)
+Value OPER (\S+)
+Value MTU (\d+)
+Value MAC (\S+)
+Value DESC (.*)
+
+Start
+  ^${NAME}\s+${ADMIN}\s+${OPER}\s+${MTU}\s+${MAC}\s*${DESC}$$ -> Record
+  ^\s*$$
+  ^. -> Error
