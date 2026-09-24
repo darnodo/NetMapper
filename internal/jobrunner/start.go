@@ -96,8 +96,11 @@ func Start(ctx context.Context, db *pgxpool.Pool, doc []byte, perimeterName, see
 		perimeterIDs := map[string]int64{}
 		for _, p := range d.Perimeters {
 			var id int64
-			if err := tx.QueryRow(ctx, `INSERT INTO perimeter (config_version, name, include, exclude) VALUES ($1, $2, $3, $4) RETURNING id`,
-				cv, p.Name, p.Include, append([]netip.Prefix{}, p.Exclude...)).Scan(&id); err != nil {
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO perimeter (config_version, name, include, exclude, degraded_at, quarantined_below)
+				VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+				cv, p.Name, p.Include, append([]netip.Prefix{}, p.Exclude...),
+				p.DegradedAt, p.QuarantinedBelow).Scan(&id); err != nil {
 				return err
 			}
 			perimeterIDs[p.Name] = id

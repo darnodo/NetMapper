@@ -123,9 +123,9 @@ func Judge(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (Judgement, 
 			coverage = float64(j.CarriedOver) / float64(j.BaselineCount)
 		}
 		j.Coverage = &coverage
-		j.Classification = classify(coverage, defaultThresholds)
+		j.Classification = classify(coverage, thresholdsFor(s))
 	}
-	j.Thresholds = defaultThresholds.record()
+	j.Thresholds = thresholdsFor(s).record()
 
 	return j, write(ctx, db, j)
 }

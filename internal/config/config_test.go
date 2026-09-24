@@ -72,6 +72,15 @@ func TestInvalid(t *testing.T) {
 		{"duplicate set", "name: ro-ssh", "name: ro-snmp", `credential set "ro-snmp" is declared twice`},
 		{"duplicate seed set", "seed_sets:\n  - name: lab-seeds\n", "seed_sets:\n  - name: lab-seeds\n  - name: lab-seeds\n", `seed set "lab-seeds" is declared twice`},
 		{"negative lease", "future_key", "discovery: {lease: -1s}\nfuture_key", "must be positive"},
+		{"degraded_at above 1", "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 1.5",
+			`perimeter "lab": degraded_at must be greater than 0 and at most 1`},
+		{"degraded_at zero", "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 0",
+			`perimeter "lab": degraded_at must be greater than 0 and at most 1`},
+		{"quarantined_below above 1", "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    quarantined_below: 2",
+			`perimeter "lab": quarantined_below must be greater than 0 and at most 1`},
+		{"thresholds crossed", "exclude: [172.20.20.1/32]",
+			"exclude: [172.20.20.1/32]\n    degraded_at: 0.8\n    quarantined_below: 0.9",
+			`perimeter "lab": quarantined_below must not be greater than degraded_at`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			doc := strings.Replace(valid, c.old, c.new, 1)
@@ -86,5 +95,30 @@ func TestInvalid(t *testing.T) {
 	}
 	if _, err := Parse([]byte(strings.Replace(valid, "172.20.20.0/24", "172.20.20.0/33", 1))); err == nil {
 		t.Error("invalid CIDR accepted")
+	}
+}
+
+// T035, FR-005: both threshold keys are optional, and declaring one leaves the other on its
+// default rather than forcing the pair to be written out.
+func TestThresholdsAreOptional(t *testing.T) {
+	d, err := Parse([]byte(valid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Perimeters[0].DegradedAt != nil || d.Perimeters[0].QuarantinedBelow != nil {
+		t.Errorf("undeclared thresholds read as %v/%v, want both unset",
+			d.Perimeters[0].DegradedAt, d.Perimeters[0].QuarantinedBelow)
+	}
+
+	one := strings.Replace(valid, "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 0.5", 1)
+	d, err = Parse([]byte(one))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Perimeters[0].DegradedAt == nil || *d.Perimeters[0].DegradedAt != 0.5 {
+		t.Errorf("degraded_at %v, want 0.5", d.Perimeters[0].DegradedAt)
+	}
+	if d.Perimeters[0].QuarantinedBelow != nil {
+		t.Errorf("quarantined_below %v, want unset so the default applies", d.Perimeters[0].QuarantinedBelow)
 	}
 }

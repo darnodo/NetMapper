@@ -229,25 +229,25 @@ thresholds and `quarantined` under the defaults. On the lab, quickstart.md secti
 
 ### Tests for User Story 3
 
-- [ ] T034 [P] [US3] Threshold test in internal/gate/thresholds_test.go: coverage `0.5` is
+- [X] T034 [P] [US3] Threshold test in internal/gate/thresholds_test.go: coverage `0.5` is
   `quarantined` under the defaults and `degraded` under a perimeter declaring `degraded_at: 0.5`, and
   the judgement records `"source": "perimeter"` instead of `"default"` (FR-005, US3)
-- [ ] T035 [P] [US3] Config validation test in internal/config/config_test.go: the three messages of
+- [X] T035 [P] [US3] Config validation test in internal/config/config_test.go: the three messages of
   contracts/config.md are produced for out-of-range and crossed values, and a perimeter declaring one
   key takes the default for the other
-- [ ] T036 [P] [US3] Pinning test in internal/gate/thresholds_test.go: changing the thresholds in the
+- [X] T036 [P] [US3] Pinning test in internal/gate/thresholds_test.go: changing the thresholds in the
   document and posting a new config version does not change an earlier snapshot's judgement, and a
   re-judge of that earlier snapshot still uses the thresholds of its own config version (FR-005,
   SC-005)
 
 ### Implementation for User Story 3
 
-- [ ] T037 [US3] Parse and validate `degraded_at` and `quarantined_below` per perimeter in
+- [X] T037 [US3] Parse and validate `degraded_at` and `quarantined_below` per perimeter in
   internal/config/config.go: both optional, both fractions in `(0, 1]`, `quarantined_below` not
   greater than `degraded_at`, with the exact messages of contracts/config.md
-- [ ] T038 [US3] Write both columns from the document in internal/jobrunner/start.go, alongside the
+- [X] T038 [US3] Write both columns from the document in internal/jobrunner/start.go, alongside the
   include and exclude ranges of the `perimeter` row it already inserts
-- [ ] T039 [US3] Read the judged snapshot's own perimeter row in internal/gate/thresholds.go and use
+- [X] T039 [US3] Read the judged snapshot's own perimeter row in internal/gate/thresholds.go and use
   its values when present, the defaults when null, recording which was used in the `thresholds` column
   (FR-005, research R13)
 
