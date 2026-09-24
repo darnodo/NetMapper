@@ -38,8 +38,42 @@ type Judgement struct {
 	BaselineCount  int
 	CarriedOver    int
 	Reached        int
-	Breakdown      map[string]any
+	Breakdown      Breakdown
 	Thresholds     map[string]any
+}
+
+// Breakdown is what a verdict shows beyond its classification: which baseline devices did not come
+// back, and why. Every reason is always present, so a reader asking for one never has to tell "none
+// of those" from "this judgement does not report that".
+type Breakdown struct {
+	NoBaseline        bool                 `json:"no_baseline"`
+	Missing           map[string]Addresses `json:"missing"`
+	PerimeterFiltered Addresses            `json:"perimeter_filtered"`
+}
+
+// Addresses is a count and the addresses behind it.
+type Addresses struct {
+	Count   int      `json:"count"`
+	Targets []string `json:"targets"`
+}
+
+// The reasons a baseline device can fail to come back. not_attempted is the one this feature
+// exists for: the others are outcomes the snapshot already records about itself.
+var reasons = []string{"unreachable", "denied", "unsupported", "parse_failed", "not_attempted"}
+
+func newBreakdown() Breakdown {
+	b := Breakdown{Missing: map[string]Addresses{}, PerimeterFiltered: Addresses{Targets: []string{}}}
+	for _, r := range reasons {
+		b.Missing[r] = Addresses{Targets: []string{}}
+	}
+	return b
+}
+
+func (b *Breakdown) add(reason, target string) {
+	a := b.Missing[reason]
+	a.Count++
+	a.Targets = append(a.Targets, target)
+	b.Missing[reason] = a
 }
 
 // Judge writes a new active judgement for a closed snapshot, superseding its current one if it has
@@ -62,27 +96,26 @@ func Judge(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (Judgement, 
 		return Judgement{}, err
 	}
 
-	j := Judgement{SnapshotID: snapshotID, Reached: reached, BaselineID: baseline}
+	j := Judgement{SnapshotID: snapshotID, Reached: reached, BaselineID: baseline, Breakdown: newBreakdown()}
 	if baseline == nil {
 		j.Classification = Published
-		j.Breakdown = map[string]any{"no_baseline": true}
+		j.Breakdown.NoBaseline = true
 	} else {
 		devices, err := compare(ctx, db, *baseline, snapshotID, s.perimeterID)
 		if err != nil {
 			return Judgement{}, err
 		}
-		missing := map[string][]string{}
-		var filtered []string
 		for _, d := range devices {
 			switch {
 			case d.filtered:
-				filtered = append(filtered, d.target)
+				j.Breakdown.PerimeterFiltered.Count++
+				j.Breakdown.PerimeterFiltered.Targets = append(j.Breakdown.PerimeterFiltered.Targets, d.target)
 			case d.carried:
 				j.BaselineCount++
 				j.CarriedOver++
 			default:
 				j.BaselineCount++
-				missing[d.reason] = append(missing[d.reason], d.target)
+				j.Breakdown.add(d.reason, d.target)
 			}
 		}
 		coverage := 1.0
@@ -90,11 +123,6 @@ func Judge(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (Judgement, 
 			coverage = float64(j.CarriedOver) / float64(j.BaselineCount)
 		}
 		j.Coverage = &coverage
-		j.Breakdown = map[string]any{
-			"no_baseline":        false,
-			"missing":            missing,
-			"perimeter_filtered": filtered,
-		}
 		j.Classification = classify(coverage, defaultThresholds)
 	}
 	j.Thresholds = defaultThresholds.record()
@@ -117,10 +145,14 @@ func write(ctx context.Context, db *pgxpool.Pool, j Judgement) error {
 	return err
 }
 
+// reachedCount counts devices, not identity observations: a device that answered on several
+// addresses has one observation per address, all collected, and only the one without
+// duplicate_of_task stands for the device itself.
 func reachedCount(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (int, error) {
 	var n int
 	err := db.QueryRow(ctx, `
 		SELECT count(*) FROM observation
-		WHERE snapshot_id = $1 AND fact_family = 'identity' AND status = 'collected'`, snapshotID).Scan(&n)
+		WHERE snapshot_id = $1 AND fact_family = 'identity' AND status = 'collected'
+		  AND NOT (parsed -> 0 ? 'duplicate_of_task')`, snapshotID).Scan(&n)
 	return n, err
 }

@@ -13,11 +13,14 @@ import (
 
 func missing(t *testing.T, j gate.Judgement, reason string) []string {
 	t.Helper()
-	m, ok := j.Breakdown["missing"].(map[string][]string)
+	a, ok := j.Breakdown.Missing[reason]
 	if !ok {
-		t.Fatalf("breakdown has no missing map: %v", j.Breakdown)
+		t.Fatalf("breakdown reports no %q at all: %+v", reason, j.Breakdown)
 	}
-	return m[reason]
+	if a.Count != len(a.Targets) {
+		t.Errorf("%s count %d but %d targets", reason, a.Count, len(a.Targets))
+	}
+	return a.Targets
 }
 
 // T029: a device that stops being reported by its neighbour leaves discovery without ever being
@@ -166,8 +169,127 @@ func TestNarrowedPerimeterIsNotALoss(t *testing.T) {
 	if got := missing(t, j, "not_attempted"); len(got) != 0 {
 		t.Errorf("not_attempted %v, want none: the device was deliberately put out of scope", got)
 	}
-	filtered, _ := j.Breakdown["perimeter_filtered"].([]string)
-	if len(filtered) != 1 || filtered[0] != "10.0.0.9" {
-		t.Errorf("perimeter_filtered %v, want [10.0.0.9]", filtered)
+	if f := j.Breakdown.PerimeterFiltered; f.Count != 1 || len(f.Targets) != 1 || f.Targets[0] != "10.0.0.9" {
+		t.Errorf("perimeter_filtered %+v, want one entry for 10.0.0.9", f)
+	}
+}
+
+// T030, research R3: a device reached on two addresses is one device, not two, and it keeps both
+// addresses as handles. When one of them is retried and fails in the newer snapshot, that failure
+// is the device's reason: it was tried, so it is not not_attempted.
+func TestDeviceKnownByTwoAddresses(t *testing.T) {
+	env(t)
+	sw2 := FakeOS("sw2", "S002", "p1 sw1 10.0.0.1")
+	net := &fake.Network{Devices: map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p2 sw2 10.0.0.2", "p3 sw2 10.0.0.3"),
+		Addr("10.0.0.2"): sw2,
+		Addr("10.0.0.3"): sw2, // same device, second address
+	}}
+	l := NewLab(t, net)
+	ctx := context.Background()
+
+	baseline := snapshotOf(l, l.Crawl(Doc))
+	if n := l.Int(`SELECT count(*) FROM observation
+	               WHERE snapshot_id = $1 AND fact_family = 'identity' AND status = 'collected'`, baseline); n != 3 {
+		t.Fatalf("%d identity observations in the baseline, want 3 (sw1, sw2, sw2's duplicate)", n)
+	}
+	if _, err := gate.Judge(ctx, l.Engine, baseline); err != nil {
+		t.Fatal(err)
+	}
+	if n := l.Int(`SELECT baseline_devices FROM snapshot_judgement
+	               WHERE snapshot_id = $1 AND active`, baseline); n != 0 {
+		t.Fatalf("first snapshot should have no baseline devices, got %d", n)
+	}
+
+	// sw2 is gone from both addresses; sw1 still reports it, so it is tried and stays silent.
+	delete(net.Devices, Addr("10.0.0.2"))
+	delete(net.Devices, Addr("10.0.0.3"))
+
+	j, err := gate.Judge(ctx, l.Engine, snapshotOf(l, l.Crawl(Doc)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.BaselineCount != 2 {
+		t.Errorf("baseline holds %d devices, want 2: sw2 on two addresses is one device", j.BaselineCount)
+	}
+	if got := missing(t, j, "unreachable"); len(got) != 1 {
+		t.Errorf("unreachable %v, want one entry for sw2", got)
+	}
+	if got := missing(t, j, "not_attempted"); len(got) != 0 {
+		t.Errorf("not_attempted %v, want none: sw2 was tried on both of its addresses", got)
+	}
+}
+
+// T028, FR-006: the figures behind a verdict. Three baseline devices leave for three different
+// reasons, and the breakdown names each one with the addresses behind it, sums to the devices that
+// did not carry over, and reaches the database in the shape contracts and quickstart queries
+// expect.
+func TestBreakdownNamesEveryReason(t *testing.T) {
+	env(t)
+	denied := FakeOS("sw4", "S004", "p1 sw1 10.0.0.1")
+	net := &fake.Network{Devices: map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p2 sw2 10.0.0.2", "p3 sw3 10.0.0.3", "p4 sw4 10.0.0.4"),
+		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1"),
+		Addr("10.0.0.3"): FakeOS("sw3", "S003", "p1 sw1 10.0.0.1"),
+		Addr("10.0.0.4"): denied,
+	}}
+	l := NewLab(t, net)
+	ctx := context.Background()
+
+	baseline := snapshotOf(l, l.Crawl(Doc))
+	if _, err := gate.Judge(ctx, l.Engine, baseline); err != nil {
+		t.Fatal(err)
+	}
+
+	// sw2 stops answering but is still reported; sw3 stops being reported; sw4 answers but now
+	// rejects every credential set.
+	delete(net.Devices, Addr("10.0.0.2"))
+	net.Devices[Addr("10.0.0.1")] = FakeOS("sw1", "S001", "p2 sw2 10.0.0.2", "p4 sw4 10.0.0.4")
+	denied.Reject = []string{"snmp-a", "ssh-a"}
+	denied.Evidence = "permission denied"
+
+	snap := snapshotOf(l, l.Crawl(Doc))
+	j, err := gate.Judge(ctx, l.Engine, snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for reason, want := range map[string]string{
+		"unreachable":   "10.0.0.2",
+		"not_attempted": "10.0.0.3",
+		"denied":        "10.0.0.4",
+	} {
+		if got := missing(t, j, reason); len(got) != 1 || got[0] != want {
+			t.Errorf("%s %v, want [%s]", reason, got, want)
+		}
+	}
+	for _, empty := range []string{"unsupported", "parse_failed"} {
+		if got := missing(t, j, empty); len(got) != 0 {
+			t.Errorf("%s %v, want none", empty, got)
+		}
+	}
+
+	var sum int
+	for _, r := range []string{"unreachable", "denied", "unsupported", "parse_failed", "not_attempted"} {
+		sum += len(missing(t, j, r))
+	}
+	if sum != j.BaselineCount-j.CarriedOver {
+		t.Errorf("missing sums to %d, want %d (baseline %d, carried over %d)",
+			sum, j.BaselineCount-j.CarriedOver, j.BaselineCount, j.CarriedOver)
+	}
+	if j.Reached != 1 {
+		t.Errorf("reached %d, want 1: only sw1 came back", j.Reached)
+	}
+
+	// The shape a quickstart query relies on: every reason readable, counts present, never null.
+	stored := l.Strings(`
+		SELECT (breakdown->'missing'->'not_attempted'->>'count') || ' ' ||
+		       (breakdown->'missing'->'not_attempted'->'targets'->>0) || ' ' ||
+		       (breakdown->'missing'->'unsupported'->>'count') || ' ' ||
+		       jsonb_array_length(breakdown->'perimeter_filtered'->'targets') || ' ' ||
+		       gate_version || ' ' || (computed_at IS NOT NULL)
+		FROM snapshot_judgement WHERE snapshot_id = $1 AND active`, snap)
+	if len(stored) != 1 || stored[0] != "1 10.0.0.3 0 0 1 true" {
+		t.Errorf("stored breakdown reads %q, want \"1 10.0.0.3 0 0 1 true\"", stored)
 	}
 }

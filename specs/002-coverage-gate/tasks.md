@@ -183,7 +183,7 @@ quickstart.md section 3.
 
 ### Tests for User Story 2
 
-- [ ] T028 [P] [US2] Breakdown test in internal/gate/compare_test.go: a baseline device that is
+- [X] T028 [P] [US2] Breakdown test in internal/gate/compare_test.go: a baseline device that is
   `unreachable` in the newer snapshot, one that is `denied`, and one with no `identity` observation at
   any of its baseline addresses produce counts under `unreachable`, `denied` and `not_attempted`
   respectively, each with the addresses behind it, and `missing` sums to
@@ -192,24 +192,26 @@ quickstart.md section 3.
   discovery entirely, with no task and no observation in the newer snapshot, is reported as
   `not_attempted` and not as `unreachable`. This is the shape of the LLDP bug found in 001 and the
   reason the feature exists (SC-006, US2-2)
-- [ ] T030 [P] [US2] Multi-address test in internal/gate/compare_test.go: a baseline device known by
+- [X] T030 [P] [US2] Multi-address test in internal/gate/compare_test.go: a baseline device known by
   two addresses, one of which is retried and fails in the newer snapshot, takes that failure's status
   as its reason rather than `not_attempted` (research R3)
 
 ### Implementation for User Story 2
 
-- [ ] T031 [US2] Extend the comparison in internal/gate/compare.go to attribute a reason to every
+- [X] T031 [US2] Extend the comparison in internal/gate/compare.go to attribute a reason to every
   baseline device that did not carry over: look for an `identity` observation in the newer snapshot on
   any address the device was known by in the baseline (its observation's `target` plus the targets of
   tasks completed `duplicate` against its claims); the reason is that observation's `status`, and
   `not_attempted` when none exists (research R3)
-  - Partly done with T029: the single-address case works and is tested both ways (`not_attempted` vs
-    `unreachable`). What remains is the multi-address part, the `duplicate` task aliases, which is
-    what T030 tests.
-- [ ] T032 [US2] Write the `breakdown` jsonb in internal/gate/gate.go exactly as shaped in
+  - Done. Writing T030 first exposed a real defect in the T029 version: 001 writes a second, equally
+    `collected` identity observation for each further address a device answered on, marked with
+    `duplicate_of_task`, so counting identity observations counted such a device twice and inflated
+    both the denominator and `reached`. A device is now its winning observation, with the duplicates'
+    addresses kept as further handles on it.
+- [X] T032 [US2] Write the `breakdown` jsonb in internal/gate/gate.go exactly as shaped in
   data-model.md: `no_baseline`, `missing` with the five reasons each carrying `count` and `targets`,
   and `perimeter_filtered` with the devices dropped by T022 (FR-006)
-- [ ] T033 [US2] Record the remaining figures in internal/gate/gate.go: `baseline_devices`,
+- [X] T033 [US2] Record the remaining figures in internal/gate/gate.go: `baseline_devices`,
   `carried_over`, `reached`, `computed_at` and `gate_version`, so a reader can answer "why not
   published" from the row alone (FR-006, FR-010, SC-002)
 

@@ -91,8 +91,8 @@ func TestFirstSnapshotHasNoBaseline(t *testing.T) {
 	if j.Classification != gate.Published {
 		t.Errorf("classification %s, want published", j.Classification)
 	}
-	if j.Breakdown["no_baseline"] != true {
-		t.Errorf("breakdown %v, want no_baseline true", j.Breakdown)
+	if !j.Breakdown.NoBaseline {
+		t.Errorf("breakdown %+v, want no_baseline true", j.Breakdown)
 	}
 }
 
