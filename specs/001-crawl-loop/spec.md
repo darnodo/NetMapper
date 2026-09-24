@@ -204,6 +204,8 @@ the run finishes with the same result as an uninterrupted run, with no device vi
 - **Finding**: something worth reporting from the run, carrying a domain and its evidence. Data
   quality covers an unidentified platform or a template that stopped matching; compliance covers a
   device that answered inside the perimeter and refused every credential set.
+- **Audit entry**: one record of a command or request sent to a device, its target, and its result,
+  written before the command leaves and completed after the device answers (FR-023).
 
 ## Success Criteria *(mandatory)*
 

@@ -42,10 +42,11 @@ bounded and configurable, with defaults that are starting points rather than mea
 **Constraints**: no packet outside the perimeter; no secret at rest; no crash state in collector memory;
 a per step idle timeout and deadline so one device cannot stall a run (no output cap: a truncated table would read as disappearances); one step's output held in memory once, a documented known limit; no lock held across network I/O
 
-**Scale/Scope**: one pack shipped (`arista_eos`), three fact families (`identity`, `neighbours`,
-`interfaces`), four subcommands plus `migrate`. Shipping only Arista cEOS is a deliberate narrowing of
-the v1 scope for this slice, chosen because it runs in containerlab and ntc-templates covers it. It is
-not the final platform list; further platforms arrive as packs
+**Scale/Scope**: one platform pack shipped (`arista_eos`), plus the vendor-neutral `_base` probe
+pack it fingerprints through; three fact families (`identity`, `neighbours`, `interfaces`), four
+subcommands plus `migrate`. Shipping only Arista cEOS is a deliberate narrowing of the v1 scope for
+this slice, chosen because it runs in containerlab and ntc-templates covers it. It is not the final
+platform list; further platforms arrive as packs
 
 ## Constitution Check
 
