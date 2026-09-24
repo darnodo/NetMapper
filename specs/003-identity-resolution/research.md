@@ -68,8 +68,11 @@ up. Each entry gives the decision, why, and what else was considered.
 
 - Decision: a device key is a text token `<kind>:<value>`, taken from the anchor identifier of the
   claim group set that first minted the device: the lexicographically smallest `kind:value` among its
-  strong identifiers. The key lives in a small registry, `device` plus `device_identifier`, scoped to
-  a perimeter name. A later snapshot's claim group set is matched to a device by **any** of its strong
+  strong identifiers. A device with no strong identifier keys on the address it answered on,
+  `addr:<address>` (clarification of 2026-09-24): a hostname is not unique, two chassis can carry the
+  same one, and a hostname key would collide inside one snapshot and need an address tie-break anyway.
+  The key lives in a small registry, `device` plus `device_identifier`, scoped to a perimeter name, so
+  two perimeters never combine a device whatever identifier they share. A later snapshot's claim group set is matched to a device by **any** of its strong
   identifiers, not by recomputing the anchor, and new identifiers observed on a known device are added
   to the registry.
 - Rationale: the key has one job, which is to be the same token for the same box in two runs (FR-021,
@@ -162,14 +165,26 @@ up. Each entry gives the decision, why, and what else was considered.
 - Rationale: 001 already made `finding` the single surface for this kind of report, and
   `store.RaiseFinding` already writes it with its evidence. An identity contradiction is a data quality
   problem in the same sense a parse failure is.
+- These findings are part of the resolution's output, so they are replaced with the entity set: a
+  re-resolution deletes the `identity_conflict` findings it previously raised for that snapshot, with
+  their `finding_evidence` rows, and raises those that still hold. A conflict settled by a decision
+  therefore stops being reported, and ten re-resolutions leave one finding per live conflict rather than
+  ten (clarification of 2026-09-24, FR-015). Findings raised by anything else, the collector's included,
+  are never touched: the delete is restricted to `category = 'identity_conflict'` and to the snapshot
+  being resolved.
 - Alternatives: a dedicated conflict table (a second findings surface, which the C4 component list
-  explicitly refuses); `domain = 'compliance'` (it is not a policy question).
+  explicitly refuses); `domain = 'compliance'` (it is not a policy question); raising idempotently and
+  never deleting (no `DELETE` grant needed, but a settled conflict stays open for ever with nothing able
+  to close it); letting them accumulate one set per resolution (noise, and FR-018 could no longer say
+  which findings describe the current set).
 
 ## R12. Grants
 
 - Decision: `netmapper_engine` gains `SELECT, INSERT, UPDATE, DELETE` on `resolution`, `entity`,
-  `entity_claim`, `device` and `device_identifier`, `INSERT` on `finding` and `finding_evidence`, and
-  `USAGE` on the new sequences. `netmapper_operator` gains `SELECT, INSERT` on `entity_decision` and
+  `entity_claim`, `device` and `device_identifier`, `INSERT` and `DELETE` on `finding` and
+  `finding_evidence`, and `USAGE` on the new sequences. The `DELETE` is what R11's replace rule costs;
+  it is unrestricted in SQL and restricted in code to `identity_conflict` rows of the snapshot being
+  resolved. `netmapper_operator` gains `SELECT, INSERT` on `entity_decision` and
   `SELECT` on the rest. No role but the owner gains `UPDATE` or `DELETE` on `entity_decision`.
 - Rationale: the engine owns the computed zone and must be able to replace it, which is what `DELETE`
   here means; the decisions are the append-only part, so they get 002's treatment. 001 gave the engine
@@ -188,6 +203,18 @@ up. Each entry gives the decision, why, and what else was considered.
   `netmapper judge` (002) is the shape to copy: parse, connect, call the package, print, exit code.
 - Alternatives: a `--resolve` flag on `netmapper run` (conflates a crawl with a recomputation); recording
   decisions by hand in SQL (an undocumented contract, and no validation that the subjects exist).
+
+## R15. Attribute values when grouped observations disagree
+
+- Decision: an entity's weak attributes (`hostname`, `platform`) come from the observation that stands
+  for the device itself, the one not marked `duplicate_of_task`. Every other value stays readable
+  through `entity_claim`.
+- Rationale: without a rule the attribute depends on row order and two recomputations of one snapshot
+  can disagree, which breaks FR-013. The winning observation is already the notion 001 and 002 use to
+  mean the device rather than one of its addresses, so this adds no new concept.
+- Alternatives: keeping every value as a list (hides nothing, but every consumer then has to choose, so
+  the problem moves one level up); raising a finding on disagreement (a short name against an FQDN is
+  the normal case, not a defect, and it would fire on every run).
 
 ## R14. Scale and cost
 

@@ -15,7 +15,7 @@ the reason a device key means the same thing in two runs (R5).
 | Column           | Type                                 | Notes                                                                                 |
 | ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
 | `perimeter_name` | `text NOT NULL`                      | perimeters are identified by name across config versions, as 002 established (002, R1) |
-| `key`            | `text NOT NULL`                      | `<kind>:<value>` of the anchor identifier at mint time (R5)                            |
+| `key`            | `text NOT NULL`                      | `<kind>:<value>` of the anchor identifier at mint time, or `addr:<address>` for a weakly identified device (R5) |
 | `weak`           | `boolean NOT NULL DEFAULT false`     | true when the device was minted without a strong identifier (FR-022)                   |
 | `first_seen`     | `timestamptz NOT NULL`               | earliest evidence across every snapshot that reached it                                |
 | `last_seen`      | `timestamptz NOT NULL`               | latest                                                                                 |
@@ -90,7 +90,9 @@ computed rows.
 
 `targets` is every address the device answered on in this snapshot, the winning observation's first
 (FR-008). `identifiers` is a flat copy of the strong claims for reading; `entity_claim` is the
-authoritative link.
+authoritative link. `hostname` and `platform` are taken from the winning observation, the one not marked
+`duplicate_of_task`, so grouped observations that disagree (a short name against an FQDN) resolve the same
+way on every recomputation (R15, FR-003).
 
 ## New table: `entity_claim`
 
@@ -151,11 +153,16 @@ writes a target. `detail` carries the contradicting kind and the values:
 `conflict` is `within_snapshot` for the R4 case (one component disagreeing with itself) and
 `across_devices` for the R6 case (a claim group set matching two known devices).
 
+These findings belong to the resolution that raised them. Re-resolving a snapshot deletes its
+`identity_conflict` rows and their `finding_evidence` rows inside the same transaction that rewrites the
+entities, then raises the conflicts that still hold (R11, FR-015). The delete is restricted in code to
+`category = 'identity_conflict'` and to that snapshot, so the collector's findings are never touched.
+
 ## Grants added (migration `0006_entity.sql`)
 
 | Role                  | Gains                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `netmapper_engine`    | `SELECT, INSERT, UPDATE, DELETE` on `resolution`, `entity`, `entity_claim`, `device`, `device_identifier`; `SELECT` on `entity_decision`; `INSERT` on `finding`, `finding_evidence`; `USAGE` on the new sequences |
+| `netmapper_engine`    | `SELECT, INSERT, UPDATE, DELETE` on `resolution`, `entity`, `entity_claim`, `device`, `device_identifier`; `SELECT` on `entity_decision`; `INSERT, DELETE` on `finding`, `finding_evidence`; `USAGE` on the new sequences |
 | `netmapper_operator`  | `SELECT, INSERT` on `entity_decision`; `USAGE` on its sequence; `SELECT` on the five computed tables; `SELECT, INSERT, UPDATE, DELETE` on the same five, only because `netmapper resolve` runs the resolver in the operator's process |
 | `netmapper_collector` | nothing. It never reads an entity                                                                                        |
 
@@ -171,8 +178,9 @@ a constraint rather than a convention, the same argument 002 made for verdicts.
 5. For each surviving component, look its strong identifiers up in `device_identifier`: no match mints a
    device, one match uses it and records the identifiers it did not yet know, more than one attaches to
    the lowest key and raises a finding (R5, R6).
-6. In one transaction, under `pg_advisory_xact_lock(snapshot_id)`: delete the snapshot's entities, insert
-   the new ones with their claims, upsert `resolution`, update `device.last_seen` (R8).
+6. In one transaction, under `pg_advisory_xact_lock(snapshot_id)`: delete the snapshot's entities and its
+   `identity_conflict` findings, insert the new entities with their claims, raise the conflicts that still
+   hold, upsert `resolution`, update `device.last_seen` (R8, R11).
 
 ## What this feature does not touch
 

@@ -31,10 +31,12 @@
 
 ## Notes
 
-- Three clarifications were resolved in the 2026-09-24 session and are recorded in the spec: entities are
-  per snapshot with a stable device key (FR-021 to FR-024), every closed snapshot is resolved whatever the
-  coverage gate said (FR-025), and interfaces stay with the graph projector (FR-026). Those three are what
-  bounds the scope, so the scope item now passes.
+- Seven clarifications are recorded in the 2026-09-24 session. The first three bound the scope: entities
+  are per snapshot with a stable device key (FR-021 to FR-024), every closed snapshot is resolved whatever
+  the coverage gate said (FR-025), and interfaces stay with the graph projector (FR-026). The four added by
+  `/speckit-clarify` after planning close smaller gaps: device keys are scoped to a perimeter (FR-021),
+  collision findings are replaced with the entity set (FR-015), a weakly identified device keys on its
+  address (FR-022), and a disagreement on a weak attribute resolves to the winning observation (FR-003).
 - One design question this spec leaves to the plan rather than to the reader: how the device key is
   computed from a set of strong identifiers of several kinds, and how it stays distinct across a split
   (FR-024). That is a mechanism, not a requirement, and belongs in `/speckit-plan` research.

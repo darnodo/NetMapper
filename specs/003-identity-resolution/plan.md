@@ -26,7 +26,7 @@ one in-memory graph algorithm and control flow. No transport, no parser, no pack
 
 **Storage**: PostgreSQL only. Five new tables (`device`, `device_identifier`, `resolution`, `entity`,
 `entity_claim`), one append-only table (`entity_decision`), one widened `CHECK` on `finding.category`,
-and the grants. Garage is untouched: an entity cites observations, it stores no bytes
+and the grants, which include a `DELETE` on `finding` for the replace rule. Garage is untouched: an entity cites observations, it stores no bytes
 
 **Testing**: `go test`; integration tests against PostgreSQL from `deploy/compose.yaml`, building
 snapshots with the fake transport from 001; the containerlab two-switch topology for the end-to-end
@@ -69,10 +69,20 @@ shapes
 | Config YAML posted whole, versioned, recorded on run | Pass   | No configuration change. A device key is scoped to the perimeter **name**, the identity 002 established across config versions (002, R1)                                                                                                                                                                           |
 | Workflow: open questions go to `docs/`               | Action | The deltas below must be carried into `docs/c4-model/04-data-model.md` in this branch, including closing the "per snapshot or validity interval" question it records as open                                                                                                                                        |
 
-Post-design re-check: still passes. Phase 1 added the registry, the `resolution` marker and the
-decision table. The registry is the one addition worth re-reading against Principle II, because it is
+Post-design re-check, second pass after the 2026-09-24 clarifications: still passes. Phase 1 added the
+registry, the `resolution` marker and the decision table. The registry is the one addition worth re-reading against Principle II, because it is
 cross-snapshot state: it stays rebuildable because replaying the snapshots in closing order mints the
 same keys from the same claims (R5, SC-008), and the quickstart makes that a test rather than a claim.
+
+The clarifications added one thing worth re-reading against the constitution: the engine now holds
+`DELETE` on `finding` and `finding_evidence`, so that a re-resolution replaces its own collision findings
+(FR-015). That is the first delete any role but the owner may perform outside the computed zone. It stays
+inside the rules because the reported zone is not the collected zone: 001's grant matrix withholds
+`UPDATE` and `DELETE` on observations, claims, raw output and `audit_log`, and nothing here touches those.
+The delete is bounded in code to `category = 'identity_conflict'` rows of the snapshot being resolved, and
+the quickstart asserts that the collector's own findings survive a re-resolution. A narrower guard, a
+`SECURITY DEFINER` function taking only a snapshot id, was considered and left out: it would be the fourth
+such function for a delete that already cannot reach anything an operator would miss.
 
 Principles touched by this feature: I, II.
 
@@ -87,8 +97,10 @@ Principles touched by this feature: I, II.
 - `entity_decision.subjects` holds device keys, not row ids, and `split` carries the identifier it
   detaches. That is what makes a decision survive a recomputation.
 - `finding.category` gains `identity_conflict`.
-- The engine's grant set gains the computed-zone tables and, for the first time, `INSERT` on `finding`
-  and `finding_evidence`: until now only the collector raised findings.
+- The engine's grant set gains the computed-zone tables and, for the first time, `INSERT` and `DELETE` on
+  `finding` and `finding_evidence`: until now only the collector raised findings, and none were ever
+  removed. The delete exists because a collision finding is part of a resolution's output and is replaced
+  with it; it is restricted in code to `identity_conflict` rows of the snapshot being resolved.
 - Note for the gate: 002's `compare` matches devices across snapshots on a shared strong claim, pairwise
   and without transitive closure. Once entities carry a device key, that query has a simpler and more
   correct source. Changing it is a separate change with its own `gate_version` bump, not part of this
@@ -146,6 +158,7 @@ decisions and the write.
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | Entities are readable only through SQL                             | No interface serves them yet; the spec puts presentation out of scope and `api` does not exist as a role                                                   | The API feature ships and reads entities with their evidence                                      |
 | The registry accumulates identifiers forever                       | Nothing evicts `device` or `device_identifier`, and nothing needs to at homelab scale: a few hundred rows that outlive the snapshots they were minted from | Eviction becomes a feature, at which point a device with no surviving snapshot is a candidate     |
+| A weakly identified device keys on the address it answered on      | Clarified on 2026-09-24: a hostname is not unique, so the address is the only handle left. A renumbered weak device reads as a replacement                    | A pack yields a strong identifier for such a platform, or the case is settled once with a merge decision |
 | A device that loses every strong identifier between runs           | It mints a new key and reads as a replacement, which is FR-023 working as decided. In a lab where SNMP sometimes returns nothing, this may prove noisy     | The lab runs long enough to say whether it happens; the answer is either a pack fix or a decision |
 | Weak-only devices key on hostname and address                      | 001's shipped pack gives every reachable device a strong claim, so the weak path is exercised by tests and not by the lab, the same gap 002 recorded        | A pack ships a platform where no strong identifier can be read                                    |
 

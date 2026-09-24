@@ -28,6 +28,23 @@ split, never-merge) stored as replayable records rather than applied in place (d
 - Q: Does this feature produce interfaces as well as devices? → A: Device entities only. Interfaces
   come from the interfaces fact family and the packs' naming rules rather than from identifier claims,
   and they belong with the graph projector that attaches edges to them.
+- Q: Is a device key unique within one perimeter, or shared across every perimeter? → A: Unique within a
+  perimeter, scoped to the perimeter name. Two perimeters never combine a device, even on an identical
+  strong identifier, so a lab clone carrying a factory serial cannot reach into another perimeter's
+  history. A chassis reached by two perimeters carries one key in each.
+- Q: When a snapshot is resolved a second time, what becomes of the identity collision findings the
+  previous resolution raised? → A: They are replaced with the entity set. A re-resolution removes the
+  collision findings its predecessor raised for that snapshot and raises those that still hold, so what
+  an engineer reads always describes the current set and a conflict settled by a decision stops being
+  reported.
+- Q: For a device with no strong identifier, is the key built from its hostname or from the address it
+  answered on? → A: From the address. A hostname is not unique (two chassis can carry the same one, which
+  the spec keeps as two entities), so a hostname key would collide and need an address tie-break anyway.
+  A renumbered weak device therefore reads as a new device, which the weak marker is there to explain.
+- Q: When two observations grouped into one entity disagree on a weak attribute, such as a short hostname
+  against an FQDN, which value does the entity carry? → A: The winning observation's, the one not marked
+  duplicate, which is already how 001 and 002 name the device itself. Deterministic, and every other value
+  stays readable through the entity's claims.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -164,6 +181,9 @@ touching anything.
   way the coverage gate sweeps for unjudged snapshots (002, FR-014).
 - A snapshot is quarantined by the gate. It is still a closed snapshot with claims in it, and this
   feature does not decide whether a consumer should trust the result.
+- A conflict reported on one resolution is settled by a decision and the snapshot is resolved again. The
+  finding must be gone, not left open beside a set that no longer contains the conflict. A conflict that
+  still holds must be reported once, not once per resolution.
 - Two devices are kept apart by a split or a never-merge decision although they share a strong
   identifier. Their device keys must stay distinct, or the two entities collide under one key the moment
   anything looks a device up by it.
@@ -188,7 +208,10 @@ touching anything.
   kind and value at strength strong, and grouping MUST follow such links transitively, so that claim
   sets linked only through a third one still form a single entity.
 - **FR-003**: An identifier at strength weak MUST NOT cause two claim sets to be grouped. It MAY be
-  recorded on the entity it belongs to as an attribute and MUST remain readable as evidence.
+  recorded on the entity it belongs to as an attribute and MUST remain readable as evidence. When the claim
+  sets grouped into one entity disagree on such an attribute, the entity MUST carry the value of the
+  observation that stands for the device itself, the one not marked duplicate, so the same inputs always
+  produce the same attribute (FR-013); the other values MUST stay readable through the entity's claims.
 - **FR-004**: A device that produced no strong identifier MUST still become an entity, built from the
   claims it did produce and the address it answered on, and MUST be marked as weakly identified so that
   a later consumer can tell a confidently identified device from a presumed one.
@@ -221,7 +244,11 @@ touching anything.
   judgement, MUST contact no device, and MUST resolve no secret.
 - **FR-015**: Resolving a snapshot again MUST produce a complete new entity set for that snapshot rather
   than a patch of the previous one, and at no point MUST a consumer read a partially written set.
-  A snapshot MUST have exactly one current entity set.
+  A snapshot MUST have exactly one current entity set. The identity collision findings of that snapshot
+  MUST be replaced with it: a re-resolution MUST remove the ones the previous resolution raised and raise
+  those that still hold, so a conflict settled by a decision stops being reported and a snapshot resolved
+  ten times carries one finding per live conflict, not ten. Findings raised by anything but resolution
+  MUST NOT be touched.
 - **FR-016**: The system MUST find closed snapshots carrying no current entity set and resolve them, so
   that an interruption, or a period with the resolving side down, repairs itself with no dedicated
   recovery path.
@@ -235,10 +262,14 @@ touching anything.
 - **FR-021**: An entity MUST belong to exactly one snapshot and MUST carry a device key computed from its
   strong identifiers, so that the same device resolved in two snapshots of the same perimeter carries the
   same key and a later consumer can follow it across runs without regrouping claims itself. The key MUST
-  be recomputable from the claims and the decisions alone.
-- **FR-022**: An entity with no strong identifier MUST still carry a device key, derived from what does
-  identify it, and MUST be marked as weakly identified (FR-004) so that a consumer can tell a key that
-  rests on a serial from one that rests on a hostname and an address.
+  be recomputable from the claims and the decisions alone. A device key MUST be scoped to a perimeter,
+  identified by its name the way 002 identifies one across config versions: two perimeters MUST NOT be
+  combined into one device, whatever identifier they share.
+- **FR-022**: An entity with no strong identifier MUST still carry a device key, derived from the address
+  it answered on, and MUST be marked as weakly identified (FR-004) so that a consumer can tell a key that
+  rests on a serial from one that rests on an address. A weak key MUST NOT be derived from a hostname,
+  which two devices can share (FR-003), and a weakly identified device that answers on a different
+  address in a later run is therefore a new device until an operator decides otherwise (FR-009).
 - **FR-023**: When a device's strong identifiers change between two runs so that none of them links it to
   a device already known, a new key MUST be minted rather than guessed onto the nearest match. Attaching
   the old key and the new one to one device MUST be an operator merge decision (FR-009), never a
@@ -256,12 +287,14 @@ touching anything.
 ### Key Entities
 
 - **Device entity**: a resolved device. Carries the identifier claims it was built from, the addresses it
-  answered on, the attributes its weak identifiers give it (hostname, platform), whether it is strongly or
-  weakly identified, and when its evidence was first and last collected. Computed, never collected:
+  answered on, the attributes its weak identifiers give it (hostname, platform, taken from the observation
+  that stands for the device itself), whether it is strongly or weakly identified, and when its evidence was
+  first and last collected. Computed, never collected:
   rebuildable at any time from the claims and the decisions.
-- **Device key**: what makes a device the same device in two runs, computed from its strong identifiers
-  (or, for a weakly identified device, from what it does carry). It is the name a decision, a diff or an
-  intent record uses to point at a device without pointing at one snapshot's row.
+- **Device key**: what makes a device the same device in two runs of one perimeter, computed from its
+  strong identifiers (or, for a weakly identified device, from what it does carry). It is the name a
+  decision, a diff or an intent record uses to point at a device without pointing at one snapshot's row.
+  Scoped to a perimeter name, so the same key under two perimeters is two devices.
 - **Entity claim link**: which identifier claims were grouped into which entity. The path from an answer
   back to the observation and the raw output that justify it.
 - **Entity decision**: an operator's merge, split or never-merge, naming its subjects, its actor and when

@@ -24,18 +24,18 @@ include at least these cases:
 | -------------------------------------------------------------------------- | ---------------------- |
 | two claim groups sharing one strong identifier become one entity          | US1-1, FR-002          |
 | A shares a serial with C, C a chassis MAC with B: one entity              | US1-2, FR-002          |
-| a duplicate-marked observation lands on the entity it duplicated          | US1-3, FR-008          |
+| a duplicate-marked observation lands on the entity it duplicated          | US1-3, FR-008, SC-002  |
 | two chassis sharing only a hostname stay two entities                     | US1-4, FR-003          |
 | a device with no strong identifier resolves, marked weak                  | US1-5, FR-004, FR-022  |
 | a snapshot with no claims resolves to zero entities, marked resolved      | US1-6, R8              |
 | the same device in two snapshots carries the same device key              | US1-7, SC-007, FR-021  |
-| two devices contradicting on a serial: two entities, one finding          | US2-1, FR-007          |
-| that finding cites the observations behind each side                      | US2-2, FR-005          |
+| two devices contradicting on a serial: two entities, one finding          | US2-1, FR-007, SC-005  |
+| that finding cites the observations behind each side                      | US2-2, FR-005, SC-003  |
 | a claim group set matching two known devices: lowest key, one finding     | R6, FR-023             |
 | a merge decision makes two keys one device                               | US3-1, FR-009          |
 | a never-merge decision suppresses the conflict finding for that pair      | US3-2, FR-009          |
 | a split survives the next resolution where the identifier reappears       | US3-3, FR-012          |
-| a decision recorded after a resolution applies on the next one            | US3-4, FR-017          |
+| a decision recorded after a resolution applies on the next one            | US3-4, FR-017, SC-006  |
 | a decision whose subjects are absent is skipped, not an error             | US3-5, edge case       |
 | merge then never-merge on the same pair: the later one governs            | FR-011, edge case      |
 | resolution reads only the active parse generation                         | FR-019, R10            |
@@ -43,8 +43,14 @@ include at least these cases:
 | re-resolving replaces the set, never leaves two sets or a partial one     | FR-015, R8             |
 | two resolutions of one snapshot at once produce one set                   | edge case, R8          |
 | a snapshot closed while the engine was down is resolved on restart        | FR-016, SC-001         |
+| a split survives, and the merge keeps applying, on a third run            | SC-006, FR-012         |
 | an open snapshot is refused                                               | FR-001                 |
 | a quarantined snapshot is resolved like any other                         | FR-025                 |
+| re-resolving replaces the conflict findings, none duplicated, none stale  | FR-015, R11            |
+| re-resolving leaves the collector's own findings untouched                | FR-015, R11            |
+| grouped observations disagreeing on a hostname resolve the same way twice | FR-003, FR-013, R15    |
+| a weakly identified device keys on its address, not its hostname          | FR-022, R5             |
+| two perimeters sharing a strong identifier stay two devices               | FR-021, clarification  |
 | resolution writes nothing in the collected zone                           | FR-014, Principle II   |
 | the engine cannot UPDATE or DELETE an entity_decision                     | FR-009, R12            |
 | wiping every computed row and replaying restores the same keys and set    | SC-008, FR-020         |
