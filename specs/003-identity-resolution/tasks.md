@@ -30,13 +30,13 @@ touches no object store, so no test needs `NETMAPPER_TEST_S3_ENDPOINT`.
 **Purpose**: The package this feature lives in, and what the tests need to build the device shapes it
 has to tell apart
 
-- [ ] T001 Create the package skeleton in internal/entity/entity.go: the `Entity` struct mirroring the
+- [x] T001 Create the package skeleton in internal/entity/entity.go: the `Entity` struct mirroring the
   `entity` columns of data-model.md (`SnapshotID`, `DeviceKey`, `Weak`, `Attributes`, `FirstSeen`,
   `LastSeen`), a `ClaimGroup` struct holding one `identity` observation with its claims, the sentinel
   errors `ErrNotFound` and `ErrNotClosed` following internal/gate/gate.go, and
   `const resolverVersion = 1` with a comment stating it is bumped by hand when a change to the
   grouping alters results (research R9)
-- [ ] T002 [P] Add an identifier-shaping variant of `FakeOS` to internal/testutil/lab.go: a builder
+- [x] T002 [P] Add an identifier-shaping variant of `FakeOS` to internal/testutil/lab.go: a builder
   that prints only the `Serial:` line, only the `MAC:` line, both, or neither, so a test can produce a
   device with one strong identifier, two, or none at all. The fakeos pack in
   internal/pack/testdata/fakeos/pack.yaml already declares `serial` and `chassis_mac` as strong and
@@ -53,47 +53,47 @@ has to tell apart
 for the replace rule of FR-015). The grant is wide in SQL and narrow in code; T011 is what proves the
 rest of the matrix still holds
 
-- [ ] T003 Create migrations/0006_entity.sql with the `device` registry table exactly as in
+- [x] T003 Create migrations/0006_entity.sql with the `device` registry table exactly as in
   data-model.md: `perimeter_name text NOT NULL`, `key text NOT NULL`,
   `weak boolean NOT NULL DEFAULT false`, `first_seen timestamptz NOT NULL`,
   `last_seen timestamptz NOT NULL`, `minted_from bigint NOT NULL REFERENCES snapshot`, and
   `PRIMARY KEY (perimeter_name, key)`. The perimeter is named, not referenced by id, for the reason
   002 established in its research R1
-- [ ] T004 Add the `device_identifier` table to migrations/0006_entity.sql: `perimeter_name text NOT NULL`,
+- [x] T004 Add the `device_identifier` table to migrations/0006_entity.sql: `perimeter_name text NOT NULL`,
   `kind text NOT NULL`, `value text NOT NULL`, `key text NOT NULL`, `first_seen timestamptz NOT NULL`,
   `PRIMARY KEY (perimeter_name, kind, value)` and
   `FOREIGN KEY (perimeter_name, key) REFERENCES device`. The primary key is the invariant "one
   identifier belongs to one device"; a conflict on it is the R6 case to handle, never an error to
   swallow
-- [ ] T005 [P] Add the `resolution` table to migrations/0006_entity.sql:
+- [x] T005 [P] Add the `resolution` table to migrations/0006_entity.sql:
   `snapshot_id bigint PRIMARY KEY REFERENCES snapshot`, `resolver_version integer NOT NULL`,
   `decisions_applied bigint NOT NULL`, `entities integer NOT NULL`,
   `computed_at timestamptz NOT NULL DEFAULT now()`. The primary key alone is FR-015's "exactly one
   current entity set", and the row is what tells an unresolved snapshot from one that resolved to
   nothing (research R8)
-- [ ] T006 Add the `entity` table to migrations/0006_entity.sql: `id bigserial PRIMARY KEY`,
+- [x] T006 Add the `entity` table to migrations/0006_entity.sql: `id bigserial PRIMARY KEY`,
   `snapshot_id bigint NOT NULL REFERENCES snapshot`, `kind text NOT NULL CHECK (kind = 'device')`,
   `device_key text NOT NULL`, `weak boolean NOT NULL`, `attributes jsonb NOT NULL DEFAULT '{}'`,
   `first_seen timestamptz NOT NULL`, `last_seen timestamptz NOT NULL`, and
   `UNIQUE (snapshot_id, device_key)`. That unique index is the whole of FR-024, and the narrow `kind`
   check is deliberate: the day the graph projector adds its kinds is a migration, not a silent
   widening (FR-026)
-- [ ] T007 [P] Add the `entity_claim` table to migrations/0006_entity.sql:
+- [x] T007 [P] Add the `entity_claim` table to migrations/0006_entity.sql:
   `entity_id bigint NOT NULL REFERENCES entity ON DELETE CASCADE`, `snapshot_id bigint NOT NULL`,
   `identifier_claim_id bigint NOT NULL`,
   `PRIMARY KEY (entity_id, snapshot_id, identifier_claim_id)` and
   `FOREIGN KEY (snapshot_id, identifier_claim_id) REFERENCES identifier_claim (snapshot_id, id)`.
   The composite foreign key is how a row reaches the partitioned table, as 001 does everywhere
-- [ ] T008 [P] Add the `entity_decision` table to migrations/0006_entity.sql:
+- [x] T008 [P] Add the `entity_decision` table to migrations/0006_entity.sql:
   `id bigserial PRIMARY KEY`, `perimeter_name text NOT NULL`,
   `kind text NOT NULL CHECK (kind IN ('merge','split','never_merge'))`, `subjects text[] NOT NULL`,
   `identifier jsonb NULL`, `actor text NOT NULL`, `at timestamptz NOT NULL DEFAULT now()`,
   `note text NULL`, plus `CHECK ((kind = 'split') = (identifier IS NOT NULL))` and
   `CHECK (array_length(subjects, 1) = CASE WHEN kind = 'split' THEN 1 ELSE 2 END)`
-- [ ] T009 [P] Widen the findings category in migrations/0006_entity.sql:
+- [x] T009 [P] Widen the findings category in migrations/0006_entity.sql:
   `ALTER TABLE finding DROP CONSTRAINT finding_category_check;` then re-add it as
   `CHECK (category IN ('unknown_platform', 'parse_failed', 'credential_denied', 'identity_conflict'))`
-- [ ] T010 Add the grants and owners to migrations/0006_entity.sql: every new table
+- [x] T010 Add the grants and owners to migrations/0006_entity.sql: every new table
   `OWNER TO netmapper_owner`; `SELECT, INSERT, UPDATE, DELETE` on `resolution`, `entity`,
   `entity_claim`, `device`, `device_identifier` plus `USAGE` on `entity_id_seq` to `netmapper_engine`;
   `SELECT` on `entity_decision` to `netmapper_engine`; `INSERT, DELETE` on `finding` and
@@ -102,7 +102,7 @@ rest of the matrix still holds
   computed tables to `netmapper_operator`, because `netmapper resolve` runs the resolver in the
   operator's process. No role but the owner gets `UPDATE` or `DELETE` on `entity_decision`
   (research R12)
-- [ ] T011 Grant test in internal/store/roles_test.go: connected as `netmapper_engine`, `UPDATE` and
+- [x] T011 Grant test in internal/store/roles_test.go: connected as `netmapper_engine`, `UPDATE` and
   `DELETE` on `entity_decision` both fail while `SELECT` succeeds; `DELETE` on `entity` succeeds;
   `INSERT` and `DELETE` on `finding` succeed; `UPDATE` and `DELETE` on `observation` and
   `identifier_claim` still fail, so the new grants did not widen the collected zone (FR-009, FR-014)
@@ -128,119 +128,119 @@ the reporting, not the refusal.
 
 > Write these first and confirm they fail.
 
-- [ ] T012 [P] [US1] Shared-identifier test in internal/entity/group_test.go: two claim groups
+- [x] T012 [P] [US1] Shared-identifier test in internal/entity/group_test.go: two claim groups
   carrying the same strong `(kind, value)` resolve to one entity that names both groups' claims
   through `entity_claim` (FR-002, US1-1)
-- [ ] T013 [P] [US1] Transitive test in internal/entity/group_test.go: group A carries a serial also
+- [x] T013 [P] [US1] Transitive test in internal/entity/group_test.go: group A carries a serial also
   on C, C carries a chassis MAC also on B, A and B share nothing; all three resolve to one entity
   (FR-002, US1-2)
-- [ ] T014 [P] [US1] Duplicate test in internal/entity/group_test.go: an `identity` observation the
+- [x] T014 [P] [US1] Duplicate test in internal/entity/group_test.go: an `identity` observation the
   crawl marked `duplicate_of_task` hangs off the entity of the task it duplicated, and that task's
   address appears in `attributes->'targets'` (FR-008, US1-3, SC-002)
-- [ ] T015 [P] [US1] Weak-identifier test in internal/entity/group_test.go: two devices printing the
+- [x] T015 [P] [US1] Weak-identifier test in internal/entity/group_test.go: two devices printing the
   same hostname and nothing else in common stay two entities (FR-003, US1-4)
-- [ ] T016 [P] [US1] Weak-device test in internal/entity/registry_test.go: a device whose output
+- [x] T016 [P] [US1] Weak-device test in internal/entity/registry_test.go: a device whose output
   carries no `Serial:` and no `MAC:` line resolves to an entity with `weak = true` and
   `device_key = 'addr:<its address>'`, never a hostname-derived key (FR-004, FR-022, US1-5)
-- [ ] T017 [P] [US1] Empty-snapshot test in internal/entity/entity_test.go: a closed snapshot holding
+- [x] T017 [P] [US1] Empty-snapshot test in internal/entity/entity_test.go: a closed snapshot holding
   no `identity` observation resolves to zero entities and still writes a `resolution` row with
   `entities = 0`, so the sweep does not pick it up again (US1-6, research R8)
-- [ ] T018 [P] [US1] Key stability test in internal/entity/registry_test.go: the same device resolved
+- [x] T018 [P] [US1] Key stability test in internal/entity/registry_test.go: the same device resolved
   in two consecutive snapshots of one perimeter carries the same `device_key` (US1-7, SC-007, FR-021)
-- [ ] T019 [P] [US1] Renumbering test in internal/entity/registry_test.go: a device whose address
+- [x] T019 [P] [US1] Renumbering test in internal/entity/registry_test.go: a device whose address
   changed between two snapshots but whose strong identifiers are unchanged keeps its key, and
   `device` gains no second row (research R5)
-- [ ] T020 [P] [US1] Partial-identifier test in internal/entity/registry_test.go: a device that
+- [x] T020 [P] [US1] Partial-identifier test in internal/entity/registry_test.go: a device that
   reported a serial and a chassis MAC in the first run and only the chassis MAC in the second keeps
   its key, which is the case a hashed key would fail (research R5)
-- [ ] T020a [P] [US1] New-key test in internal/entity/registry_test.go: a device whose serial and chassis
+- [x] T020a [P] [US1] New-key test in internal/entity/registry_test.go: a device whose serial and chassis
   MAC both changed between two snapshots, sharing no identifier with what the registry knows, mints a new
   key and a second `device` row, and nothing bridges the two entities that the system concluded on its
   own (FR-023)
-- [ ] T021 [P] [US1] Perimeter scope test in internal/entity/registry_test.go: two perimeters whose
+- [x] T021 [P] [US1] Perimeter scope test in internal/entity/registry_test.go: two perimeters whose
   devices share a strong identifier resolve to two devices with their own keys, and neither
   perimeter's registry reaches into the other (FR-021, clarification of 2026-09-24)
-- [ ] T022 [P] [US1] Attribute tie-break test in internal/entity/group_test.go: two observations
+- [x] T022 [P] [US1] Attribute tie-break test in internal/entity/group_test.go: two observations
   grouped into one entity reporting different hostnames (a short name against an FQDN) yield the
   value of the observation not marked `duplicate_of_task`, twice in a row (FR-003, FR-013,
   research R15)
-- [ ] T023 [P] [US1] Parse generation test in internal/entity/entity_test.go: claims belonging to a
+- [x] T023 [P] [US1] Parse generation test in internal/entity/entity_test.go: claims belonging to a
   superseded `parse_generation` are ignored, and only the active generation's claims are grouped
   (FR-019, research R10)
-- [ ] T024 [P] [US1] Reproducibility test in internal/entity/entity_test.go: resolving the same
+- [x] T024 [P] [US1] Reproducibility test in internal/entity/entity_test.go: resolving the same
   snapshot twice with no decision recorded in between produces the same entities, the same keys and
   the same claim membership (FR-013, SC-004)
-- [ ] T025 [P] [US1] Replacement test in internal/entity/write_test.go: re-resolving replaces the set
+- [x] T025 [P] [US1] Replacement test in internal/entity/write_test.go: re-resolving replaces the set
   rather than adding to it, leaves exactly one `resolution` row for the snapshot, and never leaves
   orphan `entity_claim` rows (FR-015)
-- [ ] T026 [P] [US1] Concurrency test in internal/entity/write_test.go: two goroutines resolving the
+- [x] T026 [P] [US1] Concurrency test in internal/entity/write_test.go: two goroutines resolving the
   same snapshot at once leave one complete entity set, the loser waiting on the advisory lock rather
   than interleaving with the winner (research R8, spec edge case)
-- [ ] T027 [P] [US1] Sweep test in internal/jobrunner/resolve_test.go: a snapshot closed directly
+- [x] T027 [P] [US1] Sweep test in internal/jobrunner/resolve_test.go: a snapshot closed directly
   against the database with no runner running is resolved on the next `Tick` (FR-016, SC-001)
-- [ ] T028 [P] [US1] Refusal test in internal/entity/entity_test.go: resolving a snapshot in state
+- [x] T028 [P] [US1] Refusal test in internal/entity/entity_test.go: resolving a snapshot in state
   `open` returns `ErrNotClosed` and writes nothing (FR-001)
-- [ ] T029 [P] [US1] Verdict independence test in internal/entity/entity_test.go: a snapshot the gate
+- [x] T029 [P] [US1] Verdict independence test in internal/entity/entity_test.go: a snapshot the gate
   classified `quarantined` is resolved like any other, and resolving writes no `snapshot_judgement`
   row (FR-025)
-- [ ] T030 [P] [US1] Immutability test in internal/entity/entity_test.go: resolving changes no row of
+- [x] T030 [P] [US1] Immutability test in internal/entity/entity_test.go: resolving changes no row of
   `observation`, `observation_raw`, `identifier_claim` or `snapshot`, checked by comparing a digest of
   those tables before and after (FR-014, FR-020, Principle II)
-- [ ] T031 [P] [US1] Replay test in internal/entity/entity_test.go: resolve two snapshots, delete
+- [x] T031 [P] [US1] Replay test in internal/entity/entity_test.go: resolve two snapshots, delete
   every row of `entity`, `entity_claim`, `resolution`, `device` and `device_identifier`, resolve both
   again in closing order, and get the same keys and the same entity sets (SC-008, FR-020)
-- [ ] T031a [P] [US1] Freshness test in internal/entity/entity_test.go: an entity built from observations
+- [x] T031a [P] [US1] Freshness test in internal/entity/entity_test.go: an entity built from observations
   collected minutes apart carries the earliest and the latest `collected_at` of its own evidence in
   `first_seen` and `last_seen`, never the resolution time (FR-006, Principle I)
 
 ### Implementation for User Story 1
 
-- [ ] T032 [US1] Implement claim reading in internal/entity/group.go: one query returning every
+- [x] T032 [US1] Implement claim reading in internal/entity/group.go: one query returning every
   `identity` observation of the snapshot with its `identifier_claim` rows, joined to the snapshot's
   active `parse_generation`, ordered by observation id so the grouping never depends on row order
   (research R2, R10)
-- [ ] T033 [US1] Implement union-find over shared strong identifiers in internal/entity/group.go,
+- [x] T033 [US1] Implement union-find over shared strong identifiers in internal/entity/group.go,
   including the transitive closure, with weak claims recorded as attributes and never used as a link
   (FR-002, FR-003, research R3)
-- [ ] T034 [US1] Detect a contradicting component in internal/entity/group.go: a component holding
+- [x] T034 [US1] Detect a contradicting component in internal/entity/group.go: a component holding
   more than one distinct value for one strong kind is not merged, and every claim group in it becomes
   its own entity. No finding is raised yet, that is US2 (research R4)
-- [ ] T035 [US1] Implement the attribute merge in internal/entity/group.go: `hostname` and `platform`
+- [x] T035 [US1] Implement the attribute merge in internal/entity/group.go: `hostname` and `platform`
   come from the observation not marked `duplicate_of_task`; `targets` lists every address the group
   answered on, that observation's first; `identifiers` is a flat copy of the strong claims
   (FR-003, FR-008, research R15)
-- [ ] T036 [US1] Implement the registry in internal/entity/registry.go: look each component's strong
+- [x] T036 [US1] Implement the registry in internal/entity/registry.go: look each component's strong
   identifiers up in `device_identifier` scoped to the perimeter name; no match mints a device keyed on
   the lexicographically smallest `<kind>:<value>` of the component, one match reuses that key and
   inserts the identifiers it did not yet know, and a component with no strong identifier mints
   `addr:<address>` with `weak = true` (FR-021, FR-022, research R5)
-- [ ] T037 [US1] Handle the two-device match in internal/entity/registry.go: a component whose
+- [x] T037 [US1] Handle the two-device match in internal/entity/registry.go: a component whose
   identifiers match more than one known device attaches to the lowest key among them and adds no
   identifier to the others, so the outcome is the same on every run. The finding is US2 (FR-023,
   research R6)
-- [ ] T038 [US1] Implement the write path in internal/entity/write.go: one transaction that takes
+- [x] T038 [US1] Implement the write path in internal/entity/write.go: one transaction that takes
   `pg_advisory_xact_lock(snapshot_id)`, deletes the snapshot's entities, inserts the new ones with
   their `entity_claim` rows, upserts `resolution` with `resolver_version`, `decisions_applied` and the
   entity count, and carries the registry's timestamps forward with
   `first_seen = LEAST(device.first_seen, ...)` and `last_seen = GREATEST(device.last_seen, ...)`, so
   resolving an older snapshot after a newer one never moves them backwards (FR-015, research R8)
-- [ ] T039 [US1] Implement `Resolve(ctx, db, snapshotID)` in internal/entity/entity.go: refuse a
+- [x] T039 [US1] Implement `Resolve(ctx, db, snapshotID)` in internal/entity/entity.go: refuse a
   snapshot that is not `closed`, read the perimeter name the way internal/gate/baseline.go does, then
   group, resolve keys and write. This is the single entry point the sweep, both subcommands and the
   tests use, which is what makes FR-013 testable (plan.md, Structure Decision)
-- [ ] T040 [US1] Add the resolving step to internal/jobrunner/resolve.go and call it from `Tick` in
+- [x] T040 [US1] Add the resolving step to internal/jobrunner/resolve.go and call it from `Tick` in
   internal/jobrunner/runner.go, after `judgeStep`: select closed snapshots with no `resolution` row
   ordered by `closed_at, id` ascending and call `entity.Resolve` for each; a failure is logged and
   retried on the next tick rather than written half-way. Oldest first is what makes the registry
   replayable (FR-016, research R1, R5)
-- [ ] T040a [US1] Return the entity count, the weak count and the conflict count from `Resolve`, so
+- [x] T040a [US1] Return the entity count, the weak count and the conflict count from `Resolve`, so
   cmd/netmapper/resolve.go can print the line contracts/cli.md specifies. T034 already detects the
   contradictions in US1; US2 only adds the findings, so the count is truthful from the start
-- [ ] T041 [US1] Wire `netmapper resolve <snapshot-id>` in cmd/netmapper/resolve.go per
+- [x] T041 [US1] Wire `netmapper resolve <snapshot-id>` in cmd/netmapper/resolve.go per
   contracts/cli.md: print `<entities> entities, <weak> weakly identified, <conflicts> conflicts`;
   exit 2 with `snapshot <id> not found` or `snapshot <id> is not closed`; resolve a never-resolved
   snapshot normally; never cascade to other snapshots (FR-017)
-- [ ] T042 [US1] Add the `resolve` subcommand to the dispatch in cmd/netmapper/main.go
+- [x] T042 [US1] Add the `resolve` subcommand to the dispatch in cmd/netmapper/main.go
 
 **Checkpoint**: User Story 1 works on its own: run quickstart.md sections 2 and 3.
 
@@ -257,34 +257,34 @@ input. On the lab, quickstart.md section 4.
 
 ### Tests for User Story 2
 
-- [ ] T043 [P] [US2] Within-snapshot conflict test in internal/entity/conflict_test.go: two claim
+- [x] T043 [P] [US2] Within-snapshot conflict test in internal/entity/conflict_test.go: two claim
   groups sharing a chassis MAC and carrying different serials produce two entities and one `finding`
   with `domain = 'data_quality'`, `category = 'identity_conflict'` and
   `detail->>'conflict' = 'within_snapshot'` naming the kind and both values (FR-007, US2-1, SC-005)
-- [ ] T044 [P] [US2] Evidence test in internal/entity/conflict_test.go: that finding's
+- [x] T044 [P] [US2] Evidence test in internal/entity/conflict_test.go: that finding's
   `finding_evidence` rows lead to the `identity` observations behind each side, and through them to
   `observation_raw` (FR-005, US2-2, SC-003)
-- [ ] T045 [P] [US2] Across-devices conflict test in internal/entity/conflict_test.go: a component
+- [x] T045 [P] [US2] Across-devices conflict test in internal/entity/conflict_test.go: a component
   matching two known devices attaches to the lowest key and raises a finding with
   `detail->>'conflict' = 'across_devices'` naming both keys and the bridging identifiers
   (FR-023, research R6)
-- [ ] T046 [P] [US2] Finding replacement test in internal/entity/conflict_test.go: re-resolving a
+- [x] T046 [P] [US2] Finding replacement test in internal/entity/conflict_test.go: re-resolving a
   snapshot whose conflict still holds leaves one finding, not two; re-resolving after the conflict is
   settled leaves none (FR-015, research R11)
-- [ ] T047 [P] [US2] Foreign finding test in internal/entity/conflict_test.go: a `parse_failed`
+- [x] T047 [P] [US2] Foreign finding test in internal/entity/conflict_test.go: a `parse_failed`
   finding the collector raised on the same snapshot survives a re-resolution untouched, including its
   `finding_evidence` rows (FR-015, research R11)
 
 ### Implementation for User Story 2
 
-- [ ] T048 [US2] Collect the within-snapshot conflict in internal/entity/group.go: a component holding
+- [x] T048 [US2] Collect the within-snapshot conflict in internal/entity/group.go: a component holding
   more than one distinct value for one strong kind is returned as a conflict carrying
   `{"conflict": "within_snapshot", "kind": ..., "values": [...], "keys": [...]}` and the `identity`
   observations of the component as its evidence. group.go raises nothing itself (FR-007)
-- [ ] T049 [US2] Collect the across-devices conflict in internal/entity/registry.go the same way, with
+- [x] T049 [US2] Collect the across-devices conflict in internal/entity/registry.go the same way, with
   `"conflict": "across_devices"` and the bridging identifiers in its detail. registry.go raises nothing
   itself (FR-023, research R6)
-- [ ] T050 [US2] Write the conflicts in internal/entity/write.go, inside the transaction of T038 and in
+- [x] T050 [US2] Write the conflicts in internal/entity/write.go, inside the transaction of T038 and in
   this order: delete the snapshot's `finding_evidence` rows then its `finding` rows, restricted to
   `category = 'identity_conflict'` and that `snapshot_id`, then raise the ones T048 and T049 collected
   through `store.RaiseFinding` with `domain = 'data_quality'` and `subject_ref` holding the device keys.
@@ -306,50 +306,50 @@ section 5.
 
 ### Tests for User Story 3
 
-- [ ] T052 [P] [US3] Merge test in internal/entity/decisions_test.go: a `merge` on two device keys
+- [x] T052 [P] [US3] Merge test in internal/entity/decisions_test.go: a `merge` on two device keys
   makes every snapshot containing both resolve them to one entity carrying the first key (US3-1,
   FR-009)
-- [ ] T053 [P] [US3] Never-merge test in internal/entity/decisions_test.go: a `never_merge` on two
+- [x] T053 [P] [US3] Never-merge test in internal/entity/decisions_test.go: a `never_merge` on two
   keys that share a strong identifier keeps two entities under two distinct device keys, so
   `UNIQUE (snapshot_id, device_key)` is satisfied by the grouping and not by luck, and raises no
   `identity_conflict` finding for that pair (US3-2, FR-009, FR-024)
-- [ ] T054 [P] [US3] Split persistence test in internal/entity/decisions_test.go: a `split` detaching
+- [x] T054 [P] [US3] Split persistence test in internal/entity/decisions_test.go: a `split` detaching
   an identifier keeps the devices apart on the next run where that identifier is observed again, each
   under its own key (US3-3, FR-012, FR-024, SC-006)
-- [ ] T055 [P] [US3] Late decision test in internal/entity/decisions_test.go: a decision recorded
+- [x] T055 [P] [US3] Late decision test in internal/entity/decisions_test.go: a decision recorded
   after a snapshot was resolved applies when that snapshot is resolved again, and `decisions_applied`
   on the `resolution` row names it (US3-4, FR-017)
-- [ ] T056 [P] [US3] Absent subject test in internal/entity/decisions_test.go: a decision whose
+- [x] T056 [P] [US3] Absent subject test in internal/entity/decisions_test.go: a decision whose
   subjects appear in no snapshot of the perimeter is skipped without failing the resolution and still
   applies later when they do appear (US3-5)
-- [ ] T057 [P] [US3] Ordering test in internal/entity/decisions_test.go: a `merge` then a
+- [x] T057 [P] [US3] Ordering test in internal/entity/decisions_test.go: a `merge` then a
   `never_merge` on the same pair resolves as two entities, the reverse order as one, and both rows
   stay readable (FR-011)
-- [ ] T058 [P] [US3] CLI validation test in cmd/netmapper/decide_test.go: exit 2 for an unknown
+- [x] T058 [P] [US3] CLI validation test in cmd/netmapper/decide_test.go: exit 2 for an unknown
   subject key, for a merge naming the same key twice, and for a split whose identifier is not
   attributed to the named device (contracts/cli.md)
 
 ### Implementation for User Story 3
 
-- [ ] T059 [US3] Implement decision reading in internal/entity/decisions.go: every
+- [x] T059 [US3] Implement decision reading in internal/entity/decisions.go: every
   `entity_decision` of the perimeter ordered by `id`, with the rule that the last decision on the same
   unordered subject pair governs and earlier ones stay readable (FR-011)
-- [ ] T060 [US3] Apply `merge` in internal/entity/decisions.go and internal/entity/registry.go: the
+- [x] T060 [US3] Apply `merge` in internal/entity/decisions.go and internal/entity/registry.go: the
   second key's identifiers resolve to the first key, and entities carry the first (FR-009)
-- [ ] T061 [US3] Apply `split` in internal/entity/decisions.go: the named identifier is removed from
+- [x] T061 [US3] Apply `split` in internal/entity/decisions.go: the named identifier is removed from
   the named device before lookup, so a claim group carrying it matches or mints another device
   (FR-012, research R7)
-- [ ] T062 [US3] Apply `never_merge` in internal/entity/group.go and internal/entity/registry.go: an
+- [x] T062 [US3] Apply `never_merge` in internal/entity/group.go and internal/entity/registry.go: an
   identifier observed on both subjects is ignored as a link and raises no conflict finding for that
   pair (FR-009, US3-2)
-- [ ] T063 [US3] Record `decisions_applied` on the `resolution` row in internal/entity/write.go: the
+- [x] T063 [US3] Record `decisions_applied` on the `resolution` row in internal/entity/write.go: the
   highest `entity_decision.id` read for the perimeter, 0 when it has none, whether or not every one of
   them applied, so a result can be explained afterwards
-- [ ] T064 [US3] Implement `netmapper decide merge|split|never-merge` in cmd/netmapper/decide.go per
+- [x] T064 [US3] Implement `netmapper decide merge|split|never-merge` in cmd/netmapper/decide.go per
   contracts/cli.md: `--perimeter`, `--keys` or `--key` plus `--identifier kind=value`, `--note`,
   `--actor` defaulting to the OS user; validate the subjects exist in that perimeter; print
   `decision <id> recorded` and then the snapshots now stale as `resolve <ids> to apply`
-- [ ] T065 [US3] Add the `decide` subcommand to the dispatch in cmd/netmapper/main.go
+- [x] T065 [US3] Add the `decide` subcommand to the dispatch in cmd/netmapper/main.go
 
 **Checkpoint**: All three stories work: run quickstart.md section 5.
 
@@ -357,19 +357,22 @@ section 5.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T066 [P] Carry the deltas of plan.md into docs/c4-model/04-data-model.md: the six new tables,
+- [x] T066 [P] Carry the deltas of plan.md into docs/c4-model/04-data-model.md: the six new tables,
   the closing of the "row per snapshot or validity interval" question for entities, `identity_conflict`
   in the findings categories, and the engine's new grants
-- [ ] T067 [P] Note in docs/c4-model/04-data-model.md that 002's `compare` will have a simpler source
+- [x] T067 [P] Note in docs/c4-model/04-data-model.md that 002's `compare` will have a simpler source
   once entities carry a device key, and that changing it is a separate change with its own
   `gate_version` bump, not part of this feature
 - [ ] T068 Run quickstart.md sections 2 to 5 against the containerlab lab and record every divergence
   in its "Divergences recorded during implementation" section, the way 002 did. A divergence is a
-  finding about the design, not a detail to fix silently
-- [ ] T069 Review `resolverVersion` in internal/entity/entity.go before merging: if the grouping changed after the first snapshots
+  finding about the design, not a detail to fix silently.
+  **Partly done**: containerlab is not installed on the dev machine, so sections 2 to 5 have not run.
+  Section 1 is green over three parallel runs, and the eight divergences the integration suite
+  surfaced are recorded. This task stays open for the lab run itself
+- [x] T069 Review `resolverVersion` in internal/entity/entity.go before merging: if the grouping changed after the first snapshots
   were resolved during development, bump it, and say so in the commit. 002's lab run showed the bump
   is easy to forget exactly when it matters (research R9)
-- [ ] T070 Run `go test ./...` with `NETMAPPER_TEST_DSN` set and confirm the whole suite passes, 001
+- [x] T070 Run `go test ./...` with `NETMAPPER_TEST_DSN` set and confirm the whole suite passes, 001
   and 002 included: nothing in this feature may change a crawl outcome or a verdict
 
 ---

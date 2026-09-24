@@ -55,3 +55,54 @@ func TestEngineCannotRewriteJudgements(t *testing.T) {
 		}
 	}
 }
+
+// T011, FR-009 and FR-014: resolution gains the computed zone and, for the first time, the right to
+// remove a finding it raised. That must not have widened anything else: a decision stays append only
+// and the collected zone stays untouchable.
+func TestResolutionGrantsStayNarrow(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	eng := testutil.As(t, db, "netmapper_engine")
+
+	for _, q := range []string{
+		"UPDATE entity_decision SET kind = 'merge'",
+		"DELETE FROM entity_decision",
+		"INSERT INTO entity_decision (perimeter_name, kind, subjects, actor) VALUES ('lab', 'merge', ARRAY['a', 'b'], 'x')",
+	} {
+		if _, err := eng.Exec(ctx, q); err == nil {
+			t.Errorf("engine: %s: allowed", q)
+		}
+	}
+	var decisions int
+	if err := eng.QueryRow(ctx, "SELECT count(*) FROM entity_decision").Scan(&decisions); err != nil {
+		t.Errorf("engine cannot read decisions: %v", err)
+	}
+
+	// The computed zone is the engine's to replace, and a finding is part of what a resolution
+	// replaces (FR-015).
+	for _, q := range []string{
+		"DELETE FROM entity",
+		"DELETE FROM entity_claim",
+		"DELETE FROM resolution",
+		"DELETE FROM device_identifier",
+		"DELETE FROM device",
+		"DELETE FROM finding_evidence",
+		"DELETE FROM finding",
+	} {
+		if _, err := eng.Exec(ctx, q); err != nil {
+			t.Errorf("engine: %s: %v", q, err)
+		}
+	}
+
+	// The new grants must not have reached the collected zone.
+	for _, q := range []string{
+		"UPDATE observation SET status = 'collected'",
+		"DELETE FROM observation",
+		"UPDATE identifier_claim SET value = ''",
+		"DELETE FROM identifier_claim",
+	} {
+		if _, err := eng.Exec(ctx, q); err == nil {
+			t.Errorf("engine: %s: allowed", q)
+		}
+	}
+}

@@ -158,5 +158,50 @@ snapshot ends with exactly one `resolution` row and a complete entity set.
 
 ## Divergences recorded during implementation
 
-To be filled in during `/speckit-implement`, the way 002's were. Anything the lab contradicts belongs
-here rather than in a silent edit of the plan.
+Recorded on 2026-09-24. Sections 2 to 5 have not been run: containerlab is not installed on this
+machine, so everything below comes from the integration suite rather than from the lab. Section 1 is
+green, three parallel runs in a row.
+
+1. **The operator needs the finding grants too.** T010 gave `INSERT, DELETE` on `finding` and
+   `finding_evidence` to `netmapper_engine` only, but `netmapper resolve` runs the resolver in the
+   operator's process, so a re-resolution of a snapshot holding a collision would have failed for the
+   operator. Both roles hold them.
+
+2. **Raising a finding needs its sequence.** 001 granted `USAGE ON ALL SEQUENCES` to the operator and
+   the collector, not to the engine, so `GRANT USAGE ON SEQUENCE finding_id_seq TO netmapper_engine`
+   is part of this migration. Research R12 predicted this was the shape of the gap, and it was.
+
+3. **FR-024 needed a rule the plan did not have.** Two claim groups refused a merge can both match the
+   identifier they collided on, which would give them one key and violate
+   `UNIQUE (snapshot_id, device_key)`. The rule added: a key already used by an earlier component of
+   the same snapshot is not offered again, and a component that cannot use its anchor walks to the next
+   free identifier it carries before falling back to `addr:<address>`. Components are ordered by their
+   anchor, so this is reproducible.
+
+4. **A merge has to link claim groups that share nothing.** Decisions name device keys, not
+   identifiers, so a merge of two devices with no identifier in common could not be applied by the
+   token-based grouping alone. A device key the registry already resolves a claim group to is now a
+   link like an identifier is.
+
+5. **An operator merge is exempt from the contradiction rule.** Two devices an operator declares to be
+   one box do disagree on their serials, so the automatic "a component that disagrees with itself is
+   not merged" rule tore the merged entity apart again on every resolution. A component whose claim
+   groups all resolve to the same single device key is one the registry already settled, by a previous
+   resolution or by a decision, and the contradiction rule leaves it alone. R4's refusal is about
+   automatic merges, which this is not.
+
+6. **001's schema cannot hold two parse generations of one observation.** `observation` is unique on
+   `(snapshot_id, target, fact_family, task_id)`, so the FR-019 test builds the superseded generation
+   on its own address rather than as a second reading of the same one. Worth knowing before a replay
+   feature is written; it is 001's constraint, not this feature's.
+
+7. **`Lab.Crawl` had to wait for the engine's sweeps.** A job reaches `succeeded` inside the tick that
+   closes its snapshot, before that same tick judges and resolves it, so stopping the engine right
+   after `Wait` could cancel the sweep mid-way. The race predated this feature and was rare enough to
+   pass; a second sweep per tick made it fire on roughly one parallel run in one. `Crawl` now waits for
+   the verdict and the entity set before stopping the engine, which also removes a pre-existing source
+   of flakiness in 002's tests.
+
+8. **`resolverVersion` stays at 1 (T069).** The grouping changed several times while this was being
+   built, but no snapshot outside the test schemas was ever resolved by an earlier version, so there is
+   nothing to find and replay. The first bump belongs to the first change made after the lab has run.

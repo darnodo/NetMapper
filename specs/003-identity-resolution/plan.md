@@ -87,6 +87,15 @@ the quickstart asserts that the collector's own findings survive a re-resolution
 `SECURITY DEFINER` function taking only a snapshot id, was considered and left out: it would be the fourth
 such function for a delete that already cannot reach anything an operator would miss.
 
+Third pass, after the 2026-09-24 analysis: still passes, with one placement made explicit. The collision
+findings are deleted and raised inside the same transaction that rewrites the entity set, so a report and
+the set it describes are never separately visible and a failed resolution leaves neither. The grouping and
+the registry return their conflicts rather than writing them, which keeps every write in one file and one
+transaction. Two limits are now recorded rather than implied: resolution cannot separate two devices whose
+strong identifiers are identical in every kind, because that evidence is the same as one device answering
+on two addresses (R4, settled at crawl time by 001's live deduplication); and FR-018's retrieval is SQL
+until an interface exists, which is where Principle I's response contract will be enforced.
+
 Principles touched by this feature: I, II.
 
 ## Documentation deltas to carry into `docs/c4-model/04-data-model.md`
