@@ -204,3 +204,28 @@ func TestEntityCarriesItsEvidenceTimes(t *testing.T) {
 		t.Errorf("first_seen/last_seen/before-resolution = %v, want the range of its own evidence", rows)
 	}
 }
+
+// contracts/cli.md makes `netmapper resolve` an operator command, so the whole resolution has to work
+// under netmapper_operator and not only under the engine. Every other test here connects as the engine,
+// which is how a missing grant on the claims and on findings went unnoticed until a security review.
+func TestResolveWorksAsTheOperator(t *testing.T) {
+	l, doc := lab(t, map[string]*fake.Device{
+		"10.0.0.1": FakeOSShaped("a", "S001", Both),
+		"10.0.0.2": FakeOSShaped("b", "X001", Both), // shares the MAC, contradicts on the serial
+	})
+	snap := snapshotOf(l, l.Crawl(doc))
+	if n := l.Int(`SELECT count(*) FROM finding WHERE snapshot_id = $1 AND category = 'identity_conflict'`, snap); n != 1 {
+		t.Fatalf("%d collision findings, want one so the operator path has to touch findings too", n)
+	}
+
+	r, err := entity.Resolve(context.Background(), l.Operator, snap)
+	if err != nil {
+		t.Fatalf("resolving as the operator: %v", err)
+	}
+	if r.Entities != 2 || r.Conflicts != 1 {
+		t.Errorf("%d entities and %d conflicts, want 2 and 1, the same as the engine produces", r.Entities, r.Conflicts)
+	}
+	if n := l.Int(`SELECT count(*) FROM finding WHERE snapshot_id = $1 AND category = 'identity_conflict'`, snap); n != 1 {
+		t.Errorf("%d collision findings after the operator resolved, want the set replaced, not stacked", n)
+	}
+}

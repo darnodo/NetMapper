@@ -114,8 +114,14 @@ GRANT SELECT ON entity_decision TO netmapper_engine;
 -- no role but the owner may UPDATE or DELETE entity_decision (FR-009).
 GRANT SELECT, INSERT, UPDATE, DELETE ON resolution, entity, entity_claim, device, device_identifier
     TO netmapper_operator;
+-- The resolver reads the claims before it writes anything, and 001 gave the operator no access to that
+-- zone: it is the collector's and the engine's. Read only, on an append-only zone, and it is what
+-- quickstart's own queries already assume an operator can do.
+GRANT SELECT ON observation, identifier_claim TO netmapper_operator;
 GRANT USAGE ON SEQUENCE entity_id_seq TO netmapper_operator;
-GRANT INSERT, DELETE ON finding, finding_evidence TO netmapper_operator;
+-- SELECT as well as INSERT and DELETE: PostgreSQL reads the columns of a DELETE's WHERE clause and of
+-- a RETURNING clause, so without it the resolver's own statements are refused under this role.
+GRANT SELECT, INSERT, DELETE ON finding, finding_evidence TO netmapper_operator;
 GRANT SELECT, INSERT ON entity_decision TO netmapper_operator;
 GRANT USAGE ON SEQUENCE entity_decision_id_seq TO netmapper_operator;
 

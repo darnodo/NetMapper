@@ -151,6 +151,18 @@ Expected: the same two entities, and no `identity_conflict` finding this time (F
 
 ## 5. Decisions surviving a recomputation (US3)
 
+Run these as the operator rather than as the database owner, or the grants the contract relies on are
+never exercised. The roles are `NOLOGIN`, so a lab needs a login role that is a member of one:
+
+```sql
+CREATE ROLE lab_operator LOGIN PASSWORD 'lab';
+GRANT netmapper_operator TO lab_operator;
+```
+
+```sh
+export NETMAPPER_DSN='postgres://lab_operator:lab@localhost:5432/netmapper?sslmode=disable'
+```
+
 ```sh
 ./netmapper decide merge --perimeter lab --keys serial:AAA,serial:BBB --note "warranty swap"
 ./netmapper resolve :SNAP
@@ -178,10 +190,14 @@ Recorded on 2026-09-24. Section 1 is green, three parallel runs in a row. Sectio
 run against the containerlab lab (three cEOS nodes on 172.20.20.0/24); divergences 10 and 11 come from
 that run. What is still unrun, and why, is at the end.
 
-1. **The operator needs the finding grants too.** T010 gave `INSERT, DELETE` on `finding` and
-   `finding_evidence` to `netmapper_engine` only, but `netmapper resolve` runs the resolver in the
-   operator's process, so a re-resolution of a snapshot holding a collision would have failed for the
-   operator. Both roles hold them.
+1. **The operator needs the finding grants too, `SELECT` included.** T010 gave `INSERT, DELETE` on
+   `finding` and `finding_evidence` to `netmapper_engine` only, but `netmapper resolve` runs the resolver
+   in the operator's process, so a re-resolution of a snapshot holding a collision would have failed for
+   the operator. Both roles hold them. `SELECT` was missing from the first correction and a security
+   review caught it: PostgreSQL reads the columns of a `DELETE`'s `WHERE` clause and of a `RETURNING`
+   clause, so all three statements the resolver runs on that surface were refused under the operator role
+   while every test connected as the engine, which holds `SELECT` from 001. The grant test now exercises
+   both roles.
 
 2. **Raising a finding needs its sequence.** 001 granted `USAGE ON ALL SEQUENCES` to the operator and
    the collector, not to the engine, so `GRANT USAGE ON SEQUENCE finding_id_seq TO netmapper_engine`

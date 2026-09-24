@@ -105,4 +105,36 @@ func TestResolutionGrantsStayNarrow(t *testing.T) {
 			t.Errorf("engine: %s: allowed", q)
 		}
 	}
+
+	// netmapper resolve runs the resolver in the operator's process, so the operator needs every right
+	// the resolver uses, on the same tables. Testing only the engine is what let a missing SELECT on
+	// finding through: PostgreSQL reads the columns of a DELETE's WHERE clause and of a RETURNING
+	// clause, so the statements below fail without it however many rows exist.
+	op := testutil.As(t, db, "netmapper_operator")
+	for _, q := range []string{
+		`DELETE FROM finding_evidence WHERE finding_id IN
+			(SELECT id FROM finding WHERE snapshot_id = 0 AND category = 'identity_conflict')`,
+		"DELETE FROM finding WHERE snapshot_id = 0 AND category = 'identity_conflict'",
+		"DELETE FROM entity WHERE snapshot_id = 0",
+		"DELETE FROM resolution WHERE snapshot_id = 0",
+		"DELETE FROM device_identifier",
+		"DELETE FROM device",
+	} {
+		if _, err := op.Exec(ctx, q); err != nil {
+			t.Errorf("operator: %s: %v", q, err)
+		}
+	}
+	var findings int
+	if err := op.QueryRow(ctx, "SELECT count(*) FROM finding").Scan(&findings); err != nil {
+		t.Errorf("operator cannot read findings, so raising one cannot return its id: %v", err)
+	}
+	// And the operator's own boundary still holds: a decision is insert only for it too.
+	for _, q := range []string{
+		"UPDATE entity_decision SET kind = 'merge'",
+		"DELETE FROM entity_decision",
+	} {
+		if _, err := op.Exec(ctx, q); err == nil {
+			t.Errorf("operator: %s: allowed", q)
+		}
+	}
 }
