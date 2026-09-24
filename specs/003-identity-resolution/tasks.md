@@ -363,12 +363,12 @@ section 5.
 - [x] T067 [P] Note in docs/c4-model/04-data-model.md that 002's `compare` will have a simpler source
   once entities carry a device key, and that changing it is a separate change with its own
   `gate_version` bump, not part of this feature
-- [ ] T068 Run quickstart.md sections 2 to 5 against the containerlab lab and record every divergence
+- [x] T068 Run quickstart.md sections 2 to 5 against the containerlab lab and record every divergence
   in its "Divergences recorded during implementation" section, the way 002 did. A divergence is a
   finding about the design, not a detail to fix silently.
-  **Partly done**: containerlab is not installed on the dev machine, so sections 2 to 5 have not run.
-  Section 1 is green over three parallel runs, and the eight divergences the integration suite
-  surfaced are recorded. This task stays open for the lab run itself
+  **Done**: sections 2 to 5 all pass against four cEOS nodes. The lab gained sw4, a pinned-serial clone
+  of sw1 for section 4, and section 3's renumbering is now a documented in-place configuration change.
+  Four divergences recorded, 10 to 13, two of which are corrections to quickstart's own expectations
 - [x] T069 Review `resolverVersion` in internal/entity/entity.go before merging: if the grouping changed after the first snapshots
   were resolved during development, bump it, and say so in the commit. 002's lab run showed the bump
   is easy to forget exactly when it matters (research R9)

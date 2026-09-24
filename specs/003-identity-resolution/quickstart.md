@@ -77,7 +77,7 @@ Wait for the job to succeed, then:
 SELECT e.device_key, e.weak, e.attributes->>'hostname', e.attributes->'targets', e.first_seen, e.last_seen
 FROM entity e JOIN snapshot s ON s.id = e.snapshot_id JOIN job b ON b.snapshot_id = s.id
 WHERE b.id = :JOB ORDER BY e.device_key;
--- two rows, sw1 and sw2, neither weak, each with its serial as the key
+-- two rows, sw1 and sw2, neither weak, each keyed on its chassis MAC (see divergence 10)
 ```
 
 Expected: two entities for two switches, whatever the crawl's task count was, and
@@ -107,20 +107,35 @@ SELECT device_key, count(*) FROM entity WHERE snapshot_id IN (:SNAP1, :SNAP2) GR
 The keys must be identical across the two snapshots. That identity is the whole point of the registry
 and the thing the diff will hang off.
 
-Then renumber a switch's management address in the lab and run again: same keys, a new address in
-`attributes->'targets'`, no new device in `device`.
+Then renumber a switch's management address and run again: same keys, a new address in
+`attributes->'targets'`, no new device in `device`. Change it in place rather than redeploying, or the
+node comes back with a new serial and a new MAC and reads as a replacement instead of a renumbering:
+
+```sh
+docker exec -i clab-netmapper-sw2 Cli -p 15 <<'EOF'
+configure
+interface Management0
+ip address 172.20.20.13/24
+end
+EOF
+```
 
 ## 4. A contradiction (US2)
 
-Give the lab two devices that contradict each other on a strong identifier. The cheapest way is a second
-cEOS node whose serial is set to sw1's while it keeps its own chassis MAC, on an address inside the
-perimeter, seeded directly. The MACs must differ: two nodes identical in every strong identifier are
-indistinguishable from one node answering on two addresses, and 001's live deduplication ends the second
-as a duplicate before resolution ever sees it.
+sw4 in the topology is that device: sw1's serial, its own chassis MAC, on 172.20.20.5 and seeded. The
+MACs must differ, because two nodes identical in every strong identifier are indistinguishable from one
+node answering on two addresses, and 001's live deduplication ends the second as a duplicate before
+resolution ever sees it.
+
+The serial is pinned through `/mnt/flash/ceos-config`, bound in from `test/lab/ceos-config-sw1` and
+`ceos-config-sw4`. cEOS ignores a `SERIALNUMBER` environment variable, so containerlab's `env:` does not
+work for this (divergence 12), and without pinning the serial is generated per container and changes on
+every redeploy.
 
 ```sql
 SELECT subject_ref, detail FROM finding WHERE category = 'identity_conflict' AND snapshot_id = :SNAP;
--- {"conflict": "within_snapshot", "kind": "serial", "values": [...], "keys": [...]}
+-- {"conflict": "within_snapshot", "kind": "chassis_mac", "values": [the two MACs], "keys": [both]}
+-- The kind named is the one they contradict each other on, not the one they share (divergence 13).
 SELECT count(*) FROM entity WHERE snapshot_id = :SNAP;
 -- still one entity per physical box: the contradicting component did not merge
 ```
@@ -159,9 +174,9 @@ snapshot ends with exactly one `resolution` row and a complete entity set.
 
 ## Divergences recorded during implementation
 
-Recorded on 2026-09-24. Sections 2 to 5 have not been run: containerlab is not installed on this
-machine, so everything below comes from the integration suite rather than from the lab. Section 1 is
-green, three parallel runs in a row.
+Recorded on 2026-09-24. Section 1 is green, three parallel runs in a row. Sections 2, 3 and 5 have been
+run against the containerlab lab (three cEOS nodes on 172.20.20.0/24); divergences 10 and 11 come from
+that run. What is still unrun, and why, is at the end.
 
 1. **The operator needs the finding grants too.** T010 gave `INSERT, DELETE` on `finding` and
    `finding_evidence` to `netmapper_engine` only, but `netmapper resolve` runs the resolver in the
@@ -216,3 +231,50 @@ green, three parallel runs in a row.
 9. **`resolverVersion` stays at 1 (T069).** The grouping changed several times while this was being
    built, but no snapshot outside the test schemas was ever resolved by an earlier version, so there is
    nothing to find and replay. The first bump belongs to the first change made after the lab has run.
+
+10. **An Arista device keys on its chassis MAC, not its serial.** Found by the lab run. Section 2 used
+    to say "each with its serial as the key", which is wrong for any pack declaring both: the anchor is
+    the lexicographically smallest `<kind>:<value>` (R5), and `chassis_mac` sorts before `serial`. The
+    real keys are `chassis_mac:00:1c:73:6d:29:e1` for sw1 and `chassis_mac:00:1c:73:4c:e4:1f` for sw2.
+    The behaviour follows R5 exactly; the expectation was written before the rule met a real pack, and
+    section 2 is corrected. Worth knowing for anyone reading a key and expecting a serial.
+
+11. **A merge of two devices that are both real leaves the hostname to the lowest observation id.**
+    Found by the lab run. R15 settles the weak attributes by taking the observation the crawl did not
+    mark a duplicate, which answers the one-device-two-addresses case it was written for. When an
+    operator merges two genuinely distinct devices, neither observation is a duplicate, so the tie-break
+    falls through to the lowest observation id. Observed on the lab: merging sw1 and sw2 gives one entity
+    carrying sw2's key and sw1's hostname, with both addresses in `targets`. Deterministic and
+    reproducible, so FR-013 holds, but a reader will find it odd, and it is the operator's own decision
+    that produced it. Left as is: naming the entity after the first subject of the decision would be the
+    alternative, and that is a spec question rather than a bug.
+
+12. **cEOS ignores a `SERIALNUMBER` environment variable.** Found while building section 4's clone.
+    containerlab passes `env:` into the container, and the variable is there, but cEOS reads its platform
+    overrides from `/mnt/flash/ceos-config` and generates a serial per container otherwise. The topology
+    therefore binds a one-line file into sw1 and sw4. Two consequences worth knowing: a node's serial and
+    chassis MAC change on every redeploy unless pinned, so any lab expectation naming a serial is only
+    good until the next `containerlab deploy`; and section 3's renumbering has to be a configuration
+    change on a running node, because recreating it gives a new identity and reads as a replacement.
+
+13. **The collision finding names the kind the two devices differ on, not the one they share.** Section 4
+    expected `"kind": "serial"`. On the lab, sw1 and sw4 share the serial and differ on their chassis MAC,
+    and the finding says `"kind": "chassis_mac"` with the two MACs as its values. FR-007 is explicit, the
+    finding names "the contradicting identifier", so the behaviour is right and the expectation was
+    written the wrong way round. Section 4 is corrected.
+
+### What the lab confirmed
+
+Sections 2, 3, 4 and 5 all pass against four cEOS nodes. Section 6 stays an integration test, for the
+reason 002 gave: closing a snapshot needs the engine, so there is no way to close one by hand while the
+engine is down.
+
+Beyond the assertions those sections list, the run confirmed several things no test in section 1 reaches:
+the evidence chain resolves on real device output, from entity through `entity_claim` and
+`identifier_claim` to `observation_raw` and the commands behind each side, on both the SNMP and the SSH
+path; `attributes->'identifiers'` carries the real serials and MACs; `netmapper decide` and
+`netmapper resolve` print exactly what contracts/cli.md specifies, `resolve 1, 2 to apply` included, with
+the real stale snapshots named; the collector's own `credential_denied` finding from sw3 survives a
+re-resolution that removes the collision findings; and SC-006 holds end to end, since the never-merge
+recorded against the first snapshot applied on its own to the next run of the perimeter, which is the one
+claim about decisions that no single-snapshot test can make.
