@@ -65,7 +65,7 @@ reasons
 | Raw output in object store by hash                   | Pass   | Not touched                                                                                                                                                                                                                                                                                                                                                                                         |
 | Status enum closed and non-null                      | Pass   | The six observation statuses are unchanged and read only. The judgement adds its own closed enum of three classifications, `NOT NULL` with a `CHECK`                                                                                                                                                                                                                                                |
 | Snapshots immutable once closed                      | Pass   | The `snapshot_closed_is_final` trigger from 001 stays; the verdict lives in its own table precisely so the snapshot row is never touched (R4)                                                                                                                                                                                                                                                       |
-| Config YAML posted whole, versioned, recorded on run | Pass   | Thresholds are two optional keys inside the same document, stored on the `perimeter` row of that config version, so a verdict is read against the thresholds its own run used (R13)                                                                                                                                                                                                                 |
+| Config YAML posted whole, versioned, recorded on run | Pass   | The threshold is one optional key inside the same document, stored on the `perimeter` row of that config version, so a verdict is read against the thresholds its own run used (R13)                                                                                                                                                                                                                 |
 | Workflow: open questions go to `docs/`               | Action | The deltas below must be carried into `docs/c4-model/04-data-model.md` in this branch                                                                                                                                                                                                                                                                                                               |
 
 Post-design re-check: still passes. Phase 1 added the `judge_snapshot` function, the partial unique
@@ -119,7 +119,7 @@ internal/
 ├── jobrunner/                # + judging step in Tick, sweep query (R6)
 └── store/                    # unchanged
 
-migrations/0005_judgement.sql # table, function, perimeter columns, grants
+migrations/0005_judgement.sql # table, function, perimeter column, grants
 ```
 
 **Structure Decision**: one new package, `internal/gate`, holding everything that decides a verdict;

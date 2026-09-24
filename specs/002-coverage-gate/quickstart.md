@@ -29,14 +29,19 @@ these cases:
 | one baseline device never attempted at all                     | SC-006, US2-2     |
 | baseline device renumbered, same strong claim                  | R2, no false loss |
 | perimeter narrowed between runs, dropped device not a loss     | R8, edge case     |
+| one device reached on two addresses counts once                | R2, R3, FR-003    |
+| every reason named, with the addresses behind it               | FR-006, US2-1     |
 | perimeter matched by name across two config versions           | R1                |
-| declared thresholds classify differently from the defaults     | US3, FR-005       |
+| baseline is the preceding run, not the last one judged         | FR-015, R7        |
+| declared threshold classifies differently from the default    | US3, FR-005       |
+| a threshold change leaves earlier verdicts alone               | SC-005, FR-005    |
 | re-judge writes a new active row, old row still readable       | FR-009, FR-012    |
 | re-judge with same inputs yields identical figures             | FR-012, SC-003    |
 | engine cannot UPDATE or DELETE a judgement                     | FR-009            |
 | snapshot closed while the engine was down is judged on restart | FR-014, US1-6     |
 | open snapshot is refused                                       | FR-001            |
 | two engines judging at once produce one active row             | R12               |
+| a quarantined snapshot stays readable and unmodified            | FR-011, FR-008    |
 
 ## 2. Lab run: a clean baseline
 
