@@ -27,7 +27,10 @@ var (
 // gateVersion identifies the calculation that produced a judgement. Bump it by hand when a change
 // to the comparison alters results, so the judgements the old version wrote can be found and
 // replayed instead of being re-crawled.
-const gateVersion = 1
+//
+// 2: a perimeter declaring one threshold and not the other used to keep the default for the other,
+// which crossed the two and quarantined coverages the declared one called degraded.
+const gateVersion = 2
 
 // Judgement is one verdict, as stored in snapshot_judgement.
 type Judgement struct {

@@ -289,7 +289,7 @@ func TestBreakdownNamesEveryReason(t *testing.T) {
 		       jsonb_array_length(breakdown->'perimeter_filtered'->'targets') || ' ' ||
 		       gate_version || ' ' || (computed_at IS NOT NULL)
 		FROM snapshot_judgement WHERE snapshot_id = $1 AND active`, snap)
-	if len(stored) != 1 || stored[0] != "1 10.0.0.3 0 0 1 true" {
-		t.Errorf("stored breakdown reads %q, want \"1 10.0.0.3 0 0 1 true\"", stored)
+	if len(stored) != 1 || stored[0] != "1 10.0.0.3 0 0 2 true" {
+		t.Errorf("stored breakdown reads %q, want \"1 10.0.0.3 0 0 2 true\"", stored)
 	}
 }

@@ -21,22 +21,22 @@ go test ./...
 Expected: all pass. The gate tests build snapshots with the fake transport and must include at least
 these cases:
 
-| Test                                                          | Proves                 |
-| ------------------------------------------------------------- | ---------------------- |
-| first snapshot of a perimeter: published, null baseline        | FR-004, R10            |
-| identical second snapshot: published, coverage 1.0             | US1-1, SC-001          |
-| one baseline device now unreachable                            | US1-2/3, FR-006        |
-| one baseline device never attempted at all                     | SC-006, US2-2          |
-| baseline device renumbered, same strong claim                  | R2, no false loss      |
-| perimeter narrowed between runs, dropped device not a loss     | R8, edge case          |
-| perimeter matched by name across two config versions           | R1                     |
-| declared thresholds classify differently from the defaults     | US3, FR-005            |
-| re-judge writes a new active row, old row still readable       | FR-009, FR-012         |
-| re-judge with same inputs yields identical figures             | FR-012, SC-003         |
-| engine cannot UPDATE or DELETE a judgement                     | FR-009                 |
-| snapshot closed while the engine was down is judged on restart | FR-014, US1-6          |
-| open snapshot is refused                                       | FR-001                 |
-| two engines judging at once produce one active row             | R12                    |
+| Test                                                           | Proves            |
+| -------------------------------------------------------------- | ----------------- |
+| first snapshot of a perimeter: published, null baseline        | FR-004, R10       |
+| identical second snapshot: published, coverage 1.0             | US1-1, SC-001     |
+| one baseline device now unreachable                            | US1-2/3, FR-006   |
+| one baseline device never attempted at all                     | SC-006, US2-2     |
+| baseline device renumbered, same strong claim                  | R2, no false loss |
+| perimeter narrowed between runs, dropped device not a loss     | R8, edge case     |
+| perimeter matched by name across two config versions           | R1                |
+| declared thresholds classify differently from the defaults     | US3, FR-005       |
+| re-judge writes a new active row, old row still readable       | FR-009, FR-012    |
+| re-judge with same inputs yields identical figures             | FR-012, SC-003    |
+| engine cannot UPDATE or DELETE a judgement                     | FR-009            |
+| snapshot closed while the engine was down is judged on restart | FR-014, US1-6     |
+| open snapshot is refused                                       | FR-001            |
+| two engines judging at once produce one active row             | R12               |
 
 ## 2. Lab run: a clean baseline
 
@@ -133,3 +133,28 @@ Covered by an integration test rather than the lab: closing a snapshot requires 
 is no way to close one while the engine is down by hand. The test closes a snapshot directly against
 the database with no engine running, then starts the runner and asserts the snapshot ends with
 exactly one active judgement.
+
+## Divergences recorded during implementation (2026-09-24)
+
+Sections 1 to 5 run against the real lab. Section 6 stays an integration test as written above.
+
+- Section 3: the neighbour table does not come back empty when LLDP is off, it comes back
+  `parse_failed`. cEOS answers `% LLDP is not enabled`, which matches neither the template nor the
+  pack's `empty_lines`, so the run raises a `data_quality` finding as well. This does not weaken the
+  scenario: the finding says a command stopped parsing, nothing in the snapshot says a device is
+  missing. Only the judgement does, as `not_attempted`.
+- Sections 3 and 4 in sequence: a regression left in place becomes the new normal on the very next
+  run, because a snapshot's baseline is the run before it. After section 3, the following run
+  compares one device against one device and is published again. Section 4 therefore has to restore
+  LLDP, take a clean two-device baseline, and only then turn LLDP off again with the tolerant
+  document. This is the intended consequence of measuring change rather than absolute state, but it
+  means an operator who ignores a quarantined verdict stops being told about that loss.
+- Section 4 found a real defect, fixed in this branch: a perimeter declaring only `degraded_at: 0.5`
+  kept the default `quarantined_below: 0.9`, so a coverage of 0.5 satisfied "degraded from 0.5" and
+  "quarantined below 0.9" at once and came out quarantined. The document's validation only compares
+  the two when both are written out, so nothing caught it. An undeclared threshold now follows the
+  declared one. `gateVersion` went to 2 for it, and re-judging the affected snapshot with
+  `netmapper judge` turned quarantined into degraded while keeping the superseded verdict readable,
+  which is the first real use of the re-judge path.
+- Section 5: `netmapper judge <id>` prints `degraded 1/2 (baseline snapshot 19)` and
+  `published no baseline` as the contract says, and exits 2 with `snapshot 999999 not found`.

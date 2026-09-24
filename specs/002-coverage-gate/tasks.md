@@ -257,15 +257,18 @@ thresholds and `quarantined` under the defaults. On the lab, quickstart.md secti
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T040 [P] Carry the documentation deltas listed in plan.md into docs/c4-model/04-data-model.md:
+- [X] T040 [P] Carry the documentation deltas listed in plan.md into docs/c4-model/04-data-model.md:
   the `snapshot_judgement` table and its partial unique index, `judge_snapshot` as the only write
   path, the two `perimeter` columns, the engine's new `INSERT` and sequence grants, and the invariant
   that a perimeter's identity across config versions is its name
-- [ ] T041 [P] Extend specs/001-crawl-loop/contracts/cli.md's successor in
+- [X] T041 [P] Extend specs/001-crawl-loop/contracts/cli.md's successor in
   specs/002-coverage-gate/contracts/cli.md if the implemented flags drift from it, and note any
   divergence rather than letting the contract go stale
-- [ ] T042 Run quickstart.md sections 1 to 6 against the lab and record any divergence in
+- [X] T042 Run quickstart.md sections 1 to 6 against the lab and record any divergence in
   specs/002-coverage-gate/quickstart.md
+  - Sections 1 to 5 run on the lab; section 6 stays an integration test. Section 4 found a real
+    defect in the threshold pairing, fixed here, and its correction was applied to the affected
+    snapshot through `netmapper judge` rather than a re-crawl.
 
 ---
 

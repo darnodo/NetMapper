@@ -66,7 +66,7 @@ func TestBaselineMatchesPerimeterByName(t *testing.T) {
 	if len(stored) != 1 {
 		t.Fatalf("%d active judgements stored, want 1", len(stored))
 	}
-	if want := "published 1 " + itoa(first) + " 1 default"; stored[0] != want {
+	if want := "published 1 " + itoa(first) + " 2 default"; stored[0] != want {
 		t.Errorf("stored %q, want %q", stored[0], want)
 	}
 }

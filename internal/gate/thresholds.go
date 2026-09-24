@@ -14,14 +14,19 @@ var defaultThresholds = thresholds{degradedAt: 0.9, quarantinedBelow: 0.9, sourc
 // by key. Reading them from the perimeter row rather than from the configuration document is what
 // keeps an old verdict readable under the rules it was made with, whatever the document says now.
 func thresholdsFor(s snapshot) thresholds {
-	t := defaultThresholds
-	if s.degradedAt != nil {
-		t.degradedAt, t.source = *s.degradedAt, "perimeter"
+	switch {
+	case s.degradedAt != nil && s.quarantinedBelow != nil:
+		return thresholds{*s.degradedAt, *s.quarantinedBelow, "perimeter"}
+	// One declared and not the other: the other follows it. Leaving the undeclared one on its
+	// default would silently cross the two (declaring degraded_at 0.5 against a default quarantine
+	// at 0.9 puts half the range in both bands), which the document's own validation only catches
+	// when both are written out.
+	case s.degradedAt != nil:
+		return thresholds{*s.degradedAt, *s.degradedAt, "perimeter"}
+	case s.quarantinedBelow != nil:
+		return thresholds{*s.quarantinedBelow, *s.quarantinedBelow, "perimeter"}
 	}
-	if s.quarantinedBelow != nil {
-		t.quarantinedBelow, t.source = *s.quarantinedBelow, "perimeter"
-	}
-	return t
+	return defaultThresholds
 }
 
 func classify(coverage float64, t thresholds) string {

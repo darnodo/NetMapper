@@ -84,3 +84,18 @@ func TestThresholdsArePinnedToTheirConfigVersion(t *testing.T) {
 			again.Classification, again.Thresholds)
 	}
 }
+
+// Declaring one threshold and not the other must not leave the pair crossed: found on the lab,
+// where a perimeter declaring degraded_at 0.5 against the default quarantine at 0.9 still
+// quarantined a coverage of 0.5.
+func TestOneDeclaredThresholdCarriesTheOther(t *testing.T) {
+	half := strings.Replace(Doc, "exclude: [10.0.0.254/32]",
+		"exclude: [10.0.0.254/32]\n    degraded_at: 0.5", 1)
+	_, j := twoDevicesLosingOne(t, half)
+	if j.Classification != gate.Degraded {
+		t.Errorf("classification %s under degraded_at 0.5 alone, want degraded", j.Classification)
+	}
+	if j.Thresholds["quarantined_below"] != 0.5 {
+		t.Errorf("thresholds %v, want quarantined_below to follow degraded_at", j.Thresholds)
+	}
+}
