@@ -460,7 +460,7 @@ T021 perimeter scope
 
 ## Phase 8: Convergence
 
-- [ ] T073 Name the registry as the exception in docs/c4-model/04-data-model.md: the "What was
+- [x] T073 Name the registry as the exception in docs/c4-model/04-data-model.md: the "What was
   computed" section opens with "Every row carries the snapshot it belongs to and the observations it
   came from", which `device` and `device_identifier` do not, being the one cross-snapshot state of the
   zone. Say so in the preamble rather than leaving two rows contradicting it
