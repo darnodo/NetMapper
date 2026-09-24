@@ -57,6 +57,7 @@ include at least these cases:
 | an entity carries the first and last collected_at of its own evidence     | FR-006, Principle I   |
 | a device that changed every strong identifier mints a new key             | FR-023                |
 | a never-merge and a split leave two entities under two distinct keys      | FR-024                |
+| a weakly identified device renumbered mints a new key                     | FR-022, edge case     |
 
 The last one is the test that actually proves Principle II for this feature, so it runs the whole
 sequence: resolve two snapshots, delete `entity`, `entity_claim`, `resolution`, `device` and

@@ -479,3 +479,15 @@ T021 perimeter scope
   as divergences 1 and 2 in quickstart.md, but the grant matrix is where a reader looks to find out who
   can remove a finding, so it has to say so too. Point at the quickstart divergences for the why
   per plan: documentation deltas (partial)
+
+---
+
+## Phase 10: Convergence
+
+- [x] T075 Add the mirror of T019 for a weakly identified device in internal/entity/registry_test.go:
+  the same device, carrying no strong identifier, answering on one address and then on another, mints a
+  new `addr:` key and a second `device` row, and so reads as a device gone and a device appeared. T019
+  proves the opposite for a device that does carry strong identifiers, and registry_test.go builds a
+  weak device only once, on a single run, so the clause is untested
+  per FR-022 and the edge case "A weakly identified device answers on a different address in the next
+  run. Its key moves with it and it reads as a new device" (missing)

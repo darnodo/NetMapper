@@ -29,6 +29,37 @@ func TestWeakDeviceKeysOnItsAddress(t *testing.T) {
 	}
 }
 
+// T075, FR-022 and the edge case "A weakly identified device answers on a different address in the
+// next run": its key moves with the address, so it reads as a device gone and a device appeared. That
+// is the cost of carrying no strong identifier, and the weak marker is what lets a consumer tell that
+// story apart from a real replacement. The exact opposite of TestRenumberingKeepsTheKey below.
+func TestWeakDeviceRenumberingMintsANewKey(t *testing.T) {
+	weak := FakeOSShaped("sw1", "S001", Shape{})
+	l, doc := lab(t, map[string]*fake.Device{"10.0.0.1": weak, "10.0.0.2": nil})
+	delete(l.Net.Devices, Addr("10.0.0.2"))
+	first := snapshotOf(l, l.Crawl(doc))
+
+	// The same box, answering on the other address and carrying nothing that could link the two.
+	delete(l.Net.Devices, Addr("10.0.0.1"))
+	l.Net.Devices[Addr("10.0.0.2")] = weak
+	second := snapshotOf(l, l.Crawl(doc))
+
+	a, b := keysOf(l, first), keysOf(l, second)
+	if len(a) != 1 || len(b) != 1 {
+		t.Fatalf("entities %v then %v, want one in each run", a, b)
+	}
+	if a[0] != "addr:10.0.0.1" || b[0] != "addr:10.0.0.2" {
+		t.Fatalf("keys %q then %q, want each to name the address it answered on", a[0], b[0])
+	}
+	rows := l.Strings(`SELECT key || ' ' || weak FROM device ORDER BY key`)
+	if len(rows) != 2 || rows[0] != "addr:10.0.0.1 true" || rows[1] != "addr:10.0.0.2 true" {
+		t.Errorf("registry %v, want the old device kept and a new one minted, both marked weak", rows)
+	}
+	if n := l.Int(`SELECT count(*) FROM device_identifier`); n != 0 {
+		t.Errorf("%d identifiers attributed, want none: there was nothing strong to attribute", n)
+	}
+}
+
 // T018, US1-7, SC-007 and FR-021: the same device in two runs of one perimeter carries one key, so a
 // consumer follows it across runs without regrouping its claims.
 func TestKeyIsStableAcrossRuns(t *testing.T) {
