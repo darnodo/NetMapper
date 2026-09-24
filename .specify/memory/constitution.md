@@ -104,13 +104,12 @@ being a directory of data and becomes a patch.
 - New interfaces returning graph data MUST ship with evidence and freshness in the same response,
   reviewed as a gate rather than as a follow-up.
 - Open design questions are recorded in `docs/`, not resolved silently in code.
-- A path the contracts assign to a role MUST be tested under that role, not only under whichever role
-  is convenient. A suite that connects as one role proves one role.
-- A document that describes behaviour MUST be corrected in the same change as the behaviour, not only
-  in a record of divergences. A divergence note explains why something changed; the reference states
-  what ships.
-- A rule that settles a tie MUST be tested with inputs that actually tie. Determinism observed on a
-  single input is determinism untested.
+- A path the contracts assign to a role MUST be tested under that role, not only under the role
+  that happens to be convenient. A suite that connects as one role proves one role.
+- A document that describes behaviour MUST be corrected in the same change as the behaviour, not
+  only in the record of divergences. A divergence note explains why; the reference says what ships.
+- A rule that settles a tie MUST be tested with inputs that actually tie. Determinism assumed on
+  one input is determinism untested.
 
 ## Governance
 
