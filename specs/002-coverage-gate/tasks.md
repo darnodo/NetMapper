@@ -73,7 +73,7 @@ usage; both gaps are closed here (research R4)
   and `USAGE` on `snapshot_judgement_id_seq` to `netmapper_engine`, `EXECUTE` on `judge_snapshot` to
   `netmapper_engine`, `SELECT` on the table to `netmapper_operator` and `netmapper_collector`. No role
   but the owner gets `UPDATE` or `DELETE`
-- [ ] T008 Immutability test in internal/store/roles_test.go: connected as `netmapper_engine`,
+- [X] T008 Immutability test in internal/store/roles_test.go: connected as `netmapper_engine`,
   `UPDATE` and `DELETE` on `snapshot_judgement` both fail, while `judge_snapshot` succeeds (FR-009)
 
 **Checkpoint**: Schema ready. Story work can begin.
@@ -111,21 +111,21 @@ device the first reached; the second ends `quarantined` with coverage 0.5 and th
   perimeters share a name but belong to different `config_version` rows, and therefore have different
   `perimeter.id` values, are compared against each other. Without this the feature is silently inert
   (research R1)
-- [ ] T014 [P] [US1] Baseline order test in internal/gate/baseline_test.go: with three closed
+- [X] T014 [P] [US1] Baseline order test in internal/gate/baseline_test.go: with three closed
   snapshots, the middle one's baseline is the oldest, not the newest; re-judging the middle one after
   the newest closed resolves the same baseline (FR-015, FR-012)
-- [ ] T015 [P] [US1] Perimeter narrowing test in internal/gate/compare_test.go: a baseline device
+- [X] T015 [P] [US1] Perimeter narrowing test in internal/gate/compare_test.go: a baseline device
   whose addresses all fall outside the newer snapshot's perimeter is dropped from `baseline_devices`
   and does not count as a loss (research R8, spec edge case)
-- [ ] T016 [P] [US1] Sweep test in internal/jobrunner/judge_test.go: a snapshot closed directly
+- [X] T016 [P] [US1] Sweep test in internal/jobrunner/judge_test.go: a snapshot closed directly
   against the database with no runner running is judged on the next `Tick`, ending with exactly one
   active judgement (FR-014, US1-6)
-- [ ] T017 [P] [US1] Re-judge test in internal/gate/gate_test.go: judging an already judged snapshot
+- [X] T017 [P] [US1] Re-judge test in internal/gate/gate_test.go: judging an already judged snapshot
   writes a new active row, leaves the previous row readable with `active = false` and its original
   figures, and reproduces the same classification and coverage (FR-009, FR-012, SC-003)
-- [ ] T018 [P] [US1] Refusal test in internal/gate/gate_test.go: judging a snapshot in state `open`
+- [X] T018 [P] [US1] Refusal test in internal/gate/gate_test.go: judging a snapshot in state `open`
   returns an error and writes no row (FR-001)
-- [ ] T019 [P] [US1] Concurrency test in internal/gate/gate_test.go: two goroutines judging the same
+- [X] T019 [P] [US1] Concurrency test in internal/gate/gate_test.go: two goroutines judging the same
   snapshot at once leave exactly one active row, the loser failing on the partial unique index
   (research R12)
 
@@ -141,9 +141,13 @@ device the first reached; the second ends `quarantined` with coverage 0.5 and th
   `strength = 'strong'` joined on `(kind, value)`, falling back to `observation.target` for baseline
   devices with no strong claim; a device is reached when it has an `identity` observation with
   `status = 'collected'` (research R2, R11)
-- [ ] T022 [US1] Apply perimeter filtering in internal/gate/compare.go: drop from the baseline set
+- [X] T022 [US1] Apply perimeter filtering in internal/gate/compare.go: drop from the baseline set
   every device whose addresses all fall outside the include/exclude ranges of the perimeter row of
   the judged snapshot's own config version, reusing `perimeter.Allowed` from 001 (research R8)
+  - Divergence: the include-then-exclude test is expressed in SQL (`target <<= ANY(include) AND NOT
+    (target <<= ANY(exclude))`) rather than by loading the perimeter and calling `perimeter.Allowed`.
+    Same semantics, and it keeps the comparison in the single statement R11 asked for. Filtered
+    devices leave the denominator and are listed under `breakdown.perimeter_filtered`.
 - [X] T023 [US1] Implement classification in internal/gate/thresholds.go with the defaults only:
   `published` at coverage `1.0`, `degraded` at `>= 0.9`, `quarantined` below, and `published` with a
   null coverage when there is no baseline; record the applied values and `"source": "default"` in the
@@ -152,17 +156,17 @@ device the first reached; the second ends `quarantined` with coverage 0.5 and th
   that is not `closed`, select the baseline, run the comparison, classify, then call `judge_snapshot`
   in one short transaction. This is the single entry point the sweep, the CLI and the tests all use,
   which is what makes FR-012 testable (plan.md, Structure Decision)
-- [ ] T025 [US1] Add the judging step to internal/jobrunner/runner.go `Tick`, independent of its loop
+- [X] T025 [US1] Add the judging step to internal/jobrunner/runner.go `Tick`, independent of its loop
   over active jobs: select closed snapshots with no active judgement ordered by `closed_at, id`
   ascending, and call `gate.Judge` for each; a snapshot whose predecessor is closed but unjudged is
   left for a later tick, and a failing judgement is logged and retried next tick rather than written
   wrong (FR-014, research R6, R7)
-- [ ] T026 [US1] Wire `netmapper judge <snapshot-id>` in cmd/netmapper/judge.go per contracts/cli.md:
+- [X] T026 [US1] Wire `netmapper judge <snapshot-id>` in cmd/netmapper/judge.go per contracts/cli.md:
   print `<classification> <carried_over>/<baseline_devices> (baseline snapshot <id>)` or
   `<classification> no baseline` on stdout; exit 2 with `snapshot <id> not found` or
   `snapshot <id> is not closed`; judge a never-judged snapshot normally; never cascade to successors
   (FR-013)
-- [ ] T027 [US1] Add the `judge` subcommand to the dispatch in cmd/netmapper/main.go
+- [X] T027 [US1] Add the `judge` subcommand to the dispatch in cmd/netmapper/main.go
 
 **Checkpoint**: User Story 1 works on its own: run quickstart.md sections 2 and 3.
 

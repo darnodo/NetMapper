@@ -3,6 +3,7 @@ package gate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -10,28 +11,28 @@ import (
 )
 
 type snapshot struct {
-	id        int64
-	state     string
-	closedAt  *time.Time
-	perimeter string
+	id          int64
+	state       string
+	closedAt    *time.Time
+	perimeter   string
+	perimeterID int64
 }
 
-// describe reads the snapshot and the name of the perimeter its run used.
+// describe reads the snapshot, the name of the perimeter its run used, and that perimeter's row,
+// whose ranges are the ones a baseline is filtered against.
 func describe(ctx context.Context, db *pgxpool.Pool, id int64) (snapshot, error) {
 	s := snapshot{id: id}
 	err := db.QueryRow(ctx, `
-		SELECT s.state, s.closed_at, p.name
+		SELECT s.state, s.closed_at, p.name, p.id
 		FROM snapshot s
 		JOIN job j ON j.snapshot_id = s.id
 		JOIN perimeter p ON p.id = (j.parameters->>'perimeter_id')::bigint
-		WHERE s.id = $1`, id).Scan(&s.state, &s.closedAt, &s.perimeter)
+		WHERE s.id = $1`, id).Scan(&s.state, &s.closedAt, &s.perimeter, &s.perimeterID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return s, errNotFound
+		return s, fmt.Errorf("snapshot %d: %w", id, ErrNotFound)
 	}
 	return s, err
 }
-
-var errNotFound = errors.New("snapshot not found")
 
 // selectBaseline returns the snapshot this one is measured against: the same perimeter's
 // immediately preceding closed snapshot that already carries an active judgement, or nil when

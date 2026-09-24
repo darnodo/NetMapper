@@ -95,3 +95,39 @@ func TestFirstSnapshotHasNoBaseline(t *testing.T) {
 		t.Errorf("breakdown %v, want no_baseline true", j.Breakdown)
 	}
 }
+
+// T014, FR-015/FR-012: a snapshot is measured against the run before it, not against whichever run
+// was judged most recently. Re-judging an old snapshot after newer ones closed must therefore find
+// the same baseline it originally had, or a verdict would depend on the day it was computed.
+func TestBaselineIsThePrecedingSnapshot(t *testing.T) {
+	env(t)
+	l := NewLab(t, &fake.Network{Devices: map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001"),
+	}})
+	ctx := context.Background()
+
+	first := snapshotOf(l, l.Crawl(Doc))
+	second := snapshotOf(l, l.Crawl(Doc))
+	third := snapshotOf(l, l.Crawl(Doc))
+
+	baselineOf := func(snap int64) int64 {
+		return int64(l.Int(`SELECT baseline_snapshot_id FROM snapshot_judgement
+		                    WHERE snapshot_id = $1 AND active`, snap))
+	}
+	if got := baselineOf(second); got != first {
+		t.Errorf("baseline of the middle snapshot is %d, want %d", got, first)
+	}
+	if got := baselineOf(third); got != second {
+		t.Errorf("baseline of the newest snapshot is %d, want %d", got, second)
+	}
+
+	// The middle snapshot is judged again now that a newer one exists.
+	j, err := gate.Judge(ctx, l.Engine, second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.BaselineID == nil || *j.BaselineID != first {
+		t.Errorf("re-judged baseline %v, want %d: baselines are chosen by closing order, not by judging order",
+			j.BaselineID, first)
+	}
+}

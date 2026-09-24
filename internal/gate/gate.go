@@ -5,6 +5,7 @@ package gate
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,12 @@ const (
 	Published   = "published"
 	Degraded    = "degraded"
 	Quarantined = "quarantined"
+)
+
+// What Judge refuses to do, for callers that need to tell an operator why.
+var (
+	ErrNotFound  = errors.New("snapshot not found")
+	ErrNotClosed = errors.New("snapshot is not closed")
 )
 
 // gateVersion identifies the calculation that produced a judgement. Bump it by hand when a change
@@ -43,7 +50,7 @@ func Judge(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (Judgement, 
 		return Judgement{}, err
 	}
 	if s.state != "closed" {
-		return Judgement{}, fmt.Errorf("snapshot %d is not closed", snapshotID)
+		return Judgement{}, fmt.Errorf("snapshot %d: %w", snapshotID, ErrNotClosed)
 	}
 
 	baseline, err := selectBaseline(ctx, db, s)
@@ -60,25 +67,34 @@ func Judge(ctx context.Context, db *pgxpool.Pool, snapshotID int64) (Judgement, 
 		j.Classification = Published
 		j.Breakdown = map[string]any{"no_baseline": true}
 	} else {
-		devices, err := compare(ctx, db, *baseline, snapshotID)
+		devices, err := compare(ctx, db, *baseline, snapshotID, s.perimeterID)
 		if err != nil {
 			return Judgement{}, err
 		}
-		j.BaselineCount = len(devices)
 		missing := map[string][]string{}
+		var filtered []string
 		for _, d := range devices {
-			if d.carried {
+			switch {
+			case d.filtered:
+				filtered = append(filtered, d.target)
+			case d.carried:
+				j.BaselineCount++
 				j.CarriedOver++
-				continue
+			default:
+				j.BaselineCount++
+				missing[d.reason] = append(missing[d.reason], d.target)
 			}
-			missing[d.reason] = append(missing[d.reason], d.target)
 		}
 		coverage := 1.0
 		if j.BaselineCount > 0 {
 			coverage = float64(j.CarriedOver) / float64(j.BaselineCount)
 		}
 		j.Coverage = &coverage
-		j.Breakdown = map[string]any{"no_baseline": false, "missing": missing}
+		j.Breakdown = map[string]any{
+			"no_baseline":        false,
+			"missing":            missing,
+			"perimeter_filtered": filtered,
+		}
 		j.Classification = classify(coverage, defaultThresholds)
 	}
 	j.Thresholds = defaultThresholds.record()

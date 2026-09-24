@@ -77,7 +77,7 @@ func Tick(ctx context.Context, db *pgxpool.Pool) error {
 			return err
 		}
 	}
-	return nil
+	return judgeStep(ctx, db)
 }
 
 func cancelStep(ctx context.Context, db *pgxpool.Pool, job, snapshot int64) error {

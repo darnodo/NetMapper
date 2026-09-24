@@ -3,6 +3,7 @@ package gate_test
 import (
 	"context"
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/darnodo/NetMapper/internal/gate"
@@ -130,5 +131,43 @@ func TestRenumberedDeviceIsNotALoss(t *testing.T) {
 	if j.CarriedOver != 2 || j.Classification != gate.Published {
 		t.Errorf("got %s %d/%d, want published 2/2: the renumbered device is the same device",
 			j.Classification, j.CarriedOver, j.BaselineCount)
+	}
+}
+
+// T015: narrowing a perimeter on purpose is a scope change, not a coverage collapse. The device the
+// new ranges no longer cover leaves the denominator instead of counting as a loss.
+func TestNarrowedPerimeterIsNotALoss(t *testing.T) {
+	env(t)
+	net := &fake.Network{Devices: map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p2 sw2 10.0.0.9"),
+		Addr("10.0.0.9"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1"),
+	}}
+	l := NewLab(t, net)
+	ctx := context.Background()
+
+	baseline := snapshotOf(l, l.Crawl(Doc))
+	if _, err := gate.Judge(ctx, l.Engine, baseline); err != nil {
+		t.Fatal(err)
+	}
+
+	// Same network, but the operator narrows the perimeter to .0-.7, leaving 10.0.0.9 out of scope.
+	narrowed := strings.Replace(Doc, "include: [10.0.0.0/24]", "include: [10.0.0.0/29]", 1)
+	j, err := gate.Judge(ctx, l.Engine, snapshotOf(l, l.Crawl(narrowed)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.BaselineCount != 1 || j.CarriedOver != 1 {
+		t.Errorf("carried over %d/%d, want 1/1: the excluded device should leave the denominator",
+			j.CarriedOver, j.BaselineCount)
+	}
+	if j.Classification != gate.Published {
+		t.Errorf("classification %s, want published", j.Classification)
+	}
+	if got := missing(t, j, "not_attempted"); len(got) != 0 {
+		t.Errorf("not_attempted %v, want none: the device was deliberately put out of scope", got)
+	}
+	filtered, _ := j.Breakdown["perimeter_filtered"].([]string)
+	if len(filtered) != 1 || filtered[0] != "10.0.0.9" {
+		t.Errorf("perimeter_filtered %v, want [10.0.0.9]", filtered)
 	}
 }

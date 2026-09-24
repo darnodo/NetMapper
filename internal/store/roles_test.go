@@ -37,3 +37,21 @@ func TestCollectorCannotRewriteCollectedZone(t *testing.T) {
 		t.Error("engine may delete observations")
 	}
 }
+
+// T008, FR-009: a verdict is never rewritten or removed. The engine writes judgements only through
+// judge_snapshot, which supersedes rather than edits, so the constraint holds in the database and
+// not merely in the code that calls it.
+func TestEngineCannotRewriteJudgements(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	eng := testutil.As(t, db, "netmapper_engine")
+	for _, q := range []string{
+		"UPDATE snapshot_judgement SET classification = 'published'",
+		"UPDATE snapshot_judgement SET active = false",
+		"DELETE FROM snapshot_judgement",
+	} {
+		if _, err := eng.Exec(ctx, q); err == nil {
+			t.Errorf("%s: allowed", q)
+		}
+	}
+}
