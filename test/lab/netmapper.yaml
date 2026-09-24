@@ -19,8 +19,8 @@ credential_sets:                    # tried in this order (FR-018)
     perimeters: [lab]
 
 seed_sets:
-  - name: lab-seeds                 # sw1 (sw2 is found through LLDP), the unused address, sw3
-    targets: [172.20.20.2, 172.20.20.9, 172.20.20.4]
+  - name: lab-seeds                 # sw1 (sw2 is found through LLDP), the unused address, sw3, sw4
+    targets: [172.20.20.2, 172.20.20.9, 172.20.20.4, 172.20.20.5]
   - name: outside-seeds             # quickstart section 4: refused
     targets: [10.99.0.1]
 

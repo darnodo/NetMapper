@@ -3,7 +3,10 @@
 # sw1 and sw2: Arista cEOS (image imported as ceos:latest), LLDP between them, SNMP v2c and SSH
 # for the netmapper user. sw3 answers SSH but has no netmapper user and no SNMP community: it
 # rejects every lab credential set (denied). 172.20.20.9 is inside the perimeter and unused
-# (unreachable).
+# (unreachable). sw4 is a clone of sw1 for quickstart.md section 4: SERIALNUMBER is pinned to sw1's
+# serial while its chassis MAC stays its own, so the two devices contradict each other on a strong
+# identifier and must not be merged. Deploy it alone with:
+#   containerlab deploy -t test/lab/two-switch.clab.yaml --node-filter sw4
 name: netmapper
 
 mgmt:
@@ -15,9 +18,14 @@ topology:
     arista_ceos:
       image: ceos:latest
   nodes:
-    sw1: {kind: arista_ceos, mgmt-ipv4: 172.20.20.2, startup-config: sw1.cfg}
+    # sw1 and sw4 carry the same pinned serial and each keeps its own chassis MAC, which is what
+    # section 4 needs. The serial comes from /mnt/flash/ceos-config: cEOS ignores a SERIALNUMBER
+    # environment variable and reads that file instead, and without it the serial is generated per
+    # container and changes on every redeploy.
+    sw1: {kind: arista_ceos, mgmt-ipv4: 172.20.20.2, startup-config: sw1.cfg, binds: ["ceos-config-sw1:/mnt/flash/ceos-config"]}
     sw2: {kind: arista_ceos, mgmt-ipv4: 172.20.20.3, startup-config: sw2.cfg}
     sw3: {kind: arista_ceos, mgmt-ipv4: 172.20.20.4, startup-config: sw3.cfg}
+    sw4: {kind: arista_ceos, mgmt-ipv4: 172.20.20.5, startup-config: sw4.cfg, binds: ["ceos-config-sw4:/mnt/flash/ceos-config"]}
   links:
     - endpoints: ["sw1:eth1", "sw2:eth1"]
     - endpoints: ["sw2:eth2", "sw3:eth1"]

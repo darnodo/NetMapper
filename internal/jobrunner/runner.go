@@ -25,7 +25,8 @@ func Run(ctx context.Context, db *pgxpool.Pool, every time.Duration, log *slog.L
 	}
 }
 
-// Tick moves every active job one step towards its end (research R12):
+// Tick moves every active job one step towards its end (research R12), then sweeps for closed
+// snapshots that still need a verdict or an entity set:
 //   - running, queue empty, no final pass yet: requeue every failed task once, attempts reset;
 //   - running, queue empty after the final pass: close the snapshot, job succeeded;
 //   - cancelling: pending tasks become cancelled; once no lease is live, close, job cancelled.
@@ -77,7 +78,10 @@ func Tick(ctx context.Context, db *pgxpool.Pool) error {
 			return err
 		}
 	}
-	return judgeStep(ctx, db)
+	if err := judgeStep(ctx, db); err != nil {
+		return err
+	}
+	return resolveStep(ctx, db)
 }
 
 func cancelStep(ctx context.Context, db *pgxpool.Pool, job, snapshot int64) error {

@@ -121,16 +121,44 @@ func (l *Lab) Wait(job int64, states ...string) string {
 	return s
 }
 
-// Crawl starts doc, runs one collector and the engine until the job ends, and returns the job.
+// Crawl starts doc, runs one collector and the engine until the job ends and the engine's sweeps
+// have caught up with the snapshot it closed, and returns the job.
 func (l *Lab) Crawl(doc string) int64 {
 	l.T.Helper()
 	job := l.Start(doc)
 	stopC := l.RunCollector(l.Collector("c1"))
 	stopE := l.RunEngine()
 	l.Wait(job, "succeeded", "failed", "cancelled")
+	l.Settle(job)
 	stopE()
 	stopC()
 	return job
+}
+
+// Settle waits for the verdict and the entity set of the snapshot this job closed. Crawl calls it; a
+// test that builds its own crawl, to start a job on another perimeter for instance, has to call it too.
+//
+// A job reaches succeeded inside the tick that closes its snapshot, before that same tick judges and
+// resolves it, so Wait returning is not the engine being done. Without this, stopping the engine can
+// cancel the sweep mid-way and a test reads a snapshot that closed but was never judged or resolved.
+// It gives up at once on a snapshot that did not close, since nothing will sweep it.
+func (l *Lab) Settle(job int64) {
+	ctx := context.Background()
+	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		var state string
+		var judged, resolved bool
+		err := l.DB.QueryRow(ctx, `
+			SELECT s.state,
+			       EXISTS (SELECT 1 FROM snapshot_judgement x WHERE x.snapshot_id = s.id AND x.active),
+			       EXISTS (SELECT 1 FROM resolution r WHERE r.snapshot_id = s.id)
+			FROM snapshot s JOIN job j ON j.snapshot_id = s.id WHERE j.id = $1`, job).Scan(&state, &judged, &resolved)
+		if err != nil || state != "closed" {
+			return
+		}
+		if judged && resolved {
+			return
+		}
+	}
 }
 
 // Strings runs a query returning one text column per row.
@@ -169,10 +197,29 @@ func (l *Lab) Outcomes(job int64) []string {
 		FROM observation o JOIN job j ON j.snapshot_id = o.snapshot_id WHERE j.id = $1 ORDER BY 1`, job)
 }
 
-// FakeOS is a device of the fakeos test pack. Neighbours are "<local port> <name> <address>",
-// where the address is an IP, a MAC or "-" for none; its fakeos type is derived from it.
+// Shape says which strong identifiers a device prints. The fakeos pack declares serial and
+// chassis_mac strong and hostname weak, so a device that prints neither has no strong identifier at
+// all, which is the shape the weakly identified path needs (FR-004, FR-022).
+type Shape struct {
+	Serial bool
+	MAC    bool
+}
+
+// Both is the ordinary device: a serial and a chassis MAC.
+var Both = Shape{Serial: true, MAC: true}
+
+// FakeOS is a device of the fakeos test pack, printing both its strong identifiers. Neighbours are
+// "<local port> <name> <address>", where the address is an IP, a MAC or "-" for none; its fakeos
+// type is derived from it.
 func FakeOS(name, serial string, neighbours ...string) *fake.Device {
-	mac := fmt.Sprintf("aa:bb:cc:00:00:%s", serial[len(serial)-2:])
+	return FakeOSShaped(name, serial, Both, neighbours...)
+}
+
+// FakeOSShaped is FakeOS with control over which identifier lines it prints, so a test can build a
+// device with two strong identifiers, one, or none. A suppressed serial is dropped from SNMP too,
+// or the claim would come back through the other transport.
+func FakeOSShaped(name, serial string, shape Shape, neighbours ...string) *fake.Device {
+	mac := MAC(serial)
 	var nb strings.Builder
 	for _, n := range neighbours {
 		f := strings.Fields(n)
@@ -184,19 +231,34 @@ func FakeOS(name, serial string, neighbours ...string) *fake.Device {
 		}
 		fmt.Fprintf(&nb, "%s %s %s %s %s\n", f[0], f[1], typ, f[2], "aa:bb:cc:ff:ff:ff")
 	}
+	version := "FakeOS 1.2\nHostname: " + name + "\n"
+	if shape.Serial {
+		version += "Serial: " + serial + "\n"
+	}
+	if shape.MAC {
+		version += "MAC: " + mac + "\n"
+	}
+	snmp := map[string]string{
+		"1.3.6.1.2.1.1.2.0": "1.3.6.1.4.1.99999.1",
+		"1.3.6.1.2.1.1.1.0": "FakeOS 1.2 on " + name,
+		"1.3.6.1.2.1.1.5.0": name,
+	}
+	if shape.Serial {
+		snmp["1.3.6.1.4.1.99999.2.1.0"] = serial
+	}
 	return &fake.Device{
 		CLI: map[string]string{
-			"display version":    fmt.Sprintf("FakeOS 1.2\nHostname: %s\nSerial: %s\nMAC: %s\n", name, serial, mac),
+			"display version":    version,
 			"display neighbours": nb.String(),
 			"display interfaces": "p1 up up 1500 " + mac + " uplink\np2 down down 1500 " + mac + "\n",
 		},
-		SNMP: map[string]string{
-			"1.3.6.1.2.1.1.2.0":       "1.3.6.1.4.1.99999.1",
-			"1.3.6.1.2.1.1.1.0":       "FakeOS 1.2 on " + name,
-			"1.3.6.1.2.1.1.5.0":       name,
-			"1.3.6.1.4.1.99999.2.1.0": serial,
-		},
+		SNMP: snmp,
 	}
+}
+
+// MAC is the chassis MAC FakeOS derives from a serial, for a test that needs to name it.
+func MAC(serial string) string {
+	return fmt.Sprintf("aa:bb:cc:00:00:%s", serial[len(serial)-2:])
 }
 
 // Addr parses an address.
