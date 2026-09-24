@@ -1,8 +1,8 @@
 # Data model: Coverage gate
 
 What this feature adds to the schema 001 left behind. Nothing here changes a table in the collected
-zone; the two changes to existing tables are two optional columns on `perimeter` (control plane) and
-two grants. Decisions and their alternatives are in [research.md](research.md).
+zone; the changes to existing tables are one optional column on `perimeter` (control plane) and the
+grants below. Decisions and their alternatives are in [research.md](research.md).
 
 ## New table: `snapshot_judgement` (reported zone)
 

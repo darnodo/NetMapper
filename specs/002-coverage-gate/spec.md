@@ -43,14 +43,15 @@ downstream comparison code.
 
 1. **Given** a closed snapshot that reaches every device its baseline reached, **When** the gate
    judges it, **Then** it is classified published.
-2. **Given** a perimeter on default thresholds whose baseline reached ten devices, and a closed
+2. **Given** a perimeter on the default threshold whose baseline reached ten devices, and a closed
    snapshot that reaches nine of them, **When** the gate judges it, **Then** it is classified
    degraded.
 3. **Given** the same perimeter and a closed snapshot that reaches eight of those ten devices,
    **When** the gate judges it, **Then** it is classified quarantined.
 4. **Given** a snapshot already judged, **When** the gate is asked to judge it again with the same
-   baseline and thresholds, **Then** the new active judgement carries the same classification and
-   figures as the one it supersedes, and the superseded one is still readable.
+   baseline, threshold and version of the calculation, **Then** the new active judgement carries the
+   same classification and figures as the one it supersedes, and the superseded one is still
+   readable.
 5. **Given** a perimeter with no prior judged snapshot, **When** its first snapshot is judged, **Then**
    the judgement is computed from that snapshot's own counts alone and states that no baseline existed.
 6. **Given** a snapshot that closed while the judging side was stopped, **When** the judging side runs
@@ -220,8 +221,9 @@ thresholds and confirm it lands in a different classification for each.
   unjudged.
 - **SC-002**: An engineer can state why a snapshot was not published using only its judgement, without
   reading raw observations or logs.
-- **SC-003**: Re-computing a judgement from the same closed snapshot and the same baseline always
-  yields the same classification and the same figures.
+- **SC-003**: Re-computing a judgement from the same closed snapshot, the same baseline, the same
+  threshold and the same version of the calculation always yields the same classification and the
+  same figures.
 - **SC-004**: A quarantined snapshot is distinguishable from a published or degraded one by its
   classification alone, before any later feature reads its observations.
 - **SC-005**: An operator can change a perimeter's threshold and see the next snapshot of that
