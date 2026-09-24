@@ -72,6 +72,10 @@ func TestInvalid(t *testing.T) {
 		{"duplicate set", "name: ro-ssh", "name: ro-snmp", `credential set "ro-snmp" is declared twice`},
 		{"duplicate seed set", "seed_sets:\n  - name: lab-seeds\n", "seed_sets:\n  - name: lab-seeds\n  - name: lab-seeds\n", `seed set "lab-seeds" is declared twice`},
 		{"negative lease", "future_key", "discovery: {lease: -1s}\nfuture_key", "must be positive"},
+		{"degraded_at above 1", "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 1.5",
+			`perimeter "lab": degraded_at must be greater than 0 and at most 1`},
+		{"degraded_at zero", "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 0",
+			`perimeter "lab": degraded_at must be greater than 0 and at most 1`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			doc := strings.Replace(valid, c.old, c.new, 1)
@@ -86,5 +90,26 @@ func TestInvalid(t *testing.T) {
 	}
 	if _, err := Parse([]byte(strings.Replace(valid, "172.20.20.0/24", "172.20.20.0/33", 1))); err == nil {
 		t.Error("invalid CIDR accepted")
+	}
+}
+
+// T035, FR-005: the threshold is optional, and a perimeter that declares none is judged by the
+// documented default.
+func TestThresholdIsOptional(t *testing.T) {
+	d, err := Parse([]byte(valid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Perimeters[0].DegradedAt != nil {
+		t.Errorf("undeclared threshold reads as %v, want unset", d.Perimeters[0].DegradedAt)
+	}
+
+	one := strings.Replace(valid, "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 0.5", 1)
+	d, err = Parse([]byte(one))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Perimeters[0].DegradedAt == nil || *d.Perimeters[0].DegradedAt != 0.5 {
+		t.Errorf("degraded_at %v, want 0.5", d.Perimeters[0].DegradedAt)
 	}
 }

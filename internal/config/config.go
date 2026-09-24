@@ -24,6 +24,10 @@ type Perimeter struct {
 	Name    string         `yaml:"name"`
 	Include []netip.Prefix `yaml:"include"`
 	Exclude []netip.Prefix `yaml:"exclude"`
+	// DegradedAt is the coverage at or above which a snapshot is degraded rather than quarantined,
+	// an optional fraction in (0, 1]. Nil means the documented default of 0.9. Published needs full
+	// coverage either way, so this is the only boundary a perimeter has to place.
+	DegradedAt *float64 `yaml:"degraded_at"`
 }
 
 type CredentialSet struct {
@@ -102,6 +106,9 @@ func (d *Document) validate() error {
 		perimeters[p.Name] = true
 		if len(p.Include) == 0 {
 			fail("perimeter %q has no include range", p.Name)
+		}
+		if p.DegradedAt != nil && (*p.DegradedAt <= 0 || *p.DegradedAt > 1) {
+			fail("perimeter %q: degraded_at must be greater than 0 and at most 1", p.Name)
 		}
 	}
 
