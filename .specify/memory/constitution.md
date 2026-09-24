@@ -1,16 +1,24 @@
 <!--
 Sync Impact Report (scratch, remove before committing the amendment)
-Version change: none (unfilled template) -> 1.0.0
-Modified principles:
-  [PRINCIPLE_1_NAME] -> I. Evidence Travels With The Answer
-  [PRINCIPLE_2_NAME] -> II. Observations Are Immutable, Everything Else Is Rebuildable
-  [PRINCIPLE_3_NAME] -> III. Credentials And Reach Stay In The Collector (NON-NEGOTIABLE)
-  [PRINCIPLE_4_NAME] -> IV. Read Only, Outward
-  [PRINCIPLE_5_NAME] -> V. Vendor Specifics Are Data, Not Code
-Added sections:
-  [SECTION_2_NAME] -> Architectural Constraints
-  [SECTION_3_NAME] -> Development Workflow
+Version change: 1.0.0 -> 1.1.0
+Bump rationale: MINOR. Development Workflow materially expanded. No principle added, removed or
+  redefined; Core Principles, Architectural Constraints and Governance are untouched.
+Modified principles: none
+Added sections: none
 Removed sections: none
+Development Workflow gains three rules. Each comes from a defect 003-identity-resolution shipped and a
+review or a convergence pass then found:
+  - test each path under the role the contracts assign it. 003 granted netmapper_operator the write
+    rights `netmapper resolve` needs but not the reads, and every test connected as netmapper_engine,
+    so the operator's own command could not run at all and nothing noticed until a security review.
+  - correct the reference document in the same change as the behaviour. Three separate convergence
+    passes each found an artefact still describing what had been superseded, twice in the grant matrix
+    and once in a description of the computed zone.
+  - test a tie-break with inputs that tie. The reduction of operator decisions was tested with one pair
+    and looked deterministic, while two decisions naming the same key reduced in map iteration order and
+    gave a different answer per run, against the feature's own reproducibility requirement.
+Templates checked: `.specify/templates/plan-template.md` derives its Constitution Check from this file
+  ("[Gates determined based on constitution file]"), so the new rules become gates with no edit to it.
 Deferred items: none
 -->
 
@@ -96,6 +104,13 @@ being a directory of data and becomes a patch.
 - New interfaces returning graph data MUST ship with evidence and freshness in the same response,
   reviewed as a gate rather than as a follow-up.
 - Open design questions are recorded in `docs/`, not resolved silently in code.
+- A path the contracts assign to a role MUST be tested under that role, not only under whichever role
+  is convenient. A suite that connects as one role proves one role.
+- A document that describes behaviour MUST be corrected in the same change as the behaviour, not only
+  in a record of divergences. A divergence note explains why something changed; the reference states
+  what ships.
+- A rule that settles a tie MUST be tested with inputs that actually tie. Determinism observed on a
+  single input is determinism untested.
 
 ## Governance
 
@@ -106,4 +121,4 @@ principle, MINOR for adding one or materially expanding guidance, PATCH for clar
 Reviews verify compliance with the five principles. Complexity that violates one is either
 justified in writing at the point it is introduced or removed. Principle III admits no exception.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-17
+**Version**: 1.1.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-24
