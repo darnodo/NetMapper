@@ -465,3 +465,17 @@ T021 perimeter scope
   came from", which `device` and `device_identifier` do not, being the one cross-snapshot state of the
   zone. Say so in the preamble rather than leaving two rows contradicting it
   per plan: documentation deltas (partial)
+
+---
+
+## Phase 9: Convergence
+
+- [x] T074 Bring the "Grants added" table of data-model.md in line with the migration that shipped.
+  Introspection of a freshly migrated schema shows two grants the table does not mention:
+  `netmapper_operator` holds `INSERT, DELETE` on `finding` and `finding_evidence`, because
+  `netmapper resolve` runs the resolver in its own process and a resolution that finds a collision
+  raises one whichever process ran it; and `netmapper_engine` holds `USAGE` on `finding_id_seq`, since
+  001 granted `ALL SEQUENCES` to the operator and the collector only. Both are deliberate and recorded
+  as divergences 1 and 2 in quickstart.md, but the grant matrix is where a reader looks to find out who
+  can remove a finding, so it has to say so too. Point at the quickstart divergences for the why
+  per plan: documentation deltas (partial)

@@ -162,9 +162,15 @@ entities, then raises the conflicts that still hold (R11, FR-015). The delete is
 
 | Role                  | Gains                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `netmapper_engine`    | `SELECT, INSERT, UPDATE, DELETE` on `resolution`, `entity`, `entity_claim`, `device`, `device_identifier`; `SELECT` on `entity_decision`; `INSERT, DELETE` on `finding`, `finding_evidence`; `USAGE` on the new sequences |
-| `netmapper_operator`  | `SELECT, INSERT` on `entity_decision`; `USAGE` on its sequence; `SELECT` on the five computed tables; `SELECT, INSERT, UPDATE, DELETE` on the same five, only because `netmapper resolve` runs the resolver in the operator's process |
+| `netmapper_engine`    | `SELECT, INSERT, UPDATE, DELETE` on `resolution`, `entity`, `entity_claim`, `device`, `device_identifier`; `SELECT` on `entity_decision`; `INSERT, DELETE` on `finding`, `finding_evidence`; `USAGE` on `entity_id_seq` and on `finding_id_seq` |
+| `netmapper_operator`  | `SELECT, INSERT` on `entity_decision`; `USAGE` on its sequence; `SELECT, INSERT, UPDATE, DELETE` on the five computed tables and `USAGE` on `entity_id_seq`; `INSERT, DELETE` on `finding`, `finding_evidence`. The write rights and the findings rights are both there for the same reason: `netmapper resolve` runs the resolver in the operator's own process, and a resolution that finds a collision raises one whichever process ran it |
 | `netmapper_collector` | nothing. It never reads an entity                                                                                        |
+
+Two of those lines are not what this document first planned, and the difference is deliberate:
+`netmapper_engine` needs `USAGE` on `finding_id_seq` because 001 granted `ALL SEQUENCES` to the operator
+and the collector only, and `netmapper_operator` needs the findings rights because `netmapper resolve`
+is a second path into the same resolver. Both were found while implementing and are recorded as
+divergences 1 and 2 in [quickstart.md](quickstart.md).
 
 No role but `netmapper_owner` gains `UPDATE` or `DELETE` on `entity_decision`. That is what makes FR-009
 a constraint rather than a convention, the same argument 002 made for verdicts.
