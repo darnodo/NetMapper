@@ -162,8 +162,10 @@ Sections 1 to 5 run against the real lab. Section 6 stays an integration test as
   0.9" at once and came out quarantined. The document's validation only compared the two when both
   were written out, so nothing caught it. The fix went further than the bug: since published is fixed
   at full coverage, the two keys could only ever describe one boundary, so `quarantined_below` was
-  removed rather than repaired. `gateVersion` went to 2, and re-judging the affected snapshot with
-  `netmapper judge` turned quarantined into degraded while keeping the superseded verdict readable,
-  which is the first real use of the re-judge path.
+  removed rather than repaired. Re-judging the affected snapshot with `netmapper judge` turned
+  quarantined into degraded while keeping the superseded verdict readable, which is the first real
+  use of the re-judge path. `gateVersion` went to 2 afterwards, so those two rows both carry version
+  1 and cannot be told apart by it: the first time the column would have been useful, the bump came
+  too late. That is the hand-bumping weakness R9 names, seen once in practice.
 - Section 5: `netmapper judge <id>` prints `degraded 1/2 (baseline snapshot 19)` and
   `published no baseline` as the contract says, and exits 2 with `snapshot 999999 not found`.
