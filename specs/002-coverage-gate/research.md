@@ -180,11 +180,10 @@ entry gives the decision, why, and what else was considered.
 
 ## R13. Declaring thresholds in the configuration document
 
-- Decision: two optional keys under each entry of `perimeters:` in the configuration document,
-  `degraded_at` and `quarantined_below`, both fractions between 0 and 1. Absent keys mean the
-  documented defaults (published only at 1.0, degraded at 0.9 or above, quarantined below that).
-  Stored on the `perimeter` row, so a judgement reads the thresholds of the config version its own
-  snapshot ran under.
+- Decision: one optional key under each entry of `perimeters:` in the configuration document,
+  `degraded_at`, a fraction between 0 and 1. Absent means the documented default of 0.9 (published
+  only at full coverage, degraded from 0.9, quarantined below). Stored on the `perimeter` row, so a
+  judgement reads the threshold of the config version its own snapshot ran under.
 - Rationale: the configuration document is already the one place an operator declares a perimeter
   (001, contracts/config.md), and thresholds are a property of a perimeter, not of a run. Storing
   them on the row rather than re-reading the document keeps a judgement reproducible after the
@@ -192,3 +191,9 @@ entry gives the decision, why, and what else was considered.
 - Alternatives: a separate thresholds table keyed by perimeter name (a second place to declare a
   perimeter); command-line flags on the engine (global, so US3 fails); percentages as integers
   (fractions match how the coverage figure itself is expressed, so one less conversion to get wrong).
+- Revised on 2026-09-24, during the lab run: this started as two keys, `degraded_at` and
+  `quarantined_below`. Since FR-005 fixes published at full coverage, the pair can only ever describe
+  one boundary, and declaring one key without the other left the second on a default that crossed it
+  (`degraded_at: 0.5` against a default quarantine at 0.9 quarantined the very coverages the declared
+  key called degraded). The second key is gone rather than repaired: it added a way to be wrong and
+  no way to say anything new.

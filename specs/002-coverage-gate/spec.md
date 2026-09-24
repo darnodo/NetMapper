@@ -16,7 +16,7 @@
 - Q: Who triggers a judgement, and who triggers a re-judgement? → A: The engine judges every snapshot automatically as it closes; a re-judge is an explicit operator action on a named snapshot, never something the engine decides on its own.
 - Q: If the engine stops or fails between a snapshot closing and its judgement being written, how does that snapshot still get judged? → A: The engine sweeps for closed snapshots with no active judgement and judges them, so any interruption is picked up on the next pass with no dedicated recovery path.
 - Q: Which predecessor is a snapshot compared against: the one closed immediately before it, or the last one judged at the moment the calculation runs? → A: The one closed immediately before it, among those carrying an active judgement. A purely time-ordered rule, so a re-judge of an old snapshot finds the same baseline it originally had.
-- Q: What default thresholds separate published, degraded and quarantined for a perimeter that declares none? → A: published when every baseline device is reached again, degraded at 90% or more, quarantined below that. Strict by default, loosened per perimeter where the noise justifies it.
+- Q: What default thresholds separate published, degraded and quarantined for a perimeter that declares none? → A: published when every baseline device is reached again, degraded at 90% or more, quarantined below that. Strict by default, loosened per perimeter where the noise justifies it. (Implementation note, 2026-09-24: since published is fixed at full coverage, this needs one declared figure, not two. A draft with a second key was removed after the lab showed the pair could be declared crossed.)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -88,24 +88,23 @@ judgement's recorded breakdown names its own dominant cause, not a generic label
 
 ### User Story 3 - Configure how strict a perimeter's gate is (Priority: P3)
 
-An operator declares, per perimeter, the coverage range that counts as degraded and the point below
-which a snapshot is quarantined, because a home-lab perimeter and a compliance-sensitive perimeter do
-not deserve the same tolerance for missing devices.
+An operator declares, per perimeter, the coverage at or above which a snapshot counts as degraded
+rather than quarantined, because a home-lab perimeter and a compliance-sensitive perimeter do not
+deserve the same tolerance for missing devices.
 
-**Why this priority**: Without per-perimeter thresholds, one tolerance must fit every perimeter the
+**Why this priority**: Without a per-perimeter threshold, one tolerance must fit every perimeter the
 tool ever watches, which either quarantines a noisy lab constantly or lets a critical perimeter's real
 regressions through as merely degraded.
 
 **Independent Test**: Judge the same coverage figure under two perimeters with different configured
-thresholds and confirm it lands in different classifications for each.
+thresholds and confirm it lands in a different classification for each.
 
 **Acceptance Scenarios**:
 
-1. **Given** a perimeter with no declared thresholds, **When** its first snapshot is judged,
-   **Then** the documented default thresholds apply and the judgement states that the default was
-   used.
-2. **Given** a perimeter whose thresholds are changed, **When** its next snapshot closes,
-   **Then** it is judged under the new thresholds, and prior judgements are unchanged.
+1. **Given** a perimeter with no declared threshold, **When** its first snapshot is judged,
+   **Then** the documented default applies and the judgement states that the default was used.
+2. **Given** a perimeter whose threshold is changed, **When** its next snapshot closes,
+   **Then** it is judged under the new value, and prior judgements are unchanged.
 
 ---
 
@@ -156,10 +155,11 @@ thresholds and confirm it lands in different classifications for each.
 - **FR-004**: When a perimeter has no prior judged snapshot, or that snapshot's own reached-device set
   is empty, the system MUST still produce a judgement from the current snapshot's own counts and MUST
   record that no usable baseline existed, rather than computing a ratio against nothing.
-- **FR-005**: Each perimeter MUST be able to declare its own degraded range and quarantine threshold.
-  A perimeter that declares none MUST be judged published only when every device of its baseline is
-  reached again, degraded when at least 90% of them are, and quarantined below that. The judgement
-  MUST record which thresholds were applied and whether they were declared or defaulted.
+- **FR-005**: Each perimeter MUST be able to declare the coverage at or above which a snapshot is
+  degraded rather than quarantined. Published MUST require every device of the baseline to be reached
+  again, whatever that figure is, so one threshold per perimeter is the whole of the tuning. A
+  perimeter that declares none MUST be judged degraded at 90% or above and quarantined below. The
+  judgement MUST record the threshold applied and whether it was declared or defaulted.
 - **FR-006**: Every judgement MUST record the figures behind its classification: the baseline
   snapshot it was compared against (or that none existed), the coverage fraction, and a breakdown of
   every baseline device not carried over, by reason: unreachable, denied, unsupported, parse failed,
@@ -198,9 +198,9 @@ thresholds and confirm it lands in different classifications for each.
   coverage fraction, the thresholds applied, the per-reason breakdown of what did not carry over, when
   it was computed, and whether it is the snapshot's active verdict. Append only, like the snapshot it
   judges: a snapshot may accumulate several judgements over time, exactly one of them active.
-- **Coverage thresholds**: the degraded range and quarantine cutoff a perimeter declares, or the
-  system default when it declares none. Scoped to a perimeter, the same way a credential set's
-  attempt budget already is (001).
+- **Coverage threshold**: the coverage at or above which a perimeter's snapshot is degraded rather
+  than quarantined, as that perimeter declares it, or the system default when it declares none.
+  Scoped to a perimeter, the same way a credential set's attempt budget already is (001).
 
 ## Success Criteria *(mandatory)*
 
@@ -214,8 +214,8 @@ thresholds and confirm it lands in different classifications for each.
   yields the same classification and the same figures.
 - **SC-004**: A quarantined snapshot is distinguishable from a published or degraded one by its
   classification alone, before any later feature reads its observations.
-- **SC-005**: An operator can change a perimeter's thresholds and see the next snapshot of that
-  perimeter judged under the new values, with no earlier judgement changed.
+- **SC-005**: An operator can change a perimeter's threshold and see the next snapshot of that
+  perimeter judged under the new value, with no earlier judgement changed.
 - **SC-006**: A coverage collapse caused by devices that were never attempted (not merely marked
   unreachable or denied) is caught by the judgement, since that is the gap this feature exists to
   close.

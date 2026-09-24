@@ -28,8 +28,9 @@ var (
 // to the comparison alters results, so the judgements the old version wrote can be found and
 // replayed instead of being re-crawled.
 //
-// 2: a perimeter declaring one threshold and not the other used to keep the default for the other,
-// which crossed the two and quarantined coverages the declared one called degraded.
+// 2: a perimeter used to declare two thresholds, degraded_at and quarantined_below, and declaring
+// only one left the other on its default, which crossed the pair. Published is fixed at full
+// coverage, so there is only ever one boundary to place: quarantined_below is gone.
 const gateVersion = 2
 
 // Judgement is one verdict, as stored in snapshot_judgement.

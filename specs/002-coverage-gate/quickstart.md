@@ -103,8 +103,11 @@ perimeters:
     degraded_at: 0.5
 ```
 
-Repeat section 3 with that document. Expected: same coverage `0.5000`, classification `degraded`,
-and `thresholds->>'source' = 'perimeter'` instead of `default`.
+Restore LLDP first and take a clean two-device baseline with that document, then turn LLDP off again
+and run once more: a baseline is the run before, so section 3 left the perimeter at one device and
+comparing one against one is published (see the divergences below). Expected on that second run: same
+coverage `0.5000`, classification `degraded` instead of `quarantined`, and
+`thresholds->>'source' = 'perimeter'`.
 
 ## 5. Re-judging (FR-009, FR-013)
 
@@ -149,11 +152,12 @@ Sections 1 to 5 run against the real lab. Section 6 stays an integration test as
   LLDP, take a clean two-device baseline, and only then turn LLDP off again with the tolerant
   document. This is the intended consequence of measuring change rather than absolute state, but it
   means an operator who ignores a quarantined verdict stops being told about that loss.
-- Section 4 found a real defect, fixed in this branch: a perimeter declaring only `degraded_at: 0.5`
-  kept the default `quarantined_below: 0.9`, so a coverage of 0.5 satisfied "degraded from 0.5" and
-  "quarantined below 0.9" at once and came out quarantined. The document's validation only compares
-  the two when both are written out, so nothing caught it. An undeclared threshold now follows the
-  declared one. `gateVersion` went to 2 for it, and re-judging the affected snapshot with
+- Section 4 found a real defect: a perimeter declaring only `degraded_at: 0.5` kept the default
+  `quarantined_below: 0.9`, so a coverage of 0.5 satisfied "degraded from 0.5" and "quarantined below
+  0.9" at once and came out quarantined. The document's validation only compared the two when both
+  were written out, so nothing caught it. The fix went further than the bug: since published is fixed
+  at full coverage, the two keys could only ever describe one boundary, so `quarantined_below` was
+  removed rather than repaired. `gateVersion` went to 2, and re-judging the affected snapshot with
   `netmapper judge` turned quarantined into degraded while keeping the superseded verdict readable,
   which is the first real use of the re-judge path.
 - Section 5: `netmapper judge <id>` prints `degraded 1/2 (baseline snapshot 19)` and

@@ -76,11 +76,6 @@ func TestInvalid(t *testing.T) {
 			`perimeter "lab": degraded_at must be greater than 0 and at most 1`},
 		{"degraded_at zero", "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 0",
 			`perimeter "lab": degraded_at must be greater than 0 and at most 1`},
-		{"quarantined_below above 1", "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    quarantined_below: 2",
-			`perimeter "lab": quarantined_below must be greater than 0 and at most 1`},
-		{"thresholds crossed", "exclude: [172.20.20.1/32]",
-			"exclude: [172.20.20.1/32]\n    degraded_at: 0.8\n    quarantined_below: 0.9",
-			`perimeter "lab": quarantined_below must not be greater than degraded_at`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			doc := strings.Replace(valid, c.old, c.new, 1)
@@ -98,16 +93,15 @@ func TestInvalid(t *testing.T) {
 	}
 }
 
-// T035, FR-005: both threshold keys are optional, and declaring one leaves the other on its
-// default rather than forcing the pair to be written out.
-func TestThresholdsAreOptional(t *testing.T) {
+// T035, FR-005: the threshold is optional, and a perimeter that declares none is judged by the
+// documented default.
+func TestThresholdIsOptional(t *testing.T) {
 	d, err := Parse([]byte(valid))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Perimeters[0].DegradedAt != nil || d.Perimeters[0].QuarantinedBelow != nil {
-		t.Errorf("undeclared thresholds read as %v/%v, want both unset",
-			d.Perimeters[0].DegradedAt, d.Perimeters[0].QuarantinedBelow)
+	if d.Perimeters[0].DegradedAt != nil {
+		t.Errorf("undeclared threshold reads as %v, want unset", d.Perimeters[0].DegradedAt)
 	}
 
 	one := strings.Replace(valid, "exclude: [172.20.20.1/32]", "exclude: [172.20.20.1/32]\n    degraded_at: 0.5", 1)
@@ -117,8 +111,5 @@ func TestThresholdsAreOptional(t *testing.T) {
 	}
 	if d.Perimeters[0].DegradedAt == nil || *d.Perimeters[0].DegradedAt != 0.5 {
 		t.Errorf("degraded_at %v, want 0.5", d.Perimeters[0].DegradedAt)
-	}
-	if d.Perimeters[0].QuarantinedBelow != nil {
-		t.Errorf("quarantined_below %v, want unset so the default applies", d.Perimeters[0].QuarantinedBelow)
 	}
 }

@@ -16,9 +16,8 @@ type snapshot struct {
 	closedAt    *time.Time
 	perimeter   string
 	perimeterID int64
-	// The thresholds its own perimeter declared, nil each when it declared none.
-	degradedAt       *float64
-	quarantinedBelow *float64
+	// The threshold its own perimeter declared, nil when it declared none.
+	degradedAt *float64
 }
 
 // describe reads the snapshot, the name of the perimeter its run used, and that perimeter's row,
@@ -26,11 +25,11 @@ type snapshot struct {
 func describe(ctx context.Context, db *pgxpool.Pool, id int64) (snapshot, error) {
 	s := snapshot{id: id}
 	err := db.QueryRow(ctx, `
-		SELECT s.state, s.closed_at, p.name, p.id, p.degraded_at, p.quarantined_below
+		SELECT s.state, s.closed_at, p.name, p.id, p.degraded_at
 		FROM snapshot s
 		JOIN job j ON j.snapshot_id = s.id
 		JOIN perimeter p ON p.id = (j.parameters->>'perimeter_id')::bigint
-		WHERE s.id = $1`, id).Scan(&s.state, &s.closedAt, &s.perimeter, &s.perimeterID, &s.degradedAt, &s.quarantinedBelow)
+		WHERE s.id = $1`, id).Scan(&s.state, &s.closedAt, &s.perimeter, &s.perimeterID, &s.degradedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return s, fmt.Errorf("snapshot %d: %w", id, ErrNotFound)
 	}

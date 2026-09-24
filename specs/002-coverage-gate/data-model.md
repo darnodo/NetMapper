@@ -19,7 +19,7 @@ One row per verdict. A snapshot accumulates rows over time and exactly one of th
 | `carried_over`         | `integer NOT NULL`                                                               | baseline devices reached again in this snapshot                                             |
 | `reached`              | `integer NOT NULL`                                                               | devices this snapshot reached, baseline or not; the figure FR-004 falls back on             |
 | `breakdown`            | `jsonb NOT NULL DEFAULT '{}'`                                                    | per-reason counts and the addresses behind them, see below                                  |
-| `thresholds`           | `jsonb NOT NULL`                                                                 | `{"degraded_at": 0.9, "quarantined_below": 0.9, "source": "default"\|"perimeter"}` (FR-005) |
+| `thresholds`           | `jsonb NOT NULL`                                                                 | `{"degraded_at": 0.9, "source": "default"\|"perimeter"}` (FR-005)                          |
 | `gate_version`         | `integer NOT NULL`                                                               | which calculation produced this row (R9)                                                    |
 | `active`               | `boolean NOT NULL DEFAULT true`                                                  | exactly one true per snapshot                                                               |
 | `computed_at`          | `timestamptz NOT NULL DEFAULT now()`                                             | FR-010                                                                                      |
@@ -66,16 +66,14 @@ verdict in place is not expressible (R4, R5). Same device as `create_task_partit
 
 ## Changed table: `perimeter` (control plane)
 
-| Column              | Type                                                                         | Notes                                          |
-| ------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------- |
-| `degraded_at`       | `numeric(5,4) NULL CHECK (degraded_at > 0 AND degraded_at <= 1)`             | coverage at or above this is at worst degraded |
-| `quarantined_below` | `numeric(5,4) NULL CHECK (quarantined_below > 0 AND quarantined_below <= 1)` | coverage below this is quarantined             |
+| Column        | Type                                                             | Notes                                          |
+| ------------- | ---------------------------------------------------------------- | ---------------------------------------------- |
+| `degraded_at` | `numeric(5,4) NULL CHECK (degraded_at > 0 AND degraded_at <= 1)` | coverage at or above this is degraded, below it quarantined |
 
-Both null means the documented defaults (`degraded_at = 0.9`, `quarantined_below = 0.9`, published
-only at `1.0`). Written by `netmapper run` from the configuration document alongside the include and
-exclude ranges, so they are pinned to the config version the snapshot ran under (R13). A
-`CHECK (degraded_at IS NULL OR quarantined_below IS NULL OR quarantined_below <= degraded_at)` keeps
-the two from crossing.
+Null means the documented default of `0.9`. Written by `netmapper run` from the configuration
+document alongside the include and exclude ranges, so it is pinned to the config version the snapshot
+ran under (R13). One column is enough: published is fixed at full coverage by FR-005, so the only
+boundary a perimeter places is the one between degraded and quarantined.
 
 ## Grants added (migration `0005_judgement.sql`)
 

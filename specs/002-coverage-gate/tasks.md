@@ -65,10 +65,11 @@ usage; both gaps are closed here (research R4)
   migrations/0005_judgement.sql: in one transaction it sets `active = false` on the snapshot's current
   active row if there is one, then inserts the new row with `active = true`, and returns its id. It is
   the only write path to the table, so "rewrite a verdict in place" is not expressible (FR-009)
-- [X] T006 [P] Add to migrations/0005_judgement.sql the two `perimeter` columns:
-  `degraded_at numeric(5,4) NULL CHECK (degraded_at > 0 AND degraded_at <= 1)` and
-  `quarantined_below numeric(5,4) NULL CHECK (quarantined_below > 0 AND quarantined_below <= 1)`,
-  plus `CHECK (degraded_at IS NULL OR quarantined_below IS NULL OR quarantined_below <= degraded_at)`
+- [X] T006 [P] Add to migrations/0005_judgement.sql the `perimeter` column
+  `degraded_at numeric(5,4) NULL CHECK (degraded_at > 0 AND degraded_at <= 1)`
+  - Revised after the lab run: this task asked for a second column, `quarantined_below`, with a
+    CHECK keeping the pair ordered. Published is fixed at full coverage, so the pair could only ever
+    place one boundary, and declaring one key without the other crossed them. One column now.
 - [X] T007 Add the grants to migrations/0005_judgement.sql: `SELECT, INSERT` on `snapshot_judgement`
   and `USAGE` on `snapshot_judgement_id_seq` to `netmapper_engine`, `EXECUTE` on `judge_snapshot` to
   `netmapper_engine`, `SELECT` on the table to `netmapper_operator` and `netmapper_collector`. No role
@@ -242,13 +243,12 @@ thresholds and `quarantined` under the defaults. On the lab, quickstart.md secti
 
 ### Implementation for User Story 3
 
-- [X] T037 [US3] Parse and validate `degraded_at` and `quarantined_below` per perimeter in
-  internal/config/config.go: both optional, both fractions in `(0, 1]`, `quarantined_below` not
-  greater than `degraded_at`, with the exact messages of contracts/config.md
-- [X] T038 [US3] Write both columns from the document in internal/jobrunner/start.go, alongside the
+- [X] T037 [US3] Parse and validate `degraded_at` per perimeter in internal/config/config.go:
+  optional, a fraction in `(0, 1]`, with the exact message of contracts/config.md
+- [X] T038 [US3] Write the column from the document in internal/jobrunner/start.go, alongside the
   include and exclude ranges of the `perimeter` row it already inserts
 - [X] T039 [US3] Read the judged snapshot's own perimeter row in internal/gate/thresholds.go and use
-  its values when present, the defaults when null, recording which was used in the `thresholds` column
+  its value when present, the default when null, recording which was used in the `thresholds` column
   (FR-005, research R13)
 
 **Checkpoint**: All three stories pass their independent tests.

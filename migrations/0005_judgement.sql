@@ -53,12 +53,11 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 
--- Per-perimeter thresholds. Null means the documented defaults.
+-- Per-perimeter coverage threshold. Null means the documented default. One number is enough:
+-- published is fixed at full coverage by FR-005, so the only boundary left to place is the one
+-- between degraded and quarantined.
 ALTER TABLE perimeter
-    ADD COLUMN degraded_at       numeric(5,4) NULL CHECK (degraded_at > 0 AND degraded_at <= 1),
-    ADD COLUMN quarantined_below numeric(5,4) NULL CHECK (quarantined_below > 0 AND quarantined_below <= 1),
-    ADD CONSTRAINT perimeter_thresholds_ordered
-        CHECK (degraded_at IS NULL OR quarantined_below IS NULL OR quarantined_below <= degraded_at);
+    ADD COLUMN degraded_at numeric(5,4) NULL CHECK (degraded_at > 0 AND degraded_at <= 1);
 
 ALTER TABLE snapshot_judgement OWNER TO netmapper_owner;
 
@@ -70,7 +69,4 @@ GRANT SELECT ON snapshot_judgement TO netmapper_operator, netmapper_collector;
 -- +goose Down
 DROP FUNCTION judge_snapshot(bigint, bigint, text, numeric, integer, integer, integer, jsonb, jsonb, integer);
 DROP TABLE snapshot_judgement;
-ALTER TABLE perimeter
-    DROP CONSTRAINT perimeter_thresholds_ordered,
-    DROP COLUMN quarantined_below,
-    DROP COLUMN degraded_at;
+ALTER TABLE perimeter DROP COLUMN degraded_at;

@@ -24,7 +24,7 @@ in [research.md](research.md).
 control flow, no new transport, no new parser, no object store access
 
 **Storage**: PostgreSQL only. One new table (`snapshot_judgement`), one new `SECURITY DEFINER`
-function, two optional columns on `perimeter`, three grants. Garage is untouched: a judgement cites
+function, one optional column on `perimeter`, three grants. Garage is untouched: a judgement cites
 observations, it stores no bytes
 
 **Testing**: `go test`; integration tests against PostgreSQL from `deploy/compose.yaml`, building
@@ -79,7 +79,7 @@ Principles touched by this feature: I, II.
 - New reported-zone table `snapshot_judgement`, with the partial unique index as the "one active
   verdict" invariant.
 - `judge_snapshot(...)` as the only write path to it, `SECURITY DEFINER`, owned by `netmapper_owner`.
-- `perimeter` gains `degraded_at` and `quarantined_below`.
+- `perimeter` gains `degraded_at`.
 - The engine's grant set gains `INSERT` on one reported-zone table and sequence usage, which 001 had
   given to no role but the operator and collector.
 - Invariant: a perimeter's identity across config versions is its **name**, not its id.
@@ -115,7 +115,7 @@ internal/
 │   ├── baseline.go           # perimeter-by-name lookup, closing-order selection (R1, R7)
 │   ├── compare.go            # the comparison query and its row types (R2, R3, R11)
 │   └── thresholds.go         # defaults, per-perimeter overrides, classification (R13)
-├── config/                   # + degraded_at / quarantined_below parse and validation
+├── config/                   # + degraded_at parse and validation
 ├── jobrunner/                # + judging step in Tick, sweep query (R6)
 └── store/                    # unchanged
 
