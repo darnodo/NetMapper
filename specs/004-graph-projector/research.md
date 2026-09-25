@@ -107,7 +107,7 @@ the source as a free-text label, which puts the same two values in the table und
 | `if:<device_key>/<canonical>`   | a port of a resolved device                        |
 | `dev:<device_key>`              | a resolved device as a whole                       |
 | `addr:<address>`                | an address a device answered on                    |
-| `unknown:<kind>=<value>[/<port>]` | a far end no entity accounts for, named by the best identifier the report gave |
+| `unknown:<kind>=<value>[/<port>]` | a far end no entity accounts for, named by the best identifier the report gave. `<kind>` is `chassis_id`, `mgmt_address` or `system_name` |
 
 `edge.name` is `type:from_ref|to_ref`, a stored generated column, and `(snapshot_id, name)` is unique.
 An `l1_link` is oriented by putting the lower reference first, so one cable has one name whichever end
@@ -122,9 +122,20 @@ to remember to deduplicate.
 
 The `unknown:` form takes the far end's port spelling when the report gave one, so two cables to the
 same unmanaged box stay two edges (FR-011). The identifier is chosen in a fixed order:
-`remote_chassis_id`, then `remote_mgmt_address`, then `remote_system_name`. A report that says nothing
-at all about the far end yields the local interface and no edge: there is no endpoint to connect to,
-and inventing one would be the opposite of FR-010.
+`remote_chassis_id`, then `remote_mgmt_address`, then `remote_system_name`. `<kind>` in the reference
+is that field name with its `remote_` prefix dropped, so what is actually written is
+`unknown:chassis_id=…`, and that is what a query has to match.
+
+The value goes through `pack.NormaliseMAC`, exactly as `resolveFar` normalises it to look for an
+entity. Without that, one device reporting one cable under two protocols that spell a chassis MAC
+differently would build two references, land in two groups and produce two edges for one cable, which
+is what the 2026-09-25 clarification says must not happen. `NormaliseMAC` returns anything that is not
+a MAC unchanged, so a hostname and an IP address are recorded as reported. The far-end port in the
+reference is not normalised and cannot be: canonicalising a port needs the platform's naming rules, and
+the platform of a device no entity accounts for is unknown, which is FR-005 applied to the far end.
+
+A report that says nothing at all about the far end yields the local interface and no edge: there is no
+endpoint to connect to, and inventing one would be the opposite of FR-010.
 
 **Alternatives considered**: a minted edge key in a registry, which is what spec.md already rejected
 and which would make this feature as large as 003 for a problem it does not have; a hash of the two

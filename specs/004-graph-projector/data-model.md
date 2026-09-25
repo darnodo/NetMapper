@@ -113,7 +113,21 @@ A relationship between two endpoints in one snapshot.
 | `if:<device_key>/<canonical>`     | a port of a resolved device                                                     |
 | `dev:<device_key>`                | a resolved device as a whole                                                    |
 | `addr:<address>`                  | an address a device answered on                                                 |
-| `unknown:<kind>=<value>[/<port>]` | a far end no entity accounts for, named by `remote_chassis_id`, else `remote_mgmt_address`, else `remote_system_name` |
+| `unknown:<kind>=<value>[/<port>]` | a far end no entity accounts for, named by the first identifier the report supplied |
+
+`<kind>` is `chassis_id`, `mgmt_address` or `system_name`: the fact family's field name with its
+`remote_` prefix dropped, which is what the projector writes and therefore what a query has to match.
+They are tried in that order and the first one the report supplied wins. `<value>` goes through the
+same MAC normalisation the far-end matcher uses, so one box reported under two spellings of its chassis
+identifier is one endpoint; anything that is not a MAC passes through as reported. `<port>` is the
+far-end port exactly as the report spelled it, because no pack can canonicalise a port on a device
+whose platform is unknown. The cEOS lab writes, for a switch that refused every credential set:
+
+```text
+unknown:chassis_id=00:1c:73:74:a1:26/Management0
+```
+
+where the observation behind it still records what Arista actually printed, `001c.7374.a126`.
 
 `UNIQUE (snapshot_id, name)` is FR-009 and FR-011 together: one cable is one row, and two cables
 between the same two switches are two rows, because the name carries the ports and not just the
@@ -165,20 +179,29 @@ For a one-sided one whose far end no entity accounts for:
 value because the protocol is not part of an edge's identity: one device reporting one cable over both
 LLDP and CDP produces one edge citing both observations (FR-011).
 
-Three shapes, and two conditions draw them apart. **Both spellings are carried by every one-sided
-link**, whatever its far end resolved to: a one-sided link has exactly one report, so the edge is the
-only place that says how that one report worded things. An agreed link has a report from each side and
-carries neither, because `interface_alias` is where a spelling lives, keyed to the port it names and to
-the observation that used it, and repeating one on the edge would give the same fact two homes that can
-disagree. **The four `remote_*` fields are carried only when the far end resolved to nothing**, because
-that is the case where no entity and no interface row holds them; FR-010 calls them "whatever the report
-said about the far end".
+Three shapes, and two conditions draw them apart.
 
-Two convergence passes were needed to get this section right. The first found the document promising
-spellings on every link where the projector writes them only for a one-sided one (T084). The second
-found that correction had replaced one wrong description with an incomplete one: it showed two shapes
-where there are three, and tied the far spelling to an unresolved far end when the code does not
-(T088). The undocumented shape was the one the cEOS lab produced on its first run.
+**`from_spelling` is on every one-sided link, and `to_spelling` is on the ones whose report named a
+far-end port.** A one-sided link has exactly one report, so the edge is the only place recording how
+that report worded things, and a report that named no far-end port leaves `to_spelling` out rather than
+empty. An agreed link carries neither, because `interface_alias` is where a spelling lives, keyed to the
+port it names and to the observation that used it, and repeating one on the edge would give the same
+fact two homes that can disagree.
+
+**The `remote_*` fields are carried only when the far end resolved to nothing**, because that is the
+case where no entity and no interface row holds them; FR-010 calls them "whatever the report said about
+the far end". Only the ones the report supplied are present, so a report giving a system name and
+nothing else carries `remote_system_name` alone.
+
+Three convergence passes were needed to get this section right, and it is worth knowing why. The first
+found the document promising spellings on every link where the projector writes them only for a
+one-sided one (T084). The second found that correction had replaced one wrong description with an
+incomplete one: two shapes where there are three, and the far spelling tied to an unresolved far end
+when the code does not do that (T088); the undocumented shape was the one the cEOS lab produced on its
+first run. The third found the sentence that replaced it still overstated, because `to_spelling`
+follows what the report named (T093). Prose describing a value that code assembles drifts every time
+either moves, and this section would hold still better as a grammar with a test asserting the shapes it
+produces.
 
 For a `has_address`: `{"address": "10.0.0.1"}`.
 

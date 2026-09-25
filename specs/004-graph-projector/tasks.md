@@ -651,3 +651,53 @@ document that still misdescribes the code, a question the lab answered, and one 
   **Done**: `farRef` passes the identifier through `pack.NormaliseMAC`, which leaves a hostname and an
   IP address untouched. `TestUnresolvedFarEndIdentifierIsNormalised` was run against the old code first
   and produced two links for one cable, so it is not a test that would have passed either way
+
+---
+
+## Phase 9: Convergence
+
+Found by `/speckit-converge` after Phase 8. No functional gap: the suite passes and the lab passes.
+All three are documentation precision, and all three sit in the two paragraphs describing the
+`unknown:` endpoint reference and the edge attributes. That is the third pass in a row to find drift
+there, which is noted at the end of this phase.
+
+- [X] T091 **CRITICAL** Define `<kind>` in the `unknown:` endpoint reference, per Constitution
+  Development Workflow "a document that describes behaviour MUST be corrected in the same change as
+  the behaviour" (contradicts). data-model.md's reference table and research R6 both write the form as
+  `unknown:<kind>=<value>[/<port>]` and then name the three sources as `remote_chassis_id`,
+  `remote_mgmt_address` and `remote_system_name`, which are the fact family's field names.
+  internal/graph/links.go trims the `remote_` prefix, so what is actually written is
+  `unknown:chassis_id=…`, `unknown:mgmt_address=…` or `unknown:system_name=…`. `<kind>` is defined
+  nowhere, so an engineer writing `WHERE to_ref LIKE 'unknown:remote_chassis_id=%'` straight from the
+  document gets no rows and no hint why. Name the three literal values in both files; the lab's own
+  output, `unknown:chassis_id=00:1c:73:74:a1:26/Management0`, is a good example to quote.
+  **Done**: both files now name `chassis_id`, `mgmt_address` and `system_name` as the literal values and
+  say the `remote_` prefix is dropped. data-model.md quotes the lab's reference and notes the
+  observation behind it still records `001c.7374.a126`, which is the difference between the collected
+  and the computed zone in one line
+- [X] T092 Record in research R6 that the identifier in an `unknown:` reference is normalised, per
+  Constitution Development Workflow and research R6 (partial). R6 sets out how the reference is built,
+  including the order the three identifiers are tried, and T090 changed that construction without
+  touching it. Nothing in R6 is false; what is missing is the fact that makes the rule work, which is
+  that the value goes through `pack.NormaliseMAC` exactly as `resolveFar` normalises it to look for an
+  entity, so one box reported under two spellings of its chassis MAC is one endpoint. Say it there,
+  with the reason T090 gives: without it, one device reporting one cable under two protocols that
+  spell a chassis MAC differently would produce two edges for one cable.
+  **Done**: R6 now records the normalisation, why it exists, that anything which is not a MAC passes
+  through, and the one thing that deliberately is *not* normalised: the far-end port, because
+  canonicalising a port needs a platform and an unresolved device has none, which is FR-005 applied to
+  the far end
+- [X] T093 Qualify the spellings sentence in data-model.md's attributes section (partial). T088 wrote
+  "Both spellings are carried by every one-sided link", and `link` in internal/graph/links.go writes
+  `to_spelling` only when the report named a far-end port. A one-sided link to a device whose report
+  named no port at all carries `from_spelling` alone, which is a fourth shape the section does not
+  mention. Either qualify the sentence or say plainly that `to_spelling` follows the report.
+  **Done**: the sentence now separates the two, and says the `remote_*` set holds only the fields the
+  report supplied rather than always four. Both statements were checked by reading the key sets out of
+  a real projection covering all four cases, not by reasoning about the code
+
+> **A note for whoever does these.** T084 corrected this section, T088 corrected that correction, and
+> T091 and T093 correct this one. Every fix was right and every fix left something, because the
+> section is hand-written prose describing a string that code builds. It would drift less as a short
+> grammar with a test asserting the shapes it produces. That is a change to how the artifact is
+> written rather than a gap in this feature, so it is recorded here rather than made a task.
