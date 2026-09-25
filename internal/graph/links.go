@@ -45,7 +45,11 @@ func (r *report) farRef() string {
 	}
 	for _, kind := range []string{"remote_chassis_id", "remote_mgmt_address", "remote_system_name"} {
 		if v := r.remote[kind]; v != "" {
-			ref := "unknown:" + strings.TrimPrefix(kind, "remote_") + "=" + v
+			// Normalised the way resolveFar normalises it to look for an entity, so one box reported
+			// under two spellings of its chassis MAC is one endpoint and one cable rather than two
+			// (FR-011, clarified 2026-09-25). NormaliseMAC returns anything that is not a MAC
+			// unchanged, so a hostname and an IP address pass through as reported.
+			ref := "unknown:" + strings.TrimPrefix(kind, "remote_") + "=" + pack.NormaliseMAC(v)
 			if r.toSpelling != "" {
 				ref += "/" + r.toSpelling
 			}

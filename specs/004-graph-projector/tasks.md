@@ -603,3 +603,51 @@ and the kind of gap it closes.
   `entity.kind` keeps its `CHECK (kind = 'device')`.
   **Done**: the `entity` row in docs/c4-model/04-data-model.md now says the projector shipped without
   needing another kind, and that a future one is a migration rather than a silent widening
+
+---
+
+## Phase 8: Convergence
+
+Found by `/speckit-converge` after the lab run. The feature has no functional gap left; these are a
+document that still misdescribes the code, a question the lab answered, and one latent defect.
+
+- [X] T088 **CRITICAL** Finish the correction T084 started, per Constitution Development Workflow "a
+  document that describes behaviour MUST be corrected in the same change as the behaviour"
+  (contradicts). data-model.md's "attributes shape" now shows two shapes where `link` in
+  internal/graph/links.go produces three: an agreed link carries `protocols` alone, a one-sided link
+  whose far end resolved carries `protocols` plus both spellings, and a one-sided link whose far end
+  resolved to nothing carries those plus the four `remote_*` fields. T084 documented the first and the
+  third. The prose is also wrong in one place: it says the far spelling is kept because "on a one-sided
+  link whose far end resolved to nothing there is no port row to hang the far spelling off", but
+  links.go keeps `to_spelling` on every one-sided link whatever the far end resolved to. The lab
+  produced the undocumented shape on sw4, whose links are one-sided because the crawl deduplicated it
+  against sw1's pinned serial. Add the third example and fix that sentence.
+  **Done**: three shapes now, with the two conditions stated separately. Both spellings go on every
+  one-sided link, because such a link has one report and the edge is the only place recording how that
+  report worded things; the four `remote_*` fields go on only the subset whose far end resolved to
+  nothing, because that is the case where no entity or interface row holds them
+- [X] T089 Record in plan.md's "Known open points" what the lab answered about a shared medium, per
+  plan: known open points (partial). The row said the question closes when "the lab runs long enough to
+  say whether it happens, at which point it is a query, not a rule". It happened on the first run: the
+  containerlab management bridge puts every node on one segment, so five of the seven links in a
+  four-node lab are that segment and one is the actual cable. Nothing is wrong with the result, and the
+  note should now say so rather than leaving the question open, because a reader counting links will
+  otherwise think something is duplicated. The neighbouring row about two ports of one device cabled
+  together stays open: what the lab produced instead is a device seeing *itself* on one port, which the
+  equal-references rule drops.
+  **Done**: the shared-medium row is closed with what the lab measured, and the loopback row stays open
+  with a note that the lab produced a self-report rather than a self-cable
+- [X] T090 Normalise the identifier in an `unknown:` endpoint reference the way `resolveFar` already
+  does for the lookup, per FR-011 as clarified on 2026-09-25 (partial). `farRef` in
+  internal/graph/links.go builds `unknown:chassis_id=<value>` from the raw string the device reported,
+  so the lab names sw3 `unknown:chassis_id=001c.7374.a126` in Arista's dotted form while the matcher
+  three functions away reads it as `00:1c:73:74:a1:26`. Nothing is broken today, because only LLDP is
+  collected anywhere and one pack spells a chassis identifier one way. It breaks the moment a pack
+  reports the same cable under two protocols that spell it differently: the two rows would land in two
+  groups and one cable would become two edges, which is exactly what the clarification says must not
+  happen. Passing the value through `pack.NormaliseMAC` is a one-line change, and the reason it was not
+  folded into the lab run is that it renames every `unknown:` edge, so it wants its own test: two
+  reports of one cable whose chassis identifier is spelled two ways collapse to one edge.
+  **Done**: `farRef` passes the identifier through `pack.NormaliseMAC`, which leaves a hostname and an
+  IP address untouched. `TestUnresolvedFarEndIdentifierIsNormalised` was run against the old code first
+  and produced two links for one cable, so it is not a test that would have passed either way

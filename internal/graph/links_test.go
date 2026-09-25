@@ -396,3 +396,33 @@ func TestDisagreementNamesBothSides(t *testing.T) {
 		t.Errorf("evidence %v, want the report from each side", ev)
 	}
 }
+
+// T090, FR-011 as clarified 2026-09-25: one cable reported twice, with the far end's chassis
+// identifier spelled two ways, is one edge. An unresolved endpoint is named by that identifier, so the
+// reference has to be normalised the way the matcher normalises it to look for an entity, or the same
+// box reads as two endpoints and one cable becomes two links.
+//
+// The lab found this: Arista reports a chassis MAC dotted, as `001c.7374.a126`, while the entity set
+// holds `00:1c:73:74:a1:26`. Nothing was broken there, because one pack spells it one way; two
+// protocols on one device spelling it differently is what this guards.
+func TestUnresolvedFarEndIdentifierIsNormalised(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		// One cable from port1 to the same unmanaged box, reported twice: colon form, then the dotted
+		// form Arista prints. Same far-end port both times, so it is one cable by any reading.
+		Addr("10.0.0.1"): FakeOS("sw1", "S001",
+			"p1 box - eth0 aa:bb:cc:99:99:99", "p1 box - eth0 aabb.cc99.9999"),
+	})
+	got := links(l)
+	want := []string{"l1_link:if:" + key("S001") + "/port1|unknown:chassis_id=aa:bb:cc:99:99:99/eth0 one_end"}
+	if !slices.Equal(got, want) {
+		t.Errorf("links %v, want the two spellings to name one cable %v", got, want)
+	}
+	// An address and a hostname are not MACs and must pass through as reported.
+	l2 := lab(t, map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p1 box 10.0.0.9 eth0 -"),
+	})
+	if got := l2.Strings(`SELECT to_ref FROM edge WHERE type = 'l1_link'`); len(got) != 1 ||
+		got[0] != "unknown:mgmt_address=10.0.0.9/eth0" {
+		t.Errorf("to_ref %v, want the address kept as reported", got)
+	}
+}

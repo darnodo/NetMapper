@@ -328,14 +328,16 @@ Five more divergences, all found by running it:
    `show lldp neighbors`, the summary command no recipe uses. US1's whole point, one port under one
    name whatever spells it differently, is therefore still covered only by the fakeos tests. Making the
    lab exercise it needs a device that abbreviates in the output a recipe actually reads.
-9. **An `unknown:` reference keeps the vendor's raw identifier spelling.** sw3 refuses every credential
-   set, so its links are named `unknown:chassis_id=001c.7374.a126/Management0`, in Arista's dotted
-   form, while `resolveFar` normalises that same value to `00:1c:73:74:a1:26` when it looks for a
-   matching entity. Inside one vendor the name is stable, which is what FR-015 asks. Across two, a
-   Cisco and an Arista reporting the same unmanaged switch would spell its chassis MAC differently and
-   produce two edges for one cable. The fix is to normalise the identifier in `farRef` the way
-   `resolveFar` already does for the lookup, and it changes the name of every `unknown:` edge, so it
-   belongs in its own change with its own test rather than in a validation pass.
+9. **An `unknown:` reference kept the vendor's raw identifier spelling. Fixed in T090.** sw3 refuses
+   every credential set, so its links were named `unknown:chassis_id=001c.7374.a126/Management0`, in
+   Arista's dotted form, while `resolveFar` normalised that same value to `00:1c:73:74:a1:26` when it
+   looked for a matching entity. Inside one vendor the name was stable, which is what FR-015 asks;
+   across two, one device reporting a cable under two protocols that spell a chassis MAC differently
+   would have produced two edges for one cable, which is what the FR-011 clarification forbids.
+   `farRef` now passes the identifier through `pack.NormaliseMAC`, which leaves a hostname and an IP
+   address untouched, and the lab confirms the result: the same reference now reads
+   `unknown:chassis_id=00:1c:73:74:a1:26/Management0` while the observation still records
+   `001c.7374.a126` as reported.
 10. **The management bridge makes every node a neighbour of every other.** Seven links, of which one is
     the actual eth cable and five are the mgmt segment. Each switch also reports *itself* on
     `Management0`, and those rows are dropped by the rule that refuses a report whose two endpoint

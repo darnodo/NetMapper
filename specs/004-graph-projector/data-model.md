@@ -140,6 +140,13 @@ For an agreed `l1_link`, where both endpoints are resolved ports:
 { "protocols": ["lldp"] }
 ```
 
+For a one-sided one whose far end did resolve to an entity, which happens when that device never
+reported back:
+
+```json
+{ "protocols": ["lldp"], "from_spelling": "Ethernet1", "to_spelling": "Et1" }
+```
+
 For a one-sided one whose far end no entity accounts for:
 
 ```json
@@ -158,16 +165,20 @@ For a one-sided one whose far end no entity accounts for:
 value because the protocol is not part of an edge's identity: one device reporting one cable over both
 LLDP and CDP produces one edge citing both observations (FR-011).
 
-Everything else is carried by a one-sided link only. The four `remote_*` fields are what FR-010 calls
-"whatever the report said about the far end", and they exist because there is no endpoint row to hold
-them; on an agreed link the two endpoints already say all of it. The spellings go with them for the
-same reason: `interface_alias` is where a spelling lives, keyed to the port it names and to the
-observation that used it, and repeating one on an agreed edge would give the same fact two homes that
-can disagree. On a one-sided link whose far end resolved to nothing there is no port row to hang the
-far spelling off, so the edge keeps it.
+Three shapes, and two conditions draw them apart. **Both spellings are carried by every one-sided
+link**, whatever its far end resolved to: a one-sided link has exactly one report, so the edge is the
+only place that says how that one report worded things. An agreed link has a report from each side and
+carries neither, because `interface_alias` is where a spelling lives, keyed to the port it names and to
+the observation that used it, and repeating one on the edge would give the same fact two homes that can
+disagree. **The four `remote_*` fields are carried only when the far end resolved to nothing**, because
+that is the case where no entity and no interface row holds them; FR-010 calls them "whatever the report
+said about the far end".
 
-This was the other way round until a convergence pass found the document describing spellings the
-projector writes only for a one-sided link (T084).
+Two convergence passes were needed to get this section right. The first found the document promising
+spellings on every link where the projector writes them only for a one-sided one (T084). The second
+found that correction had replaced one wrong description with an incomplete one: it showed two shapes
+where there are three, and tied the far spelling to an unresolved far end when the code does not
+(T088). The undocumented shape was the one the cEOS lab produced on its first run.
 
 For a `has_address`: `{"address": "10.0.0.1"}`.
 
