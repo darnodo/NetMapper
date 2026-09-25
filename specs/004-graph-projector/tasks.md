@@ -445,11 +445,15 @@ finding that says why there is none
   **Done**: stays at 1. The projection did change three times during development, but every snapshot
   projected by the earlier versions lived in a throwaway test schema that its own test dropped. No
   stored set was produced by a version other than this one, so there is nothing for a bump to identify
-- [ ] T082 **Not run: needs the containerlab topology, which is a lab deployment rather than a
-  `docker compose up`.** Run quickstart.md sections 2 to 7 against the containerlab lab and record
-  every divergence
+- [X] T082 Run quickstart.md sections 2 to 7 against the containerlab lab and record every divergence
   in its "Divergences recorded during implementation" section, the way 002 and 003 did. A divergence is
-  a finding about the design, not a detail to fix silently
+  a finding about the design, not a detail to fix silently.
+  **Done**: sections 2 to 7 pass against four cEOS nodes, two crawls, no error in the engine log. Five
+  more divergences recorded, 8 to 12. Two of them matter. The lab turns out not to exercise aliasing at
+  all, because every Arista command a recipe reads prints full interface names, so US1 stays covered by
+  the fakeos tests alone. And an `unknown:` endpoint reference keeps the vendor's raw chassis spelling
+  while the matcher normalises it, which is stable within one vendor and would split one cable in two
+  across vendors; that one wants its own change
 - [X] T083 Run `go test ./...` with `NETMAPPER_TEST_DSN` and `NETMAPPER_TEST_S3_ENDPOINT` set and
   confirm the whole suite passes, 001, 002 and 003 included: nothing in this feature may change a crawl
   outcome, a verdict or an entity set.
@@ -461,10 +465,9 @@ finding that says why there is none
   `pack.LoadRoot` lists a directory with `os.ReadDir`, where a symlink is not a directory; the packs
   are copied now
 
-> **T082 is the only task left open.** It needs the four-node containerlab topology deployed with a
-> cEOS image, which is a lab the operator brings up rather than something the test suite can stand up
-> for itself. Everything else, T001 to T081 and T083, is done and the whole `go test ./...` suite
-> passes against PostgreSQL and Garage from `deploy/compose.yaml`.
+> **Every task is done.** The whole `go test ./...` suite passes against PostgreSQL and Garage from
+> `deploy/compose.yaml`, and quickstart.md sections 2 to 7 pass against the four-node cEOS topology.
+> Divergences 1 to 7 came out of the implementation, 8 to 12 out of the lab run.
 
 ---
 

@@ -10,6 +10,57 @@ the lab scenarios containerlab with a cEOS image. This feature adds no dependenc
 does need the pack directory readable by the engine and by `netmapper project`, which is the `--packs`
 flag both now take.
 
+### Running the lab
+
+`ceos:latest` is the one piece that cannot be fetched by a script: Arista gates the download behind an
+account, so it is imported by hand once and then stays in the OrbStack VM.
+
+```sh
+docker import cEOS64-lab-<version>.tar ceos:latest
+docker images | grep ceos            # confirm it is there before deploying
+```
+
+containerlab itself lives in the devcontainer, which drives the OrbStack daemon from outside
+(`.devcontainer/devcontainer.json`, docker-outside-of-docker). Open the folder in the devcontainer and
+deploy from a terminal inside it:
+
+```sh
+containerlab deploy -t test/lab/two-switch.clab.yaml
+```
+
+The workspace is mounted at the same path inside the container as on the Mac, because containerlab
+hands bind-mount paths (the startup configs, the lab directory) to a daemon that does not share the
+container's filesystem. Changing that path breaks the deploy.
+
+Without VS Code, the same image runs the same command from the host:
+
+```sh
+docker run --rm --user root --network=host --pid=host --privileged   -v /var/run/docker.sock:/var/run/docker.sock   -v "$PWD:$PWD" -w "$PWD"   ghcr.io/srl-labs/containerlab/devcontainer-dood-slim:0.79.0   containerlab deploy -t test/lab/two-switch.clab.yaml
+```
+
+On OrbStack the socket is at `~/.orbstack/run/docker.sock`, so substitute it on the left of that bind.
+`--user root` is needed because the image's default user cannot open the socket. This form was verified
+as far as the image allows: `containerlab version` runs, and `containerlab inspect -t
+test/lab/two-switch.clab.yaml --all` parses the topology and reports the nodes as not yet deployed.
+
+Then, in the repository, with `deploy/compose.yaml` up. The environment is
+[001's](../001-crawl-loop/quickstart.md) unchanged, since only the collector reads the object store:
+
+```sh
+export NETMAPPER_DSN=postgres://netmapper:netmapper@localhost:5432/netmapper?sslmode=disable
+export NETMAPPER_S3_ENDPOINT=localhost:3900 NETMAPPER_S3_BUCKET=netmapper NETMAPPER_S3_INSECURE=1 \
+       NETMAPPER_S3_ACCESS_KEY=GK0123456789abcdef01234567 \
+       NETMAPPER_S3_SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+export LAB_SNMP_COMMUNITY=public LAB_SSH_PASSWORD=admin
+go build -o netmapper ./cmd/netmapper && ./netmapper migrate
+./netmapper engine --packs packs &
+./netmapper collector --packs packs &
+```
+
+`--packs` on the engine is what this feature added. Point it at a directory that holds the packs the
+lab's devices actually run, or the far-end spellings fall back to themselves and the graph is quietly
+wrong rather than absent, which is divergence 7 below.
+
 The `fakeos` test pack needs two additions before the interface tests can say anything: a
 `remote_interface` field in its `neighbours` recipe and template, and an `interface_names` rule the
 far-end spelling actually exercises. Both are pack data, which is the point.
@@ -115,8 +166,10 @@ JOIN entity e ON e.id = i.entity_id
 WHERE i.snapshot_id = :SNAP ORDER BY e.device_key, i.canonical_name, a.spelling;
 ```
 
-Expected: the port on each side of the inter-switch cable carries at least two rows, its own spelling
-with `source = 'device'` and the neighbour's with `source = 'neighbour'`.
+Expected: one row per distinct spelling. On this lab that is a single row per port, `source =
+'device'`, because Arista spells a port the same way everywhere the recipes look; see divergence 8. A
+port that exists only because a neighbour named it, such as sw4's `Management0`, carries one row with
+`source = 'neighbour'`.
 
 ## 3. The cable, and its evidence (US2, SC-003, SC-004)
 
@@ -254,3 +307,44 @@ corrected in the same change.
    for a known one loaded from the wrong directory, silently produces a second interface per port and
    links that never pair. It is not an error and nothing reports it. Worth a thought when the API
    feature gives these rows a surface.
+
+### What the lab confirmed, and what it did not
+
+Sections 2 to 7 were run against the four-node cEOS topology on 2026-09-25. Two crawls, zero errors in
+the engine log. Confirmed on real hardware: the `Ethernet1` cable between sw1 and sw2 is one
+`both_ends` link citing both sides back to `show lldp neighbors detail` and its stored bytes; all seven
+links carry the same name in both snapshots (SC-006); re-projecting is byte-identical (SC-005); wiping
+every projected row and recomputing restores the same set (SC-008); deleting a projection lets the
+sweep rebuild it, and re-resolving a snapshot cascades its interfaces away and makes the sweep
+re-project (FR-021, research R12). `netmapper project --packs packs 2` printed
+`6 interfaces, 10 edges, 0 disagreements`.
+
+Five more divergences, all found by running it:
+
+8. **This lab does not exercise aliasing at all.** Both recipes read full names: `show lldp neighbors
+   detail` prints `Ethernet1` for the local and the remote port, and `show interfaces status` prints
+   `Ethernet1` too. So the Arista pack's `interface_names` rules never fire, every alias equals the
+   canonical name, and each port has exactly one alias row. The abbreviation `Et1` shows up only in
+   `show lldp neighbors`, the summary command no recipe uses. US1's whole point, one port under one
+   name whatever spells it differently, is therefore still covered only by the fakeos tests. Making the
+   lab exercise it needs a device that abbreviates in the output a recipe actually reads.
+9. **An `unknown:` reference keeps the vendor's raw identifier spelling.** sw3 refuses every credential
+   set, so its links are named `unknown:chassis_id=001c.7374.a126/Management0`, in Arista's dotted
+   form, while `resolveFar` normalises that same value to `00:1c:73:74:a1:26` when it looks for a
+   matching entity. Inside one vendor the name is stable, which is what FR-015 asks. Across two, a
+   Cisco and an Arista reporting the same unmanaged switch would spell its chassis MAC differently and
+   produce two edges for one cable. The fix is to normalise the identifier in `farRef` the way
+   `resolveFar` already does for the lookup, and it changes the name of every `unknown:` edge, so it
+   belongs in its own change with its own test rather than in a validation pass.
+10. **The management bridge makes every node a neighbour of every other.** Seven links, of which one is
+    the actual eth cable and five are the mgmt segment. Each switch also reports *itself* on
+    `Management0`, and those rows are dropped by the rule that refuses a report whose two endpoint
+    references are equal. That tie-break, written for a case that looked contrived, fires on the first
+    real topology it met.
+11. **sw4 resolves but never reports.** It carries sw1's pinned serial, so the crawl ends its find task
+    as a duplicate and it never collects neighbours or interfaces. Its `Management0` exists only
+    because sw1 and sw2 named it, and both links to it are `one_end`. That is US3-2 happening by
+    itself, with the `identity_conflict` 003 raises sitting beside it.
+12. **MTU, MAC and speed are null on every Arista interface**, because `show interfaces status` does not
+    carry them. FR-006 asks for every field "that was collected", so null is right, and section 2's
+    query will always print `-` for those three on this platform.
