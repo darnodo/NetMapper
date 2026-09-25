@@ -13,7 +13,11 @@ implementations:
       remote_mgmt_address: ADDRESS
       remote_mgmt_address_type: TYPE
       remote_chassis_id: CHASSIS
+      remote_interface: REMOTE
       protocol: '=lldp'
     values:
       remote_mgmt_address: { '-': '' }   # fakeos prints - when a neighbour gives no address
       remote_mgmt_address_type: { ip4: ipv4, ip6: ipv6, mac: mac, '-': '', '*': other }
+      remote_system_name: { '-': '' }    # - when the neighbour declares no name either
+      remote_chassis_id: { '-': '' }     # - when the neighbour declares no chassis id
+      remote_interface: { '-': '' }      # - when the neighbour names no port at the far end

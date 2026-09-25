@@ -7,14 +7,18 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/darnodo/NetMapper/internal/pack"
 )
 
-// Run ticks the job runner until ctx ends. It is the engine's only component in this feature.
-func Run(ctx context.Context, db *pgxpool.Pool, every time.Duration, log *slog.Logger) {
+// Run ticks the job runner until ctx ends. The pack registry is read-only data, used by the graph
+// projector alone and for one thing: the naming rules that canonicalise the port a neighbour reports
+// for the far end of a cable (004, research R3).
+func Run(ctx context.Context, db *pgxpool.Pool, reg *pack.Registry, every time.Duration, log *slog.Logger) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
-		if err := Tick(ctx, db); err != nil && ctx.Err() == nil {
+		if err := Tick(ctx, db, reg); err != nil && ctx.Err() == nil {
 			log.Error("job runner", "err", err)
 		}
 		select {
@@ -26,13 +30,13 @@ func Run(ctx context.Context, db *pgxpool.Pool, every time.Duration, log *slog.L
 }
 
 // Tick moves every active job one step towards its end (research R12), then sweeps for closed
-// snapshots that still need a verdict or an entity set:
+// snapshots that still need a verdict, an entity set or a projection:
 //   - running, queue empty, no final pass yet: requeue every failed task once, attempts reset;
 //   - running, queue empty after the final pass: close the snapshot, job succeeded;
 //   - cancelling: pending tasks become cancelled; once no lease is live, close, job cancelled.
 //
 // Failed tasks get nothing written for them here: their last_error is the record (FR-014).
-func Tick(ctx context.Context, db *pgxpool.Pool) error {
+func Tick(ctx context.Context, db *pgxpool.Pool, reg *pack.Registry) error {
 	rows, err := db.Query(ctx, `SELECT id, state, snapshot_id, parameters FROM job WHERE state IN ('running', 'cancelling') ORDER BY id`)
 	if err != nil {
 		return err
@@ -81,7 +85,10 @@ func Tick(ctx context.Context, db *pgxpool.Pool) error {
 	if err := judgeStep(ctx, db); err != nil {
 		return err
 	}
-	return resolveStep(ctx, db)
+	if err := resolveStep(ctx, db); err != nil {
+		return err
+	}
+	return projectStep(ctx, db, reg)
 }
 
 func cancelStep(ctx context.Context, db *pgxpool.Pool, job, snapshot int64) error {

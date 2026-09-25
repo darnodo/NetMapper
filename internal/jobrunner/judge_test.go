@@ -31,7 +31,7 @@ func TestSweepJudgesClosedSnapshots(t *testing.T) {
 	if _, err := l.DB.Exec(ctx, `DELETE FROM snapshot_judgement WHERE snapshot_id = $1`, snap); err != nil {
 		t.Fatal(err)
 	}
-	if err := jobrunner.Tick(ctx, l.Engine); err != nil {
+	if err := jobrunner.Tick(ctx, l.Engine, l.Registry); err != nil {
 		t.Fatal(err)
 	}
 	rows := l.Strings(`

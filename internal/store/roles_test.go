@@ -138,3 +138,77 @@ func TestResolutionGrantsStayNarrow(t *testing.T) {
 		}
 	}
 }
+
+// T014, contracts/cli.md and research R15: the graph projector runs under the engine in the sweep and
+// under the operator in `netmapper project`, so both roles must be able to replace the projected
+// tables, and the collector must still see none of them. The constitution added this check because 003
+// granted the operator the writes `netmapper resolve` needed but not the reads, and every test
+// connected as the engine, so the operator's own command could not run at all.
+func TestProjectionGrants(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+
+	// The collector never reads an interface or an edge, and nothing here changed that.
+	col := testutil.As(t, db, "netmapper_collector")
+	for _, q := range []string{
+		"SELECT count(*) FROM interface",
+		"SELECT count(*) FROM interface_alias",
+		"SELECT count(*) FROM interface_evidence",
+		"SELECT count(*) FROM edge",
+		"SELECT count(*) FROM edge_evidence",
+		"SELECT count(*) FROM projection",
+	} {
+		if _, err := col.Exec(ctx, q); err == nil {
+			t.Errorf("collector: %s: allowed", q)
+		}
+	}
+
+	// Both roles run the same projector, so both are checked on the same statements. The deletes carry
+	// a WHERE clause on purpose: PostgreSQL reads the columns a DELETE filters on, so a missing SELECT
+	// shows up here and not in a bare DELETE.
+	for _, role := range []string{"netmapper_engine", "netmapper_operator"} {
+		p := testutil.As(t, db, role)
+		for _, q := range []string{
+			"SELECT count(*) FROM interface WHERE snapshot_id = 0",
+			"SELECT count(*) FROM edge WHERE snapshot_id = 0 AND name = ''",
+			`DELETE FROM edge_evidence WHERE edge_id IN (SELECT id FROM edge WHERE snapshot_id = 0)`,
+			"DELETE FROM edge WHERE snapshot_id = 0",
+			`DELETE FROM interface_alias WHERE interface_id IN
+				(SELECT id FROM interface WHERE snapshot_id = 0)`,
+			`DELETE FROM interface_evidence WHERE interface_id IN
+				(SELECT id FROM interface WHERE snapshot_id = 0)`,
+			"DELETE FROM interface WHERE snapshot_id = 0",
+			"DELETE FROM projection WHERE snapshot_id = 0",
+			`DELETE FROM finding WHERE snapshot_id = 0 AND category = 'link_disagreement'`,
+		} {
+			if _, err := p.Exec(ctx, q); err != nil {
+				t.Errorf("%s: %s: %v", role, q, err)
+			}
+		}
+		// The projector reads these before it writes anything, and neither role was granted them here:
+		// both already held them from 001 and 003. A failure means that assumption broke.
+		for _, q := range []string{
+			"SELECT count(*) FROM resolution",
+			"SELECT count(*) FROM entity",
+			"SELECT count(*) FROM entity_claim",
+			"SELECT count(*) FROM identifier_claim",
+			"SELECT count(*) FROM observation",
+			"SELECT count(*) FROM parse_generation",
+			"SELECT count(*) FROM task",
+		} {
+			if _, err := p.Exec(ctx, q); err != nil {
+				t.Errorf("%s: %s: %v", role, q, err)
+			}
+		}
+		// Projection writes nothing in the collected zone (FR-020).
+		for _, q := range []string{
+			"UPDATE observation SET status = 'collected'",
+			"DELETE FROM observation",
+			"DELETE FROM identifier_claim",
+		} {
+			if _, err := p.Exec(ctx, q); err == nil {
+				t.Errorf("%s: %s: allowed", role, q)
+			}
+		}
+	}
+}
