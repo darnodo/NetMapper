@@ -81,8 +81,8 @@ observation, the collection time and how well it is known. No other endpoint inv
 
 The interface is the first component anyone can reach, and the database behind it holds every address,
 credential reference and command the collector ever ran. A caller with no token gets nothing. A caller
-with a token gets exactly what its scope allows, and every call that changes something is recorded
-against the token that made it.
+with a token gets exactly what its scope allows. No call changes anything (FR-012), so there is no
+mutating call to audit yet; that obligation arrives with the feature that brings one.
 
 **Why this priority**: the constitution makes this the only exposed role and forbids it from holding a
 credential or reaching a device, so the boundary this story draws is the one the whole security model
@@ -152,10 +152,11 @@ against a snapshot are readable with the observations behind them.
   answer must carry that distinction, since it changes how much the port can be trusted.
 - An edge names a far end no entity accounts for. The answer must return what the report said about it
   rather than omitting the edge or inventing a device.
-- A snapshot has been evicted and only its tombstone remains. Asking for its graph must say so rather
-  than returning an empty graph.
-- The same token is used concurrently from several callers. Nothing about the answers changes; the
-  record of mutating calls still names every one of them.
+- A snapshot has been evicted and only its tombstone remains. Deferred: no eviction exists yet (see
+  FR-009). When it does, asking for such a snapshot's graph must say so rather than return an empty one.
+- The same token is used concurrently from several callers. Nothing about the answers changes, and
+  since no call changes anything there is nothing to record against the token beyond when it was last
+  used.
 - A token is revoked while a call it authorised is in flight. The call in flight is allowed to finish;
   the next one is refused.
 - A caller asks for a snapshot that is still open. It carries no entity set and no graph, and the answer
@@ -222,8 +223,10 @@ against a snapshot are readable with the observations behind them.
   it was compared against.
 - **FR-008**: The system MUST serve the findings raised against a snapshot, each with its category, its
   subject and the observations it cites.
-- **FR-009**: A snapshot that was never projected, is still open, or has been evicted MUST produce an
-  answer that says so, distinct from an answer describing a graph with nothing in it.
+- **FR-009**: A snapshot that was never projected, is still open, or was projected from an entity set
+  since replaced MUST produce an answer that says so, distinct from an answer describing a graph with
+  nothing in it. An evicted snapshot is out of scope: nothing in the schema evicts one yet, and the
+  answer it gets arrives with the feature that evicts, which defines what remains of it.
 - **FR-010**: Every call MUST present a token. A call with no token, an unknown token or a revoked token
   MUST be refused, and MUST reveal nothing about whether the thing asked for exists.
 - **FR-011**: A token MUST carry a set of scopes drawn from a closed set of values, and a call the

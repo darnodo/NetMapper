@@ -44,7 +44,8 @@ no rate limit
 
 **Constraints**: no device contacted and no secret reference resolved (FR-015); nothing written in the
 collected, computed or reported zones, enforced by a role with no `INSERT` or `DELETE` anywhere and by
-a `READ ONLY` transaction around every handler's queries (FR-016, R7); no credential value or
+a `READ ONLY`, `REPEATABLE READ` transaction around every handler's queries, so one answer never
+mixes two graphs (FR-016, R7); no credential value or
 object-store key in any response at any scope (FR-014); no unauthenticated endpoint at all, including
 health (FR-010, contracts/rest.md); the interface manages no credential of its own, since FR-012
 leaves it no mutating call
@@ -58,9 +59,9 @@ leaves it no mutating call
 
 | Principle / constraint                               | Status | How this plan holds it |
 | ---------------------------------------------------- | ------ | ---------------------- |
-| I. Evidence travels with the answer                  | Pass   | This is the feature where the principle is finally exercised. FR-002 puts the observations and their collection time on every element, FR-003 puts confidence on every edge, FR-020 puts the coverage verdict on every answer, and FR-004 makes the bytes reachable. SC-002 checks it over the whole surface rather than by sampling, which is the only way a response contract can be said to hold |
+| I. Evidence travels with the answer                  | Pass   | This is the feature where the principle is finally exercised. FR-002 puts the observations, their collection time and a confidence on every element, FR-002a fixes the confidence values per kind (device, interface, edge, finding), FR-003 makes a link both ends reported distinguishable from one only one end did, FR-020 puts the coverage verdict on every answer, and FR-004 makes the bytes reachable. SC-002 checks it over the whole surface rather than by sampling, which is the only way a response contract can be said to hold |
 | II. Observations immutable, rest rebuildable         | Pass   | Nothing is written outside `api_token`. The role holds no `INSERT` and no `DELETE` on any zone, and every handler's reads sit in a `READ ONLY` transaction, so the guarantee is the database's rather than the handlers' (R7) |
-| III. Credentials and reach stay in the collector     | Action | The interface opens no session and resolves no secret reference, and it cannot read `credential_set` at all. It does gain read-only object-store access, which is the one place this feature widens what the exposed component can touch. The reasoning is in FR-004a and R11: the bytes are evidence, the chain has to reach them, and that access opens nothing on the network. This is the single item a reviewer should weigh rather than skim |
+| III. Credentials and reach stay in the collector     | Pass   | The interface opens no session and resolves no secret reference, and it cannot read `credential_set` at all. Its read-only object-store access is permitted explicitly by constitution v1.2.0, which defines a device credential and allows `api` that access under three conditions FR-004a meets: it cannot write, it is never returned, and it reaches no device |
 | IV. Read only, outward                               | Pass   | No device contacted, nothing written back to any intent source |
 | V. Vendor specifics are data                         | Pass   | No pack is loaded. The interface serves canonical names the parser and the projector already produced, and contains no vendor name |
 | One binary, three roles by subcommand                | Pass   | `api` is the third role the constraint already names, and the first to exist. `token` joins the operator subcommands alongside `resolve`, `decide` and `project` |
@@ -74,22 +75,14 @@ leaves it no mutating call
 | Workflow: a tie-break is tested with inputs that tie | Action | One tie exists: a hostname or an address naming two devices (FR-001a). It is tested with inputs that actually tie, and the expected result is a refusal naming both, not an order |
 | Workflow: reference documents corrected with behaviour | Action | `03-components.md` says the interface has "the three scopes" and names them nowhere. One ships. That sentence is corrected in this branch, not implemented |
 
-Post-design re-check: still passes, with one item that should not be waved through.
+Post-design re-check: passes. The object-store access, first argued here as a judgement call, is now
+settled by constitution v1.2.0, whose Principle III allows `api` read-only access to stored raw output
+under the conditions FR-004a states.
 
-**The object-store access is the only widening in this feature, and it deserves the scrutiny.** The
-constitution's third principle is about reach: credentials that open a session to a device, and a path
-from the exposed component to the network. Read-only access to a bucket of stored command output is
-neither. But it is the first time the component anyone can reach holds a key to anything outside
-PostgreSQL, and the bucket contains every command the collector ever ran, including the output of the
-ones that failed authentication. Three things bound it, and all three are requirements rather than
-intentions: the access is read-only (FR-004a), it is never returned (FR-014, SC-006), and it reaches
-no device. If a reviewer disagrees with the trade, the alternative is in R11 and costs the feature its
-point: an evidence chain that stops one link short of the thing it names.
-
-The second thing worth re-reading is the single write. `api_token.last_used_at` is set on every
-successful authentication, which makes the exposed component's role not quite read-only. R6 argues it,
-data-model.md scopes the grant to one table, and R7 puts every other query behind a `READ ONLY`
-transaction so this remains the only one. It is small, and it is the kind of small that is worth naming
+The thing worth re-reading is the single write. `api_token.last_used_at` is set on every successful
+authentication, which makes the exposed component's role not quite read-only. R6 argues it,
+data-model.md scopes the grant to one column of one table, and R7 puts every other query behind a
+`READ ONLY` transaction so this remains the only one. It is small, and it is the kind of small that is worth naming
 rather than discovering.
 
 Principles touched by this feature: I, II, III.
@@ -134,7 +127,8 @@ specs/005-read-api/
 cmd/netmapper/
 ├── main.go                 # + api and token subcommand dispatch
 ├── api.go                  # netmapper api --listen
-└── token.go                # netmapper token create|list|revoke
+├── token.go                # netmapper token create|list|revoke
+└── collector.go            # only the comment on rawStore(), which the api now shares
 
 internal/
 ├── api/                    # the feature
@@ -143,7 +137,8 @@ internal/
 │   ├── snapshot.go         # choosing the snapshot, and the envelope every answer carries (R9)
 │   ├── devices.go          # the device list, naming a device, one device with its ports and edges (R10)
 │   ├── evidence.go         # attaching observations and collection times to every element (R11)
-│   └── raw.go              # the bytes, read from the object store (R11, FR-004a)
+│   ├── raw.go              # the bytes, read from the object store (R11, FR-004a)
+│   └── findings.go         # the findings, and the confidence each category carries (FR-008, FR-002a)
 ├── store/                  # unchanged; RawStore.Get already does what raw.go needs
 └── ...                     # nothing else in internal/ changes
 
@@ -156,8 +151,9 @@ and its correctness cannot depend on editing them. That is the boundary worth ke
 moment a handler needs a column that does not exist, the honest fix is a change to the feature that
 owns it rather than a join invented here.
 
-Six files rather than one for the reason 003 and 004 used: they are six topics that each fit on a
-screen, and `auth.go` in particular is the one a reviewer will want to read alone.
+Seven files rather than one for the reason 003 and 004 used: they are seven topics that each fit on a
+screen, and `auth.go` in particular is the one a reviewer will want to read alone. The plan first
+listed six; findings shipped in a file of their own because their confidence rule is its own topic.
 
 ## Known open points
 
@@ -176,7 +172,7 @@ screen, and `auth.go` in particular is the one a reviewer will want to read alon
 | Addition                                          | Why needed                                                                                                                                                  | Simpler alternative rejected because                                                                                                                  |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A fourth database role                            | The exposed component's blast radius is bounded by its grants, not by its handlers. A role with no `INSERT` and no `DELETE` makes FR-016 the database's rule | Reusing `netmapper_engine` hands the whole computed zone's write rights to the process on the port (R3)                                               |
-| A `READ ONLY` transaction around every handler    | The grant alone still permits the one write R6 opens, so a stray write in a later handler would pass review                                                 | Trusting the grant is the version of this that fails silently once (R7)                                                                               |
+| A `READ ONLY`, `REPEATABLE READ` transaction around every handler | The grant alone still permits the one write R6 opens, so a stray write in a later handler would pass review; and one answer runs several queries that must see one graph | Trusting the grant is the version of this that fails silently once; the default isolation lets a resolve committing mid-request mix two graphs (R7) |
 | Tokens managed from the command line              | FR-012 leaves the interface no mutating call, so it cannot manage its own credentials without contradicting the requirement it exists under                 | A bootstrap endpoint is a second authentication mechanism for one call, guarded by a file-based secret nobody rotates (R8)                             |
 | SHA-256 rather than a password hash               | A 256-bit random token has nothing to guess, so a slow KDF costs milliseconds per request and removes no attack                                             | argon2id is already available and would be the right answer for a user-chosen secret, which this is not (R4)                                          |
 | Refusing an undefined scope rather than ignoring it | It is what keeps the second scope from silently widening every token that already exists                                                                   | Treating unknown values as harmless is the permissive default that makes scope checks useless the first time the set grows (R13)                      |

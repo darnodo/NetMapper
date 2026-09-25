@@ -93,15 +93,25 @@ process, which needs a queue for a timestamp.
 
 ## R7. A read-only transaction per request
 
-**Decision**: every query runs inside a transaction opened `READ ONLY`. Authentication, with its one
-write, happens before it.
+**Decision**: every query runs inside a transaction opened `READ ONLY` and `REPEATABLE READ`.
+Authentication, with its one write, happens before it.
 
-**Rationale**: it makes FR-016 structural. A handler that grows a stray write later fails at runtime
-against the database rather than passing review, which is a stronger guarantee than the grant alone,
-since the grant would still allow the `api_token` update from inside a handler.
+**Rationale**: `READ ONLY` makes FR-016 structural. A handler that grows a stray write later fails at
+runtime against the database rather than passing review, which is a stronger guarantee than the grant
+alone, since the grant would still allow the `api_token` update from inside a handler.
+
+`REPEATABLE READ` gives every statement of one answer the same view of the database. One answer runs
+several queries: the snapshot and whether it has a graph, the entities, their ports, their edges, the
+evidence of each. Under the default `READ COMMITTED`, each of those sees the latest commit, so a
+`netmapper resolve` or `netmapper project` that replaces the snapshot's rows between two of them
+could produce an answer that mixes two graphs: `has_graph: true` over an entity set that was just
+replaced, a device with no ports, or an element whose evidence rows vanished, which FR-002 turns into
+a 500. A read-only transaction at this level takes no locks and cannot fail on a serialisation
+conflict, so it costs nothing a caller would notice. Added by a code review after implementation.
 
 **Alternatives considered**: relying on the grants alone, which permits exactly one unintended write,
-the one R6 opens.
+the one R6 opens; `READ COMMITTED` with the race left in place, which the resolver and projector
+running on the same database make a matter of timing rather than of possibility.
 
 ## R8. Issuing and revoking tokens from the command line
 

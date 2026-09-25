@@ -530,3 +530,50 @@ Task: "Observation and raw endpoints in internal/api/raw.go"     # T027, T028
 - The one write in the process is `last_used_at`, in T008. If a later task seems to need another,
   stop: that is a spec change, not an implementation detail
 - Commit after each task or logical group
+
+---
+
+## Phase 7: Convergence
+
+Found by `/speckit-converge` after `/speckit-implement` and a `/code-review --fix` pass. The code
+satisfies every functional requirement and the full suite passes against PostgreSQL and Garage with
+nothing skipped; what remains is documents describing behaviour the code no longer has, which the
+constitution's workflow rule treats as a defect of the change.
+
+- [X] T055 Correct research R7, data-model.md "Reading: how a request is answered" step 3, and plan.md
+  (Technical Context constraints and the Complexity Tracking row) to say the per-request transaction is
+  `READ ONLY` **and** `REPEATABLE READ`, per Constitution Development Workflow and research R7
+  (partial). The code-review fix in internal/api/api.go added the isolation level so that a
+  `netmapper resolve` or `project` committing mid-request cannot mix two graphs into one answer, for
+  example `has_graph: true` over an entity set just replaced. R7 today names only `READ ONLY`, so the
+  reason for the second half lives in a code comment alone
+- [X] T056 Update plan.md's Constitution Check: row I cites FR-002a (a confidence on every device,
+  interface, edge and finding) rather than FR-003's edges only; row III moves from "Action" to "Pass"
+  citing constitution v1.2.0, which now permits the read-only object-store access explicitly; and the
+  post-design paragraph arguing that access as a judgement call shrinks to one sentence pointing at
+  the amendment, per Constitution Development Workflow and Constitution III (partial)
+- [X] T057 Scope FR-009 and the evicted-snapshot edge case in spec.md to what exists, per FR-009
+  (partial). Nothing in the schema evicts a snapshot (`snapshot.state` is `open` or `closed`), so the
+  "has been evicted" clause is a MUST the code cannot meet and no test can exercise. Keep "never
+  projected" and "still open", add "or projected from an entity set since replaced" (what
+  `requireGraph` actually refuses), and state that the evicted answer arrives with the feature that
+  evicts, matching plan.md's known open point and quickstart.md's divergence
+- [X] T058 Remove the audit wording from spec.md, per FR-012 (contradicts). US2's introduction says
+  "every call that changes something is recorded against the token that made it" and the concurrent-
+  token edge case says "the record of mutating calls still names every one of them"; FR-012 and the
+  Assumptions say this interface has no mutating call and no audit. State instead that no call changes
+  anything, so there is nothing to audit yet
+- [X] T059 Add a test in internal/api/imports_test.go asserting that the package's **direct** imports
+  (`go list -f '{{.Imports}}'`, not `-deps`) include none of internal/transport, internal/secret,
+  internal/collector or internal/pack, per FR-015 (partial). A `-deps` check would fail today and
+  wrongly: internal/store's audit.go uses `transport.Ref`, and transport imports secret, so both are
+  linked into the package without the api ever calling them. Say that in the test's comment, so the
+  next reader knows the boundary is held by the code path and the `netmapper_api` role, and the import
+  check only stops the api from reaching for them directly
+- [X] T060 Add internal/api/findings.go to plan.md's Project Structure, and note there that
+  cmd/netmapper/collector.go gained a corrected comment on `rawStore()`, per plan: Project Structure
+  (partial). The structure decision says six files; seven shipped, because findings are their own
+  topic
+- [X] T061 Remove the Sync Impact Report comment from the top of .specify/memory/constitution.md, per
+  the constitution's own amendment note (contradicts). It says "remove before committing the
+  amendment" and was committed with v1.2.0; the amendment's rationale belongs in the commit message

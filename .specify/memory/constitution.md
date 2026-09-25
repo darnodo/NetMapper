@@ -1,26 +1,3 @@
-<!--
-Sync Impact Report (scratch, remove before committing the amendment)
-Version change: 1.1.0 -> 1.2.0
-Bump rationale: MINOR. Principle III gains a definition of "credential" and one bounded allowance for
-  the api role. Its aim is unchanged (no path from the exposed component to a device, no secret value
-  outside the collector), so this is not a redefinition; it does permit something the old wording
-  forbade on a literal reading, which is more than a PATCH clarification.
-Modified principles: III. Credentials And Reach Stay In The Collector (title unchanged)
-  - "hold no credential" becomes "hold no device credential and resolve no secret reference", with
-    what a device credential is spelled out.
-  - api MAY hold read-only object-store access to serve stored raw output, under three conditions
-    that are all required: read only, never returned, no path to a device.
-  - Rationale gains why this is a definition and not an exception, since Governance says Principle III
-    admits none.
-Added sections: none
-Removed sections: none
-Origin: /speckit-analyze on 005-read-api (finding C1). FR-004 serves raw output from the api, which
-  needs an object-store access key; the old text forbade "any credential" with no definition.
-Templates checked: `.specify/templates/plan-template.md` derives its gates from this file, no edit.
-Deferred items: 005-read-api plan.md Constitution Check row III can move from "Action" to "Pass"
-  once it cites this version.
--->
-
 # NetMapper Constitution
 
 ## Core Principles

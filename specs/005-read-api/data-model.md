@@ -83,8 +83,10 @@ so a revoked one stays visible and a name is never quietly reused.
    are one refusal; a token whose scopes do not cover the call is a different one (R12).
 2. `last_used_at` is set. This is the only write in the request, and it happens before the read
    transaction opens (R6, R7).
-3. A `READ ONLY` transaction opens. Every query the handler runs happens inside it, so an accidental
-   write fails against the database rather than against a review (R7).
+3. A `READ ONLY`, `REPEATABLE READ` transaction opens. Every query the handler runs happens inside
+   it, so an accidental write fails against the database rather than against a review, and every
+   query of one answer sees the same snapshot of the data, even if a resolution or projection commits
+   in the middle (R7).
 4. The snapshot is chosen: the one the caller named, or the most recently closed one carrying a current
    projection (R9).
 5. The handler reads what it serves and attaches, to every element, the observations behind it and when
