@@ -142,6 +142,17 @@ caller who used it never gets an ambiguity refusal. Refusing rather than choosin
 identity resolution applies to a contradicting component and the projector applies to an ambiguous
 chassis identifier: a wrong answer nobody can see is worse than a refusal.
 
+An address tie is a normal case, not a corner one. On a network, one address belonging to several
+boxes is routine: first-hop redundancy virtual IPs, cluster management IPs on firewall and load
+balancer pairs, anycast gateways, duplicates. Today the address tier matches only what FR-001a names,
+the addresses the crawl reached (`targets`); interface addresses are not collected by any fact family.
+Even so, the tie happens now: when the crawl reaches a VRRP or HSRP virtual IP and the pair fails over
+between the `find` and `scrape` tasks, two boxes answer on one address in one snapshot, their serials
+contradict, resolution refuses to merge them, and both entities carry that address. The test builds
+this tie by inserting it (tasks.md T018), because the fake network cannot show a different device per
+transport on one address. When a later feature collects interface addresses, loopbacks and anycast
+SVIs will make ties routine, and this rule already covers them.
+
 **Alternatives considered**: matching all three at once and preferring the key on a tie, which gives
 the same answer with a rule that has to be read twice; case-insensitive hostname matching, which is a
 guess about what devices report and can be added without changing the contract.

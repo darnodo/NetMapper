@@ -64,3 +64,7 @@
 - Two things the planner inherits rather than decides: `api_token` exists in no migration and is this
   feature's to create, and `audit_log`'s action check admits only `ssh.*` and `snmp.*` values against a
   non-null `inet` target, which this feature does not touch.
+- **Confidence (2026-09-25, after `/speckit-analyze` finding C2)**: FR-002 now requires a confidence
+  on every element, as constitution Principle I does, and FR-002a fixes the values per kind. Every
+  value is read from what 003 and 004 already store except a finding's, which follows its category.
+  Re-validated: every item still passes, no marker added.

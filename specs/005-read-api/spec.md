@@ -190,8 +190,21 @@ against a snapshot are readable with the observations behind them.
   list is small enough to read, and a query language is a second contract to keep stable for the agent
   consumer that arrives later.
 - **FR-002**: Every device, interface, edge and finding in any answer MUST carry the observations it was
-  derived from and the time those observations were collected. An answer that omits either MUST NOT be
-  served, at any level of privilege.
+  derived from, the time those observations were collected, and a confidence. An answer that omits any
+  of the three MUST NOT be served, at any level of privilege.
+- **FR-002a**: The confidence of an element MUST be one value from a fixed set per kind of element,
+  named the same way on every kind, so a consumer reads one field whatever it is looking at:
+  - a device: identified **strongly** or **weakly** by resolution (the marker FR-006 requires);
+  - an interface: **described** by its own device or **revealed** by a neighbour (the distinction
+    FR-005 requires);
+  - an edge: reported by **both ends**, by **one end**, or observed **directly** as an address a
+    device answered on (the distinction FR-003 requires);
+  - a finding: raised **directly** from what one observation recorded (an unknown platform, a parse
+    failure, a refused credential), or **derived** by comparing several (an identity conflict, a link
+    disagreement).
+  Every value comes from what the earlier features already stored; none is computed by the
+  interface. A finding of a kind this list does not place MUST NOT be served with a guessed
+  confidence: adding a finding category means deciding its confidence in the same change.
 - **FR-003**: Every edge in an answer MUST say how well it is known, so that a link both ends reported
   and a link one end reported are distinguishable without opening the evidence.
 - **FR-004**: An answer MUST let a caller reach the raw output behind any observation it names, and the
@@ -276,7 +289,7 @@ against a snapshot are readable with the observations behind them.
   can ask again precisely.
 - **SC-001b**: An engineer who knows nothing but a snapshot can discover every device in it, and from
   there reach any one of them, without writing a query.
-- **SC-002**: Every element of every answer names its evidence and its collection time; a response
+- **SC-002**: Every element of every answer names its evidence, its collection time and its confidence; a response
   containing an element without them is a failure, and this is checked over the whole surface rather
   than sampled.
 - **SC-003**: A cable both ends reported and a cable one end reported are distinguishable in an answer

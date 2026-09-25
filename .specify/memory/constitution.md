@@ -1,25 +1,24 @@
 <!--
 Sync Impact Report (scratch, remove before committing the amendment)
-Version change: 1.0.0 -> 1.1.0
-Bump rationale: MINOR. Development Workflow materially expanded. No principle added, removed or
-  redefined; Core Principles, Architectural Constraints and Governance are untouched.
-Modified principles: none
+Version change: 1.1.0 -> 1.2.0
+Bump rationale: MINOR. Principle III gains a definition of "credential" and one bounded allowance for
+  the api role. Its aim is unchanged (no path from the exposed component to a device, no secret value
+  outside the collector), so this is not a redefinition; it does permit something the old wording
+  forbade on a literal reading, which is more than a PATCH clarification.
+Modified principles: III. Credentials And Reach Stay In The Collector (title unchanged)
+  - "hold no credential" becomes "hold no device credential and resolve no secret reference", with
+    what a device credential is spelled out.
+  - api MAY hold read-only object-store access to serve stored raw output, under three conditions
+    that are all required: read only, never returned, no path to a device.
+  - Rationale gains why this is a definition and not an exception, since Governance says Principle III
+    admits none.
 Added sections: none
 Removed sections: none
-Development Workflow gains three rules. Each comes from a defect 003-identity-resolution shipped and a
-review or a convergence pass then found:
-  - test each path under the role the contracts assign it. 003 granted netmapper_operator the write
-    rights `netmapper resolve` needs but not the reads, and every test connected as netmapper_engine,
-    so the operator's own command could not run at all and nothing noticed until a security review.
-  - correct the reference document in the same change as the behaviour. Three separate convergence
-    passes each found an artefact still describing what had been superseded, twice in the grant matrix
-    and once in a description of the computed zone.
-  - test a tie-break with inputs that tie. The reduction of operator decisions was tested with one pair
-    and looked deterministic, while two decisions naming the same key reduced in map iteration order and
-    gave a different answer per run, against the feature's own reproducibility requirement.
-Templates checked: `.specify/templates/plan-template.md` derives its Constitution Check from this file
-  ("[Gates determined based on constitution file]"), so the new rules become gates with no edit to it.
-Deferred items: none
+Origin: /speckit-analyze on 005-read-api (finding C1). FR-004 serves raw output from the api, which
+  needs an object-store access key; the old text forbade "any credential" with no definition.
+Templates checked: `.specify/templates/plan-template.md` derives its gates from this file, no edit.
+Deferred items: 005-read-api plan.md Constitution Check row III can move from "Action" to "Pass"
+  once it cites this version.
 -->
 
 # NetMapper Constitution
@@ -51,13 +50,22 @@ re-crawl of the building.
 ### III. Credentials And Reach Stay In The Collector (NON-NEGOTIABLE)
 
 Only `collector` opens a session to a device. Only `collector` resolves a secret, in memory, for
-the time of the task. `engine` and `api` MUST hold no credential and reach no device. `api` is the
-only role exposed to users, agents or browsers. The database and the configuration document MUST
+the time of the task. `engine` and `api` MUST hold no device credential, MUST resolve no secret
+reference, and MUST reach no device. A device credential is anything that opens a session to a
+device or resolves into a value that does: passwords, community strings, keys, and the secret
+references that point at them. `api` is the only role exposed to users, agents or browsers.
+
+`api` MAY hold read-only access to the object store, for one purpose: serving the raw output an
+observation already references. All three conditions are required: the access MUST NOT be able to
+write, it MUST NOT be returned by any interface, and it MUST NOT give a path to a device. Any wider
+storage access, or any access that can write, is outside this allowance. The database and the configuration document MUST
 store secret references, never values, and no interface MUST return a secret value. Every target
 MUST be checked against the active perimeter before a packet leaves.
 
 Rationale: the part anyone can reach must never be the part that can log into every switch in the
-building.
+building. The object-store allowance is a definition of what this principle protects, not an
+exception to it: stored command output is evidence already collected, and reading it logs into
+nothing.
 
 ### IV. Read Only, Outward
 
@@ -120,4 +128,4 @@ principle, MINOR for adding one or materially expanding guidance, PATCH for clar
 Reviews verify compliance with the five principles. Complexity that violates one is either
 justified in writing at the point it is introduced or removed. Principle III admits no exception.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-24
+**Version**: 1.2.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-25
