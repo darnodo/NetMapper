@@ -31,7 +31,7 @@ Two of these deserve a word.
 
 NetMapper never writes to NetBox. Pushing discovered devices into the documentation would destroy the difference between what is and what was declared, and that difference is the product.
 
-Grafana reads PostgreSQL rather than the API, which is a deliberate exception rather than a second supported output. The built-in interface stays plain because the graph and the weather map are expected to live in Grafana, joined to metrics NetMapper does not collect.
+Grafana reads PostgreSQL rather than the API, which is a deliberate exception rather than a second supported output. The read API (005) does not replace it: the exception stands, and it now has an API contract to be outside of. The built-in interface stays plain because the graph and the weather map are expected to live in Grafana, joined to metrics NetMapper does not collect.
 
 ## What crosses no boundary
 

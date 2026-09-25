@@ -44,13 +44,13 @@ Two things found while writing these tasks, carried below rather than resolved s
 
 **Purpose**: The package this feature lives in
 
-- [ ] T001 Create the package skeleton in internal/api/api.go: a `Server` struct holding the
+- [X] T001 Create the package skeleton in internal/api/api.go: a `Server` struct holding the
   `*pgxpool.Pool` (connected as `netmapper_api`) and a `*store.RawStore`, a `New(db, raw) *Server`
   constructor, a `Handler() http.Handler` method returning a `http.ServeMux` with no routes yet, and a
   `writeJSON(w, status, v)` helper that sets `Content-Type: application/json`. Package comment states
   that this package opens no device session, resolves no secret reference and computes nothing
   (FR-015), and that it is the only package in the project a network caller reaches
-- [ ] T002 [P] Correct the comment on `rawStore()` in cmd/netmapper/collector.go: "Only the collector
+- [X] T002 [P] Correct the comment on `rawStore()` in cmd/netmapper/collector.go: "Only the collector
   does" stops being true in this feature. Say the collector writes and `netmapper api` reads, and that
   nothing else touches the object store. The function itself is reused unchanged by T013
 
@@ -66,7 +66,7 @@ bound the only component anyone can reach; read them twice
 
 ### Schema and role
 
-- [ ] T003 Create migrations/0008_api.sql with the `api_token` table exactly as in data-model.md:
+- [X] T003 Create migrations/0008_api.sql with the `api_token` table exactly as in data-model.md:
   `id bigserial PRIMARY KEY`, `name text NOT NULL UNIQUE`, `hash bytea NOT NULL UNIQUE`,
   `scopes text[] NOT NULL CHECK (cardinality(scopes) > 0)`,
   `created_at timestamptz NOT NULL DEFAULT now()`, `last_used_at timestamptz NULL`,
@@ -74,7 +74,7 @@ bound the only component anyone can reach; read them twice
   an undefined value (R13) and pinning the set here makes the second scope a migration before it is a
   decision (data-model.md). `ALTER TABLE api_token OWNER TO netmapper_owner`. Use goose `-- +goose Up`
   / `-- +goose Down` markers as 0007 does
-- [ ] T004 Add the `netmapper_api` role to migrations/0008_api.sql inside a
+- [X] T004 Add the `netmapper_api` role to migrations/0008_api.sql inside a
   `-- +goose StatementBegin` / `DO $$ ... $$` block copied from 0004_roles.sql (create `NOLOGIN`,
   swallow `duplicate_object OR unique_violation`, `GRANT USAGE ON SCHEMA current_schema()`). Then the
   grants, and nothing more:
@@ -86,11 +86,11 @@ bound the only component anyone can reach; read them twice
   T052 corrects the document). Column-level `UPDATE` is narrower than the table grant data-model.md
   describes and costs nothing; say so in a comment. No grant on `credential_set`, `config_version`,
   `perimeter`, `seed_set`, `task`, `job`, `entity_decision` or `audit_log`
-- [ ] T005 Grant the operator its token rights in migrations/0008_api.sql:
+- [X] T005 Grant the operator its token rights in migrations/0008_api.sql:
   `GRANT SELECT, INSERT, UPDATE ON api_token TO netmapper_operator` and
   `GRANT USAGE ON SEQUENCE api_token_id_seq TO netmapper_operator`. No role gets `DELETE` on
   `api_token`, so a revoked token stays visible and a name is never reused (data-model.md)
-- [ ] T006 Add role tests to internal/store/roles_test.go beside the existing ones, connecting through
+- [X] T006 Add role tests to internal/store/roles_test.go beside the existing ones, connecting through
   `testutil.As(t, db, "netmapper_api")`:
   `TestAPICannotReadCredentials` (`SELECT` on `credential_set`, `config_version`, `perimeter`,
   `seed_set`, `task`, `job`, `entity_decision`, `audit_log` each fails);
@@ -103,13 +103,13 @@ bound the only component anyone can reach; read them twice
 
 ### Authentication (R4, R5, R12, R13)
 
-- [ ] T007 Create internal/api/auth.go with the token primitives: `const tokenPrefix = "nm_"`,
+- [X] T007 Create internal/api/auth.go with the token primitives: `const tokenPrefix = "nm_"`,
   `NewToken() (value string, hash []byte, err error)` (32 bytes from `crypto/rand`, value is
   `nm_` + `base64.RawURLEncoding`, hash is `sha256.Sum256` of the whole value string including the
   prefix), `HashToken(value string) []byte`, and `var Scopes = map[string]bool{"read": true}` as the
   closed set, with a comment that it is the only place a scope is defined. Exported because
   cmd/netmapper/token.go uses them (T035)
-- [ ] T008 Add the authentication middleware to internal/api/auth.go: `func (s *Server) authenticate(
+- [X] T008 Add the authentication middleware to internal/api/auth.go: `func (s *Server) authenticate(
   next http.Handler) http.Handler`. Read `Authorization`, require the exact form `Bearer nm_...`,
   hash it, and `SELECT id, scopes, revoked_at FROM api_token WHERE hash = $1`. No header, a malformed
   header, no row, or a non-null `revoked_at` all return **the same** response:
@@ -120,7 +120,7 @@ bound the only component anyone can reach; read them twice
   `UPDATE api_token SET last_used_at = now() WHERE id = $1` outside any read transaction (R6, R7). No
   cache (R5). Wrap the **whole mux**, not individual routes, so an unknown path without a token is a
   401 and not a 404 (contracts/rest.md: no unauthenticated endpoint at all)
-- [ ] T009 Add test helpers in internal/api/helpers_test.go: `mintToken(t, db, name string,
+- [X] T009 Add test helpers in internal/api/helpers_test.go: `mintToken(t, db, name string,
   scopes ...string) string` inserting a row as the owner pool with `api.NewToken()` and returning the
   value; `revoke(t, db, name)`; `serve(t, l *testutil.Lab) *httptest.Server` building
   `api.New(testutil.As(t, l.DB, "netmapper_api"), testutil.S3(t)).Handler()`; and
@@ -129,14 +129,14 @@ bound the only component anyone can reach; read them twice
 
 ### The read-only transaction (R7)
 
-- [ ] T010 Add the transaction wrapper to internal/api/api.go:
+- [X] T010 Add the transaction wrapper to internal/api/api.go:
   `type handler func(w http.ResponseWriter, r *http.Request, tx pgx.Tx) error` and
   `func (s *Server) read(h handler) http.HandlerFunc`, which opens
   `s.db.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})`, calls `h`, and always rolls back
   (nothing to commit). An error `h` returns that is not already written becomes `500`
   `{"error":"internal"}` with the detail logged through `slog`, never returned. Every route in every
   story is registered through `read`
-- [ ] T011 Write `TestHandlerWriteFailsInReadOnlyTransaction` in internal/api/api_test.go: register a
+- [X] T011 Write `TestHandlerWriteFailsInReadOnlyTransaction` in internal/api/api_test.go: register a
   deliberately bad handler through `read` that runs `UPDATE api_token SET last_used_at = now()` (the
   one write the role's grant permits) and assert it fails with SQLSTATE `25006`
   (`read_only_sql_transaction`). This is the only way to prove R7 is structural rather than a habit
@@ -144,7 +144,7 @@ bound the only component anyone can reach; read them twice
 
 ### Snapshot envelope and choice (R9, FR-017 to FR-020)
 
-- [ ] T012 Create internal/api/snapshot.go with the envelope every answer carries:
+- [X] T012 Create internal/api/snapshot.go with the envelope every answer carries:
   `type SnapshotRef struct { ID int64; ClosedAt *time.Time; State string; Verdict *string;
   Coverage *float64; HasGraph bool }` with JSON names `id`, `closed_at`, `state`, `verdict`,
   `coverage`, `has_graph`. `verdict` and `coverage` come from the `snapshot_judgement` row with
@@ -154,7 +154,7 @@ bound the only component anyone can reach; read them twice
   `loadSnapshot(ctx, tx, id) (SnapshotRef, error)` returning `errNoSnapshot` when the id does not exist,
   and `defaultSnapshot(ctx, tx) (SnapshotRef, error)` selecting the most recently closed snapshot with
   a current projection, ordered `closed_at DESC, id DESC`, whatever its verdict (FR-019)
-- [ ] T013 Add `pickSnapshot(ctx, tx, r *http.Request) (SnapshotRef, error)` to internal/api/snapshot.go:
+- [X] T013 Add `pickSnapshot(ctx, tx, r *http.Request) (SnapshotRef, error)` to internal/api/snapshot.go:
   if `?snapshot=<id>` is present, parse it (not an integer is `400` `{"error":"bad_snapshot"}`),
   load exactly that one and never fall back to another (FR-018); otherwise `defaultSnapshot`. When no
   snapshot carries a graph at all, return `409` `{"error":"not_projected","snapshot":null}`. Add
@@ -164,7 +164,7 @@ bound the only component anyone can reach; read them twice
 
 ### Evidence (R11, FR-002)
 
-- [ ] T014 Create internal/api/evidence.go: `type Evidence struct { ObservationID int64
+- [X] T014 Create internal/api/evidence.go: `type Evidence struct { ObservationID int64
   "observation_id"; CollectedAt time.Time "collected_at"; Family string "family"; Target string
   "target"; Side string "side,omitempty" }` and one loader per element kind, each taking the ids of the
   elements in one answer and returning `map[int64][]Evidence` in a single query (no query per row):
@@ -175,7 +175,7 @@ bound the only component anyone can reach; read them twice
   so answers are stable. Add `mustEvidence(kind string, id int64, ev []Evidence) error` returning an
   error when the list is empty: the handler turns that into a 500 rather than serving an element
   without its evidence (FR-002: "MUST NOT be served")
-- [ ] T015 Write the whole-surface evidence checker in internal/api/evidence_test.go:
+- [X] T015 Write the whole-surface evidence checker in internal/api/evidence_test.go:
   `checkEvidence(t, body []byte)` decodes the JSON into `any`, walks it, and fails for any object under
   `devices`, `interfaces`, `edges` or `findings` (and the top-level device object of
   `/v1/devices/{name}`) that lacks a non-empty `evidence` array whose every entry has
@@ -190,13 +190,13 @@ bound the only component anyone can reach; read them twice
 
 ### Process wiring
 
-- [ ] T016 Create cmd/netmapper/api.go with `cmdAPI`: flag `--listen` defaulting to `:8080`, then
+- [X] T016 Create cmd/netmapper/api.go with `cmdAPI`: flag `--listen` defaulting to `:8080`, then
   `rawStore()` (missing `NETMAPPER_S3_*` is exit 2 like the collector), `connect(ctx)` (exit 1 on
   failure), `raw.Client.BucketExists(ctx, raw.Bucket)` so an unreachable object store is exit 1 at
   startup (contracts/rest.md), then `http.Server{Addr, Handler: api.New(db, raw).Handler(),
   ReadHeaderTimeout: 10 * time.Second}`, shut down with `srv.Shutdown` when `ctx` is cancelled. Log
   `api started` with the listen address and never the S3 keys
-- [ ] T017 Register `"api": cmdAPI` and `"token": cmdToken` in the `commands` map of
+- [X] T017 Register `"api": cmdAPI` and `"token": cmdToken` in the `commands` map of
   cmd/netmapper/main.go, and add both to the usage line and the package comment. `cmdToken` is written
   in T035; until then leave a stub returning `exitInvalid` so the binary builds
 
@@ -218,7 +218,7 @@ ports, cables and addresses each carry evidence; follow one `observation_id` to 
 
 > Write these first and see them fail. Every test runs `checkEvidence` (T015) on every 200 body.
 
-- [ ] T018 [P] [US1] Write naming tests in internal/api/devices_test.go: the same device is reachable
+- [X] T018 [P] [US1] Write naming tests in internal/api/devices_test.go: the same device is reachable
   by its device key, by its hostname and by an address in its `targets`, and all three answers carry
   the same `device_key` (FR-001a, FR-001b); a tie built with inputs that actually tie, two
   `testutil.FakeOS` devices with the **same name and different serials**, so resolution produces two
@@ -233,7 +233,7 @@ ports, cables and addresses each carry evidence; follow one `observation_id` to 
   under test is the API's, not resolution's; editing the computed zone in a test is legitimate since
   it is rebuildable (Principle II). A device key from snapshot A asked of snapshot B where it does not exist is `404`
   `no_such_device`, not an answer from A (FR-018, edge case)
-- [ ] T019 [P] [US1] Write device-content tests in internal/api/devices_test.go: `/v1/devices` carries
+- [X] T019 [P] [US1] Write device-content tests in internal/api/devices_test.go: `/v1/devices` carries
   `device_key`, `hostname`, `platform`, `targets`, `weak` and `evidence` for each device and **no**
   `interfaces` or `edges` key (FR-001c, SC-001b); a device on a flat segment, one port with neighbour
   entries to at least four other devices, returns every edge on that port (FR-001d); an agreed link has
@@ -243,41 +243,41 @@ ports, cables and addresses each carry evidence; follow one `observation_id` to 
   the case 004's T002 built) carries both spellings in `aliases` (FR-005); an edge to a far end no
   entity accounts for is returned with its `unknown:` reference (edge case); a weakly identified device
   has `weak: true` (FR-006, US1-4)
-- [ ] T020 [P] [US1] Write snapshot-choice tests in internal/api/devices_test.go: with no `?snapshot`
+- [X] T020 [P] [US1] Write snapshot-choice tests in internal/api/devices_test.go: with no `?snapshot`
   the answer comes from the most recently closed projected snapshot and names it (FR-017, FR-019); a
   newer closed snapshot whose `projection` row was deleted by the owner pool (simulating the sweep not
   having reached it) is not the default, and naming it explicitly returns `409 not_projected` (FR-009,
   FR-019 edge case); a snapshot whose `resolution.computed_at` was moved forward so the projection is
   stale is treated the same way (R9); an open snapshot named explicitly is `409 not_projected`; an
   unknown id is `404 no_such_snapshot`; `?snapshot=abc` is `400`
-- [ ] T021 [P] [US1] Write evidence-chain tests in internal/api/raw_test.go: take an `observation_id`
+- [X] T021 [P] [US1] Write evidence-chain tests in internal/api/raw_test.go: take an `observation_id`
   from an interface's evidence, `GET /v1/observations/{id}` lists its commands with `step`, `command`
   and hex `hash`, and `GET /v1/observations/{id}/raw/{step}` returns `200`,
   `Content-Type: application/octet-stream` and bytes equal to `RawStore.Get` of that hash (FR-004,
   SC-006a, US1-3); an unknown observation is `404 no_such_observation`; an unknown step is
   `404 no_such_step`; the response body of the observation endpoint contains no object-store key
   string (`raw/sha256/`) and no bucket name (FR-004a)
-- [ ] T022 [P] [US1] Write `TestInterfaceEndpoint` in internal/api/devices_test.go: `/v1/interfaces/
+- [X] T022 [P] [US1] Write `TestInterfaceEndpoint` in internal/api/devices_test.go: `/v1/interfaces/
   {device}/{name}` returns the same interface object, aliases, evidence and edges as the matching
   element of `/v1/devices/{device}`, and an unknown port is `404 no_such_interface`
 
 ### Implementation for User Story 1
 
-- [ ] T023 [US1] Implement device naming in internal/api/devices.go: `resolveDevice(ctx, tx,
+- [X] T023 [US1] Implement device naming in internal/api/devices.go: `resolveDevice(ctx, tx,
   snapshotID, name) (entityIDs []int64, keys []string, err error)` as one query trying
   `device_key = $2`, then `attributes->>'hostname' = $2`, then `attributes->'targets' ? $2`, in that
   order, stopping at the first tier that matches anything (R10). Exact, case-sensitive match (R10
   rejects guessing). Return keys sorted so the 409 body is deterministic. "More than one match" is
   decided in one place shared by the hostname and address tiers, not once per tier, so T018's two tie
   tests cover one refusal path rather than two copies that can drift
-- [ ] T024 [US1] Implement `GET /v1/devices` in internal/api/devices.go: `pickSnapshot`,
+- [X] T024 [US1] Implement `GET /v1/devices` in internal/api/devices.go: `pickSnapshot`,
   `requireGraph`, then every `entity` of the snapshot ordered by `device_key` with `device_key`,
   `hostname`, `platform` and `targets` read from `attributes` (the JSON names internal/entity/entity.go
   uses), `weak`, `confidence` (`weak` when `weak` is true, else `strong`, FR-002a), `first_seen`,
   `last_seen`, and `evidence` from `entityEvidence`. Response
   `{"snapshot": {...}, "devices": [...]}`. No interfaces and no edges (FR-001c). No filtering and no
   query parameters beyond `snapshot`
-- [ ] T025 [US1] Implement `GET /v1/devices/{name}` in internal/api/devices.go: `pickSnapshot`,
+- [X] T025 [US1] Implement `GET /v1/devices/{name}` in internal/api/devices.go: `pickSnapshot`,
   `requireGraph`, `resolveDevice` (zero is `404 {"error":"no_such_device"}`, more than one is
   `409 {"error":"ambiguous","candidates":[...]}`), then the device as in T024 plus `interfaces` and
   `edges`. Each interface: `canonical_name`, `source`, `description`, `admin_state`, `oper_state`,
@@ -287,21 +287,21 @@ ports, cables and addresses each carry evidence; follow one `observation_id` to 
   `to_entity_id` equals it (that covers `l1_link` on its ports and `has_address`): `name`, `type`,
   `from_ref`, `to_ref`, `confidence` (the column as stored, FR-002a), `attributes`, `first_seen`, `last_seen` and `evidence` with
   `side`. No `LIMIT` anywhere (FR-001d). Order interfaces by `canonical_name` and edges by `name`
-- [ ] T026 [US1] Implement `GET /v1/interfaces/{device}/{name}` in internal/api/devices.go by reusing
+- [X] T026 [US1] Implement `GET /v1/interfaces/{device}/{name}` in internal/api/devices.go by reusing
   the T025 loaders filtered to one `canonical_name`, not by writing a second query set. Edges are those
   whose `from_interface_id` or `to_interface_id` is that interface
-- [ ] T027 [US1] Create internal/api/raw.go with `GET /v1/observations/{id}`: the `observation` row
+- [X] T027 [US1] Create internal/api/raw.go with `GET /v1/observations/{id}`: the `observation` row
   (`id`, `snapshot_id`, `collected_at`, `target`, `transport`, `platform`, `recipe_id`,
   `fact_family`, `status`, `detail`) and `commands` from `observation_raw` (`step` from `step_id`,
   `command`, `hash` as lowercase hex, `size` from `raw_object`), wrapped in the envelope of the
   observation's own snapshot. Do not return `parsed`: it is not evidence the contract names and can be
   large. `404 {"error":"no_such_observation"}` when absent
-- [ ] T028 [US1] Add `GET /v1/observations/{id}/raw/{step}` to internal/api/raw.go: look up the hash in
+- [X] T028 [US1] Add `GET /v1/observations/{id}/raw/{step}` to internal/api/raw.go: look up the hash in
   `observation_raw` inside the read transaction, then call `s.raw.Get(ctx, hash)` and write the bytes
   with `Content-Type: application/octet-stream`. A missing row is `404 {"error":"no_such_step"}`; an
   object-store error is a 500 whose logged detail may include the key and whose body never does
   (FR-004a, FR-014). Never call `Put` or any other write method
-- [ ] T029 [US1] Register the five US1 routes in `Server.Handler` in internal/api/api.go, each through
+- [X] T029 [US1] Register the five US1 routes in `Server.Handler` in internal/api/api.go, each through
   `s.read(...)`, using method-and-path patterns (`GET /v1/devices`, `GET /v1/devices/{name}`,
   `GET /v1/interfaces/{device}/{name}`, `GET /v1/observations/{id}`,
   `GET /v1/observations/{id}/raw/{step}`). An `{id}` that is not an integer is `400`
@@ -320,14 +320,14 @@ token and a token with an undefined scope; confirm the four 401s are byte-identi
 
 ### Tests for User Story 2
 
-- [ ] T030 [P] [US2] Write token CLI tests in cmd/netmapper/token_test.go, following
+- [X] T030 [P] [US2] Write token CLI tests in cmd/netmapper/token_test.go, following
   cmd/netmapper/project_test.go for running a subcommand against the test database as
   `netmapper_operator`: `create` prints one line starting `nm_` and the stored `hash` equals
   `sha256` of it while no column contains the value (FR-013, R4); `list` output contains no `nm_`
   string (FR-013); a duplicate name, `--scope admin` and `revoke` of an unknown name each exit 2;
   `revoke` sets `revoked_at` and a second `revoke` of the same name exits 2 rather than moving the
   timestamp
-- [ ] T031 [P] [US2] Write `TestEveryEndpointUnderEveryTokenState` in internal/api/auth_test.go as one
+- [X] T031 [P] [US2] Write `TestEveryEndpointUnderEveryTokenState` in internal/api/auth_test.go as one
   table: the eight endpoint paths (with a real device, observation, step and interface from the lab)
   crossed with the states no header, `Authorization: Basic x`, `Bearer nm_unknown`, a revoked token, a
   token with `scopes = {admin}`, a token with `scopes = {read, admin}`, and a valid `read` token.
@@ -335,18 +335,18 @@ token and a token with an undefined scope; confirm the four 401s are byte-identi
   (FR-010, SC-004, R12); both undefined-scope tokens give `403` `{"error":"forbidden","need":"read"}`,
   so a known-plus-unknown set is refused and not treated as permissive (FR-011, SC-005, R13); the valid
   token gives `200` or the expected status
-- [ ] T032 [P] [US2] Write the probing tests in internal/api/auth_test.go: without a token,
+- [X] T032 [P] [US2] Write the probing tests in internal/api/auth_test.go: without a token,
   `/v1/devices/<existing>` and `/v1/devices/nonesuch`, `/v1/observations/<existing>` and
   `/v1/observations/999999999`, and `/healthz`, `/version` and `/` all return the identical 401
   (SC-004, contracts/rest.md: no unauthenticated endpoint); revoking a token between two requests on
   the same server makes the second one 401 with no wait (FR-021, R5, US2-4); `last_used_at` is set
   after a successful call and not after a refused one
-- [ ] T033 [P] [US2] Write `TestNoSecretInAnyResponse` in internal/api/boundary_test.go: set `NM_SSH`
+- [X] T033 [P] [US2] Write `TestNoSecretInAnyResponse` in internal/api/boundary_test.go: set `NM_SSH`
   and `NM_SNMP` to distinctive values, crawl, then hit every endpoint (including every raw step of every
   observation) and assert no body contains either secret value, either `secret_ref` string
   (`env:NM_SSH`, `env:NM_SNMP`), the S3 access key or the S3 secret key, or any `nm_` token value
   (FR-013, FR-014, SC-006). Whole surface, not only where a secret might be expected
-- [ ] T034 [P] [US2] Write `TestServingWritesNothing` in internal/api/boundary_test.go: compute a
+- [X] T034 [P] [US2] Write `TestServingWritesNothing` in internal/api/boundary_test.go: compute a
   checksum per table over every row of `observation`, `observation_raw`, `raw_object`,
   `identifier_claim`, `snapshot`, `snapshot_judgement`, `resolution`, `entity`, `entity_claim`,
   `projection`, `interface`, `interface_alias`, `interface_evidence`, `edge`, `edge_evidence`,
@@ -355,13 +355,13 @@ token and a token with an undefined scope; confirm the four 401s are byte-identi
 
 ### Implementation for User Story 2
 
-- [ ] T035 [US2] Create cmd/netmapper/token.go with `cmdToken` dispatching `create`, `list` and
+- [X] T035 [US2] Create cmd/netmapper/token.go with `cmdToken` dispatching `create`, `list` and
   `revoke`, replacing the T017 stub. `create --name N --scope S` (repeatable `--scope`, at least one)
   refuses any scope not in `api.Scopes` with exit 2, calls `api.NewToken`, inserts `name`, `hash`,
   `scopes`, and prints the value alone on stdout, once. A unique violation on `name` is exit 2
-- [ ] T036 [US2] Add `list` to cmd/netmapper/token.go: tab-separated `name`, `scopes` joined by `,`,
+- [X] T036 [US2] Add `list` to cmd/netmapper/token.go: tab-separated `name`, `scopes` joined by `,`,
   `created_at`, `last_used_at` or `-`, `revoked_at` or `-`, ordered by `name`. Never select `hash`
-- [ ] T037 [US2] Add `revoke --name N` to cmd/netmapper/token.go:
+- [X] T037 [US2] Add `revoke --name N` to cmd/netmapper/token.go:
   `UPDATE api_token SET revoked_at = now() WHERE name = $1 AND revoked_at IS NULL`; zero rows affected
   is exit 2 with `no active token named N` on stderr. No `DELETE` (data-model.md)
 
@@ -378,31 +378,31 @@ the verdict, coverage and baseline are there; read the findings of one with thei
 
 ### Tests for User Story 3
 
-- [ ] T038 [P] [US3] Write snapshot tests in internal/api/snapshot_test.go: `/v1/snapshots` lists every
+- [X] T038 [P] [US3] Write snapshot tests in internal/api/snapshot_test.go: `/v1/snapshots` lists every
   snapshot newest first with `has_graph` correct for a projected, an unprojected and an open one;
   `/v1/snapshots/{id}` carries `classification`, `coverage`, `baseline_snapshot_id`,
   `baseline_devices`, `carried_over`, `reached`, `thresholds` and `breakdown` (FR-007, US3-1)
-- [ ] T039 [P] [US3] Write `TestQuarantinedSnapshotIsServed` in internal/api/snapshot_test.go,
+- [X] T039 [P] [US3] Write `TestQuarantinedSnapshotIsServed` in internal/api/snapshot_test.go,
   building the quarantine the way `TestQuarantinedSnapshotIsProjected` in internal/graph/graph_test.go
   does (two crawls, the second reaching fewer devices): with no `?snapshot`, `/v1/devices` answers from
   the quarantined snapshot and its envelope carries `"verdict":"quarantined"` and the coverage figure
   (FR-019, FR-020, SC-009, US3-3)
-- [ ] T040 [P] [US3] Write findings tests in internal/api/findings_test.go: a lab device refusing
+- [X] T040 [P] [US3] Write findings tests in internal/api/findings_test.go: a lab device refusing
   every credential set raises a `credential_denied` finding, and `/v1/findings` returns it with
   `category`, `domain`, `severity`, `subject_ref`, `state`, `detail` and non-empty `evidence`
   (FR-008, US3-2); findings of another snapshot are not included (FR-018)
 
 ### Implementation for User Story 3
 
-- [ ] T041 [US3] Add `GET /v1/snapshots` to internal/api/snapshot.go: every snapshot as a
+- [X] T041 [US3] Add `GET /v1/snapshots` to internal/api/snapshot.go: every snapshot as a
   `SnapshotRef`, ordered `id DESC`, in `{"snapshots": [...]}`. This endpoint lists snapshots rather
   than answering from one, so it carries no top-level `snapshot` envelope; T015's checker must allow
   that for this path only, and T054 states it in contracts/rest.md
-- [ ] T042 [US3] Add `GET /v1/snapshots/{id}` to internal/api/snapshot.go: the envelope plus a
+- [X] T042 [US3] Add `GET /v1/snapshots/{id}` to internal/api/snapshot.go: the envelope plus a
   `judgement` object from the active `snapshot_judgement` row with the columns T038 names, plus
   `computed_at` and `gate_version`; `"judgement": null` when never judged; `404 no_such_snapshot` when
   absent. Served for open and unprojected snapshots too, since a verdict does not need a graph
-- [ ] T043 [US3] Create internal/api/findings.go with `GET /v1/findings`: `pickSnapshot`, then every
+- [X] T043 [US3] Create internal/api/findings.go with `GET /v1/findings`: `pickSnapshot`, then every
   `finding` of that snapshot ordered by `id`, with the columns T040 names and `evidence` from
   `findingEvidence`, and `confidence` from a map in findings.go: `unknown_platform`, `parse_failed`,
   `credential_denied` are `direct`; `identity_conflict`, `link_disagreement` are `derived` (FR-002a).
@@ -410,7 +410,7 @@ the verdict, coverage and baseline are there; read the findings of one with thei
   category cannot ship without a decision. Findings exist before projection, so this does **not**
   call `requireGraph`; an open snapshot named explicitly is still answered, with its `state` in the
   envelope
-- [ ] T044 [US3] Register the three US3 routes in `Server.Handler` in internal/api/api.go through
+- [X] T044 [US3] Register the three US3 routes in `Server.Handler` in internal/api/api.go through
   `s.read(...)`, and add all three to the endpoint table of T031 so they are covered by every token
   state and by T033 and T034
 
@@ -423,32 +423,32 @@ the verdict, coverage and baseline are there; read the findings of one with thei
 **Purpose**: the reference documents corrected in the same change as the behaviour (Constitution,
 Development Workflow), and the lab run
 
-- [ ] T045 [P] Correct docs/c4-model/03-components.md: replace "bearer tokens, the three scopes" with
+- [X] T045 [P] Correct docs/c4-model/03-components.md: replace "bearer tokens, the three scopes" with
   one `read` scope and a sentence saying the set is defined when there is something to mutate (plan.md
   documentation deltas)
-- [ ] T046 [P] In docs/c4-model/03-components.md, mark the Config service and Job endpoints under `api`
+- [X] T046 [P] In docs/c4-model/03-components.md, mark the Config service and Job endpoints under `api`
   as not built: this feature serves reads only, configuration and jobs stay on the operator CLI
-- [ ] T047 [P] Correct the `api` row of docs/c4-model/02-containers.md: it holds no device credential
+- [X] T047 [P] Correct the `api` row of docs/c4-model/02-containers.md: it holds no device credential
   and it does hold read-only object-store access for raw output
-- [ ] T048 [P] Add `api_token` to the control plane in docs/c4-model/04-data-model.md (the value is
+- [X] T048 [P] Add `api_token` to the control plane in docs/c4-model/04-data-model.md (the value is
   never stored, only its SHA-256), and add `netmapper_api` to the grant matrix with exactly the grants
   of T004 and T005
-- [ ] T049 [P] Add one sentence to docs/c4-model/01-system-context.md confirming the Grafana exception
+- [X] T049 [P] Add one sentence to docs/c4-model/01-system-context.md confirming the Grafana exception
   stands alongside the new API contract rather than being replaced by it
-- [ ] T050 Run `go vet ./...` and `go test ./...` with the compose stack up and both test variables
+- [X] T050 Run `go vet ./...` and `go test ./...` with the compose stack up and both test variables
   set; fix anything that fails. Record the result, including any test that skipped
-- [ ] T051 Run quickstart.md sections 2 to 6 against the containerlab topology and record anything that
+- [X] T051 Run quickstart.md sections 2 to 6 against the containerlab topology and record anything that
   differs from the expected output in quickstart.md's "Divergences recorded during implementation"
 
 ### Corrections found while generating tasks
 
-- [ ] T052 Correct the `netmapper_api` grant block in data-model.md to include `entity_claim` and
+- [X] T052 Correct the `netmapper_api` grant block in data-model.md to include `entity_claim` and
   `identifier_claim`, and to show `UPDATE (last_used_at)` on `api_token` if T004 kept the column-level
   grant. Say why in one sentence: the device's evidence chain in the same document needs them
-- [ ] T053 Record in quickstart.md's divergences, and as a known open point in plan.md, that FR-009's
+- [X] T053 Record in quickstart.md's divergences, and as a known open point in plan.md, that FR-009's
   "has been evicted" case has nothing to read: no eviction or tombstone exists in the schema. The API
   handles `open` and `closed`; the evicted answer arrives with the feature that evicts
-- [ ] T054 Add to contracts/rest.md the error bodies the tasks introduced and the contract did not
+- [X] T054 Add to contracts/rest.md the error bodies the tasks introduced and the contract did not
   list: `400 bad_snapshot`, `404 no_such_snapshot`, `no_such_observation`, `no_such_step`,
   `no_such_interface`, `500 internal`; the `has_graph` field of the envelope; that `/v1/snapshots`
   carries no envelope; that `?snapshot` also applies to `/v1/devices/{name}` and

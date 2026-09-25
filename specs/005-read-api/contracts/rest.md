@@ -53,12 +53,44 @@ Every element that rests on evidence carries it:
 An element without `evidence` and without a collection time is a defect of this feature, not a sparse
 answer (FR-002, SC-002).
 
+Every device, interface, edge and finding also carries `confidence`, one value from a fixed set per
+kind, so a consumer reads one field whatever it is looking at (spec FR-002a):
+
+| Element   | `confidence`                        | From                                        |
+| --------- | ----------------------------------- | ------------------------------------------- |
+| device    | `strong`, `weak`                    | whether resolution identified it weakly      |
+| interface | `described`, `revealed`             | whether its device or a neighbour named it  |
+| edge      | `both_ends`, `one_end`, `direct`    | the edge's stored confidence                 |
+| finding   | `direct`, `derived`                 | its category: one observation, or several   |
+
+The envelope also carries `has_graph`: whether the snapshot has a projection built from the entity set
+it carries now. `verdict` and `coverage` are `null` for a snapshot never judged, never omitted.
+
+## Errors
+
+| Status | Body                                            | When                                                        |
+| ------ | ----------------------------------------------- | ----------------------------------------------------------- |
+| 400    | `{"error": "bad_snapshot"}`                     | `?snapshot=` is not an integer                              |
+| 400    | `{"error": "bad_id"}`                           | an `{id}` in the path is not an integer                     |
+| 404    | `{"error": "no_such_snapshot"}`                 | the snapshot named does not exist                           |
+| 404    | `{"error": "no_such_device", "snapshot": {…}}`  | nothing in that snapshot matches the name                   |
+| 404    | `{"error": "no_such_interface", "snapshot": {…}}` | the device has no port by that name                       |
+| 404    | `{"error": "no_such_observation"}`              |                                                             |
+| 404    | `{"error": "no_such_step"}`                     | the observation exists and ran no such step                 |
+| 405    |                                                 | any method but `GET`                                        |
+| 409    | `{"error": "not_projected", "snapshot": {…}}`   | the snapshot is open, unprojected, or its projection is stale; `snapshot` is `null` when no snapshot carries a graph at all |
+| 500    | `{"error": "internal"}`                         | nothing more: detail goes to the log, never to the caller   |
+
+`?snapshot=<id>` applies to `/v1/devices`, `/v1/devices/{name}`, `/v1/interfaces/{device}/{name}` and
+`/v1/findings`.
+
 ## Endpoints
 
 ### `GET /v1/snapshots`
 
 Every snapshot, newest first: id, state, `closed_at`, verdict, coverage, and whether it carries a
-current graph. This is how a caller discovers what they can ask about.
+current graph. This is how a caller discovers what they can ask about. It lists snapshots rather than
+answering from one, so it carries no top-level `snapshot`; each entry is one.
 
 ### `GET /v1/snapshots/{id}`
 
@@ -83,8 +115,8 @@ answer states the `device_key` it resolved to, whatever was asked for (FR-001b).
 | Situation                              | Status | Body                                                        |
 | -------------------------------------- | ------ | ----------------------------------------------------------- |
 | Resolved                               | 200    | the device                                                   |
-| Nothing matches in that snapshot       | 404    | `{"error": "no_such_device"}`                                |
-| A hostname or address matching several | 409    | `{"error": "ambiguous", "candidates": ["chassis_mac:…", …]}` |
+| Nothing matches in that snapshot       | 404    | `{"error": "no_such_device", "snapshot": {…}}`               |
+| A hostname or address matching several | 409    | `{"error": "ambiguous", "candidates": ["chassis_mac:…", …], "snapshot": {…}}` |
 | The snapshot carries no graph          | 409    | `{"error": "not_projected", "snapshot": {…}}`                |
 
 404 and "the snapshot has no graph" are different answers on purpose (FR-009): absent and empty must
@@ -117,7 +149,8 @@ access. It writes nothing there and returns no access key.
 
 One interface with its aliases, its evidence and the edges touching it. A convenience over
 `/v1/devices/{name}` for a caller who already knows which port they care about, and the one endpoint
-that could be dropped without losing a requirement.
+that could be dropped without losing a requirement. `{name}` is the rest of the path, so a port
+spelled `Ethernet1/1` can be written as it is or as `Ethernet1%2F1`.
 
 ## netmapper api (new subcommand)
 

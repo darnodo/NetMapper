@@ -39,15 +39,20 @@ schemas do not collide on it.
 
 ```
 netmapper_api  SELECT   snapshot, snapshot_judgement, projection, resolution,
-                        entity, interface, interface_alias, interface_evidence,
+                        entity, entity_claim, identifier_claim,
+                        interface, interface_alias, interface_evidence,
                         edge, edge_evidence,
                         observation, observation_raw, raw_object,
                         finding, finding_evidence,
                         api_token
-               UPDATE   api_token
+               UPDATE   api_token (last_used_at)
 ```
 
-That is the whole grant. No `INSERT` anywhere, no `DELETE` anywhere, and `UPDATE` on exactly one table.
+That is the whole grant. No `INSERT` anywhere, no `DELETE` anywhere, and `UPDATE` on exactly one
+column of one table. `entity_claim` and `identifier_claim` are there because a device's own evidence
+runs through them (see "The evidence chain" below); an earlier draft of this list left them out. The
+`UPDATE` is column-level so the role can never un-revoke a token, change its scopes or replace its
+hash.
 The role is what bounds a compromise of the only component anyone can reach, so it is the part of this
 feature worth reading twice.
 

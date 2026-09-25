@@ -58,10 +58,10 @@ Thin by design: it validates, it reads, it enqueues. It computes nothing.
 
 | Component | Responsibility |
 |---|---|
-| Auth | bearer tokens, the three scopes, audit of every mutating call |
-| Config service | validates the YAML document, stores it as objects, versions it |
-| Job endpoints | triggers a run, a replay or an import, returns progress |
+| Auth | bearer tokens with one scope, `read`, which covers every endpoint. The set grows when there is something to mutate, and audit of mutating calls arrives with the first one (005) |
+| Config service | validates the YAML document, stores it as objects, versions it. Not built: configuration is posted from the operator CLI (005 serves reads only) |
+| Job endpoints | triggers a run, a replay or an import, returns progress. Not built: jobs are triggered from the operator CLI |
 | Query layer | graph, snapshots, diffs and findings, with the evidence attached to every answer |
-| MCP server | the same queries, in the shape an agent consumes |
+| MCP server | the same queries, in the shape an agent consumes. Not built yet |
 
 The query layer is where the promise of the whole project is either kept or lost. An answer that arrives without its evidence and its age is the same answer any other tool would give.

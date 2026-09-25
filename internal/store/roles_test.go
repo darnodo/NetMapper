@@ -2,7 +2,10 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/darnodo/NetMapper/internal/store"
 	"github.com/darnodo/NetMapper/internal/testutil"
@@ -211,4 +214,106 @@ func TestProjectionGrants(t *testing.T) {
 			}
 		}
 	}
+}
+
+// 005 T006, data-model.md and research R3: the role the exposed process logs in as cannot read the
+// configuration, where secret references live, nor anything it does not serve.
+func TestAPICannotReadCredentials(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	api := testutil.As(t, db, "netmapper_api")
+	for _, table := range []string{
+		"credential_set", "config_version", "perimeter", "seed_set",
+		"task", "job", "entity_decision", "audit_log",
+	} {
+		if _, err := api.Exec(ctx, "SELECT count(*) FROM "+table); !denied(err) {
+			t.Errorf("api: SELECT on %s: %v, want permission denied", table, err)
+		}
+	}
+}
+
+// 005 T006, FR-016, SC-008 and research R3: nothing the api reads can be written by it. The one
+// exception is last_used_at on api_token (research R6).
+func TestAPICannotWriteAnyZone(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	api := testutil.As(t, db, "netmapper_api")
+	served := []string{
+		"snapshot", "snapshot_judgement", "projection", "resolution",
+		"entity", "entity_claim", "identifier_claim",
+		"interface", "interface_alias", "interface_evidence", "edge", "edge_evidence",
+		"observation", "observation_raw", "raw_object",
+		"finding", "finding_evidence", "api_token",
+	}
+	for _, table := range served {
+		if _, err := api.Exec(ctx, "SELECT count(*) FROM "+table); err != nil {
+			t.Errorf("api: SELECT on %s: %v", table, err)
+		}
+		for _, q := range []string{
+			"INSERT INTO " + table + " DEFAULT VALUES",
+			"DELETE FROM " + table,
+		} {
+			if _, err := api.Exec(ctx, q); !denied(err) {
+				t.Errorf("api: %s: %v, want permission denied", q, err)
+			}
+		}
+	}
+	for _, q := range []string{
+		"UPDATE snapshot SET state = 'closed'",
+		"UPDATE snapshot_judgement SET active = false",
+		"UPDATE entity SET weak = true",
+		"UPDATE interface SET source = 'device'",
+		"UPDATE edge SET confidence = 'one_end'",
+		"UPDATE observation SET status = 'collected'",
+		"UPDATE finding SET state = 'open'",
+	} {
+		if _, err := api.Exec(ctx, q); !denied(err) {
+			t.Errorf("api: %s: %v, want permission denied", q, err)
+		}
+	}
+	if _, err := api.Exec(ctx, "UPDATE api_token SET last_used_at = now()"); err != nil {
+		t.Errorf("api cannot record last_used_at: %v", err)
+	}
+}
+
+// 005 T006, research R6: the one write is one column wide. A compromised api process cannot revive a
+// revoked token, widen its scopes or swap its hash.
+func TestAPICanOnlyTouchLastUsed(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	api := testutil.As(t, db, "netmapper_api")
+	for _, q := range []string{
+		"UPDATE api_token SET revoked_at = NULL",
+		"UPDATE api_token SET scopes = ARRAY['read']",
+		"UPDATE api_token SET hash = '\\x00'",
+		"UPDATE api_token SET name = 'x'",
+		"DELETE FROM api_token",
+	} {
+		if _, err := api.Exec(ctx, q); !denied(err) {
+			t.Errorf("api: %s: %v, want permission denied", q, err)
+		}
+	}
+}
+
+// 005 T006, data-model.md: the operator issues and revokes tokens and can never delete one.
+func TestOperatorCannotDeleteTokens(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	op := testutil.As(t, db, "netmapper_operator")
+	if _, err := op.Exec(ctx, `INSERT INTO api_token (name, hash, scopes) VALUES ('t', '\x01', ARRAY['read'])`); err != nil {
+		t.Fatalf("operator cannot issue a token: %v", err)
+	}
+	if _, err := op.Exec(ctx, "UPDATE api_token SET revoked_at = now() WHERE name = 't'"); err != nil {
+		t.Errorf("operator cannot revoke a token: %v", err)
+	}
+	if _, err := op.Exec(ctx, "DELETE FROM api_token"); !denied(err) {
+		t.Errorf("operator: DELETE FROM api_token: %v, want permission denied", err)
+	}
+}
+
+// denied reports a permission failure, as opposed to a statement that failed for another reason, such
+// as a NOT NULL column an INSERT with no values would trip whatever the grants say.
+func denied(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "42501"
 }

@@ -173,7 +173,7 @@ Take a checksum of all four zones, serve every endpoint, take it again.
 
 ```sql
 SELECT md5(string_agg(x, '|' ORDER BY x)) FROM (
-  SELECT id || status || fact_family FROM observation
+  SELECT id || status || fact_family AS x FROM observation
   UNION ALL SELECT id || device_key || weak::text FROM entity
   UNION ALL SELECT id::text || canonical_name || source FROM interface
   UNION ALL SELECT id::text || name || confidence FROM edge
@@ -187,3 +187,41 @@ to get wrong twice, but the checksum is what proves it.
 
 Recorded here as they are found, the way 002, 003 and 004 did, so the reference and the behaviour stay
 corrected in the same change.
+
+- **FR-009's evicted case has nothing to read.** No eviction or tombstone exists in the schema:
+  `snapshot.state` is `open` or `closed`. The interface answers `open`, closed-but-unprojected and
+  stale-projection snapshots with `409 not_projected`; the evicted answer arrives with the feature that
+  evicts. Also recorded as a known open point in plan.md.
+- **Two grants data-model.md's first draft left out.** `entity_claim` and `identifier_claim` carry a
+  device's evidence. The migration grants them and data-model.md now lists them.
+- **`UPDATE` on `api_token` is column-level**, `last_used_at` only, narrower than the draft's table
+  grant.
+- **A device's evidence also includes the observations its address edges cite.** The projector matches
+  an identity observation that produced no claim to a device by address; reading claims alone would
+  have left such a device without evidence, and FR-002 then refuses to serve it.
+- **Refusals that name a device say which snapshot was searched.** `404 no_such_device`,
+  `409 ambiguous` and `404 no_such_interface` carry the `snapshot` envelope, since a caller who named
+  no snapshot cannot otherwise tell what was looked at (FR-017).
+- **`/v1/interfaces/{device}/{name}` takes the rest of the path as the port name**, so `Ethernet1/1`
+  works written as it is as well as `Ethernet1%2F1`.
+- **A method other than `GET` with a valid token is `405`**, which the standard library's mux gives for
+  free and a test now pins (FR-012).
+- **Every element carries `confidence`** from a fixed set per kind (spec FR-002a), found missing by
+  `/speckit-analyze` against constitution Principle I.
+- **Lab run, 2026-09-25 (tasks.md T051).** Sections 2, 3, 5 and 6 matched against the four-node cEOS lab,
+  with `token` run as `netmapper_operator` and `api` as `netmapper_api`. Three differences, none in the
+  interface:
+  - Section 3: `interfaces[0].evidence[0]` was the LLDP observation (`show lldp neighbors detail`),
+    not `show interfaces status`, because evidence is ordered by collection time and LLDP came first.
+    The interface listing is the port's second evidence entry. The chain from port to bytes holds
+    either way.
+  - Section 4: excluding two switches from the perimeter does not quarantine, since the gate measures
+    against the current perimeter, and `docker pause` does not make a switch unreachable, since the
+    paused container's network stack still accepts the connection and the session hangs until
+    unpause. What worked: `docker exec clab-netmapper-sw2 ip link set eth0 down` (and sw4), crawl, then
+    `ip link set eth0 up`. That gave `quarantined` at 0.5, and `/v1/devices` with no snapshot named
+    answered from it with the verdict in the envelope.
+  - Section 6: the checksum query as first written did not run, because its subquery never named the
+    column `x`, and a shell comparing two empty results would have reported "unchanged". The query
+    above now names it (`AS x`); with that, the checksum was identical before and after serving every
+    endpoint under a valid, an absent and an unknown token.
