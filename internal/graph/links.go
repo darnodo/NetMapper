@@ -12,10 +12,12 @@ import (
 // report is one `neighbours` row read as a statement about a cable: who is reporting, on which port,
 // and what it says is at the far end.
 type report struct {
-	from         *entity
-	fromPort     string // canonical, applied by the parser at collection time
-	fromSpelling string
-	fromIface    *iface
+	from *entity
+	// fromPort is canonical and is also the only spelling the near end has: the parser applies the
+	// pack's naming rules to `local_interface` at collection time, so there is no second form of it
+	// to keep (T095).
+	fromPort  string
+	fromIface *iface
 
 	to         *entity // nil when no entity accounts for the far end
 	toPort     string  // canonical, when the far end resolved and the report named a port
@@ -82,7 +84,7 @@ func (p *projection) readReports(reg *pack.Registry, rows []famRow) []*report {
 			continue
 		}
 		r := &report{
-			from: row.owner, fromPort: local, fromSpelling: local,
+			from: row.owner, fromPort: local,
 			protocol: str(row.row, "protocol"), obs: row.obs, at: row.at,
 			remote: map[string]string{},
 		}
@@ -197,10 +199,72 @@ func (p *projection) buildLinks(reports []*report) {
 		g.members = append(g.members, r)
 	}
 
+	absorbPortless(groups)
+
 	for _, key := range slices.Sorted(maps.Keys(groups)) {
 		p.edges = append(p.edges, p.link(groups[key]))
 	}
 	p.findings = append(p.findings, disagreements(groups)...)
+}
+
+// absorbPortless folds a report that named the far device but no far port into the group that names
+// that device's port, so one cable is one link even when only one end identified the port (FR-009).
+//
+// A report like "my port1 faces device A, port unknown" produces the endpoints `{dev:A, if:B/port1}`,
+// while A's own report of the same cable produces `{if:A/pA, if:B/port1}`. They share the resolved
+// interface, and `dev:A` does not contradict `if:A/pA`, it is the same statement with less in it, so
+// the two describe one cable and the link ends up agreed by both ends.
+//
+// The fold happens only when exactly one group qualifies. Two candidates mean the device claims two of
+// its ports face the same remote port, which is a contradiction, and picking one would invent a link
+// neither side described. In that case the portless report keeps its own `dev:` edge, known from one
+// side, which is what it actually said.
+func absorbPortless(groups map[string]*linkGroup) {
+	for _, key := range slices.Sorted(maps.Keys(groups)) {
+		g, ok := groups[key]
+		if !ok {
+			continue // already folded into another group
+		}
+		var dev, pin string
+		switch {
+		case strings.HasPrefix(g.from, "dev:") && strings.HasPrefix(g.to, "if:"):
+			dev, pin = g.from, g.to
+		case strings.HasPrefix(g.to, "dev:") && strings.HasPrefix(g.from, "if:"):
+			dev, pin = g.to, g.from
+		default:
+			continue
+		}
+		prefix := "if:" + strings.TrimPrefix(dev, "dev:") + "/"
+
+		var match *linkGroup
+		found := 0
+		for _, other := range slices.Sorted(maps.Keys(groups)) {
+			c := groups[other]
+			if other == key || c == nil {
+				continue
+			}
+			var far string
+			switch pin {
+			case c.from:
+				far = c.to
+			case c.to:
+				far = c.from
+			default:
+				continue
+			}
+			if strings.HasPrefix(far, prefix) {
+				match, found = c, found+1
+			}
+		}
+		if found != 1 {
+			continue
+		}
+		for _, r := range g.members {
+			match.reporters[r.from.key] = true
+			match.members = append(match.members, r)
+		}
+		delete(groups, key)
+	}
 }
 
 // link builds the one edge a group of reports describes.
@@ -234,7 +298,9 @@ func (p *projection) link(g *linkGroup) *edge {
 	// endpoints already say it, and repeating it would be one source of truth too many (FR-010).
 	if g.oneSided() {
 		r := g.members[0]
-		e.attributes["from_spelling"] = r.fromSpelling
+		// Only the far end's spelling is recorded. The near end's cannot differ from the canonical
+		// name already inside `from_ref`: the parser canonicalises `local_interface` at collection
+		// time, and readReports takes both the port and the spelling from that one value (T095).
 		if r.toSpelling != "" {
 			e.attributes["to_spelling"] = r.toSpelling
 		}

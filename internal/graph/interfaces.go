@@ -48,7 +48,7 @@ func (p *projection) addReportedPorts(reports []*report) {
 		// answer two different questions, and only the second one is about vocabulary.
 		local := r.from.port(r.fromPort, sourceNeighbour, r.at)
 		local.evidence[r.obs] = true
-		local.see(r.fromSpelling, sourceDevice, r.obs)
+		local.see(r.fromPort, sourceDevice, r.obs)
 
 		if r.to == nil || r.toPort == "" {
 			continue

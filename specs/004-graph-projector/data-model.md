@@ -158,7 +158,7 @@ For a one-sided one whose far end did resolve to an entity, which happens when t
 reported back:
 
 ```json
-{ "protocols": ["lldp"], "from_spelling": "Ethernet1", "to_spelling": "Et1" }
+{ "protocols": ["lldp"], "to_spelling": "Et1" }
 ```
 
 For a one-sided one whose far end no entity accounts for:
@@ -166,7 +166,6 @@ For a one-sided one whose far end no entity accounts for:
 ```json
 {
   "protocols": ["lldp"],
-  "from_spelling": "Ethernet1",
   "to_spelling": "Et1",
   "remote_system_name": "sw2",
   "remote_chassis_id": "aa:bb:cc:00:00:02",
@@ -181,27 +180,31 @@ LLDP and CDP produces one edge citing both observations (FR-011).
 
 Three shapes, and two conditions draw them apart.
 
-**`from_spelling` is on every one-sided link, and `to_spelling` is on the ones whose report named a
-far-end port.** A one-sided link has exactly one report, so the edge is the only place recording how
-that report worded things, and a report that named no far-end port leaves `to_spelling` out rather than
-empty. An agreed link carries neither, because `interface_alias` is where a spelling lives, keyed to the
-port it names and to the observation that used it, and repeating one on the edge would give the same
-fact two homes that can disagree.
+**`to_spelling` is on a one-sided link whose report named a far-end port, and nothing else carries a
+spelling.** Only the far end's wording can differ from the reference beside it: the parser
+canonicalises `local_interface` at collection time, so the near end has one form and it is already
+inside `from_ref`. An agreed link carries no spelling at all, because `interface_alias` is where a
+spelling lives, keyed to the port it names and to the observation that used it, and repeating one on
+the edge would give the same fact two homes that can disagree.
+
+A `from_spelling` attribute existed until T095 and never held anything but a copy of the canonical
+name, which is what a fourth pass over this section finally noticed.
 
 **The `remote_*` fields are carried only when the far end resolved to nothing**, because that is the
 case where no entity and no interface row holds them; FR-010 calls them "whatever the report said about
 the far end". Only the ones the report supplied are present, so a report giving a system name and
 nothing else carries `remote_system_name` alone.
 
-Three convergence passes were needed to get this section right, and it is worth knowing why. The first
+Four convergence passes were needed to get this section right, and it is worth knowing why. The first
 found the document promising spellings on every link where the projector writes them only for a
 one-sided one (T084). The second found that correction had replaced one wrong description with an
 incomplete one: two shapes where there are three, and the far spelling tied to an unresolved far end
 when the code does not do that (T088); the undocumented shape was the one the cEOS lab produced on its
 first run. The third found the sentence that replaced it still overstated, because `to_spelling`
-follows what the report named (T093). Prose describing a value that code assembles drifts every time
-either moves, and this section would hold still better as a grammar with a test asserting the shapes it
-produces.
+follows what the report named (T093). The fourth found that `from_spelling`, which all three earlier
+passes had argued about, could never hold anything but a copy of the canonical name, and removed it
+(T095). Prose describing a value that code assembles drifts every time either moves, and this section
+would hold still better as a grammar with a test asserting the shapes it produces.
 
 For a `has_address`: `{"address": "10.0.0.1"}`.
 

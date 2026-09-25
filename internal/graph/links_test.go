@@ -426,3 +426,66 @@ func TestUnresolvedFarEndIdentifierIsNormalised(t *testing.T) {
 		t.Errorf("to_ref %v, want the address kept as reported", got)
 	}
 }
+
+// T094, FR-009: two reports of one cable produce one link even when only one end names the far-end
+// port. `remote_interface` is optional in the fact family, and a device that omits it says "my port1
+// faces that device, port unknown", which builds the endpoints `{dev:<key>, if:me/port1}` where the
+// other end builds `{if:them/pX, if:me/port1}`. Those used to be two groups and two one-sided edges
+// for one cable, against FR-009's "one link, not two, and marked as agreed by both ends".
+func TestOneCableWhenOnlyOneEndNamesThePort(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p1 sw2 10.0.0.2 p1 "+MAC("S002")),
+		// The fourth field is "-", so sw2 names sw1 but no port on it.
+		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1 - "+MAC("S001")),
+	})
+	want := []string{"l1_link:if:" + key("S001") + "/port1|if:" + key("S002") + "/port1 both_ends"}
+	if got := links(l); !slices.Equal(got, want) {
+		t.Errorf("links %v, want one agreed cable %v", got, want)
+	}
+	// The portless report is evidence for the same edge, from its own side.
+	got := l.Strings(`SELECT ev.side || ' ' || host(o.target)
+		FROM edge g JOIN edge_evidence ev ON ev.edge_id = g.id
+		JOIN observation o ON o.snapshot_id = ev.snapshot_id AND o.id = ev.observation_id
+		WHERE g.type = 'l1_link' ORDER BY 1`)
+	if !slices.Equal(got, []string{"from 10.0.0.1", "to 10.0.0.2"}) {
+		t.Errorf("evidence %v, want one row per side", got)
+	}
+	if n := l.Int(`SELECT count(*) FROM edge WHERE type = 'l1_link' AND to_ref LIKE 'dev:%'`); n != 0 {
+		t.Error("a dev: endpoint survived alongside the port-named one")
+	}
+}
+
+// The other half of the rule: the fold happens only when one group qualifies. Two candidates mean the
+// device claims two of its ports face one remote port, and picking one would invent a link neither
+// side described, so the portless report keeps its own one-sided edge.
+func TestPortlessReportIsNotFoldedWhenAmbiguous(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		// sw1 claims both of its ports face the same port of sw2, which is the contradiction.
+		Addr("10.0.0.1"): FakeOS("sw1", "S001",
+			"p1 sw2 10.0.0.2 p1 "+MAC("S002"), "p2 sw2 10.0.0.2 p1 "+MAC("S002")),
+		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1 - "+MAC("S001")),
+	})
+	if got := links(l); len(got) != 3 {
+		t.Errorf("%d links, want sw1's two claims plus sw2's unfolded report: %v", len(got), got)
+	}
+	if n := l.Int(`SELECT count(*) FROM edge WHERE type = 'l1_link' AND from_ref LIKE 'dev:%'`); n != 1 {
+		t.Error("the ambiguous portless report was folded into one of the candidates anyway")
+	}
+	if n := l.Int(`SELECT count(*) FROM edge WHERE type = 'l1_link' AND confidence = 'both_ends'`); n != 0 {
+		t.Error("an agreed link was invented from an ambiguous fold")
+	}
+}
+
+// T095: the near end's spelling is never recorded on an edge, because it cannot differ from the
+// canonical name the reference already carries.
+func TestEdgeCarriesNoNearSpelling(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p2 box 10.0.0.9 eth0 aa:bb:cc:99:99:99"),
+	})
+	if n := l.Int(`SELECT count(*) FROM edge WHERE attributes ? 'from_spelling'`); n != 0 {
+		t.Error("an edge carries from_spelling, which can only ever repeat its own reference")
+	}
+	if n := l.Int(`SELECT count(*) FROM edge WHERE attributes ->> 'to_spelling' = 'eth0'`); n != 1 {
+		t.Error("the far end's spelling, which is the one that can differ, was lost")
+	}
+}

@@ -156,6 +156,15 @@ the platform of a device no entity accounts for is unknown, which is FR-005 appl
 A report that says nothing at all about the far end yields the local interface and no edge: there is no
 endpoint to connect to, and inventing one would be the opposite of FR-010.
 
+A report that named the far device but no port on it produces a `dev:` endpoint, and the group it
+forms is folded into the group that names that device's port when exactly one such group exists. The
+two describe one cable: they share the resolved interface, and `dev:A` is `if:A/pA` with less in it
+rather than a contradiction of it, so FR-009's "one link, not two, marked as agreed by both ends"
+holds even when only one end identified the port. The fold is refused when two groups qualify, because
+the device would then be claiming two of its ports face one remote port and choosing between them
+would invent a link neither side described. Added after a convergence pass found the split; it is the
+one plain requirement violation this feature produced.
+
 **Alternatives considered**: a minted edge key in a registry, which is what spec.md already rejected
 and which would make this feature as large as 003 for a problem it does not have; a hash of the two
 endpoints, which is stable and unreadable, and which no operator can type into a query.

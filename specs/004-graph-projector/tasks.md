@@ -709,7 +709,7 @@ there, which is noted at the end of this phase.
 Found by `/speckit-converge` after two code-review passes and their fixes. F1 is the first plain
 requirement violation this feature has produced; everything before it was documentation drift.
 
-- [ ] T094 Make one cable produce one link when only one side names a far-end port, per FR-009
+- [X] T094 Make one cable produce one link when only one side names a far-end port, per FR-009
   (partial). `farRef` in internal/graph/links.go returns `dev:<key>` when the far end resolved to an
   entity but the report named no port, because FR-011 identifies a link by its interfaces and there is
   no interface to name. The consequence is that the two ends of one cable build different references
@@ -724,7 +724,7 @@ requirement violation this feature has produced; everything before it was docume
   limitation: a `one_end` edge to `dev:B` is not wrong, it is less precise, and FR-009's "not two" is
   what it breaks. Whichever way it goes, the test is two reports of one cable where one names the
   far-end port and the other does not
-- [ ] T095 Decide what `from_spelling` is for, then make the code and data-model.md agree (contradicts).
+- [X] T095 Decide what `from_spelling` is for, then make the code and data-model.md agree (contradicts).
   `readReports` in internal/graph/links.go sets `fromPort: local, fromSpelling: local` from one value,
   `local_interface`, which internal/fact/fact.go marks `Canonical: true` and the parser has already
   normalised. So `from_spelling` on a one-sided edge is always byte-identical to the name inside
