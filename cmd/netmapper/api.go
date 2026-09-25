@@ -32,8 +32,10 @@ func cmdAPI(ctx context.Context, args []string) int {
 		return fail("connect", err)
 	}
 	defer db.Close()
-	if _, err := raw.Client.BucketExists(ctx, raw.Bucket); err != nil {
+	if ok, err := raw.Client.BucketExists(ctx, raw.Bucket); err != nil {
 		return fail("object store", err)
+	} else if !ok {
+		return fail("object store", fmt.Errorf("bucket %s does not exist", raw.Bucket))
 	}
 
 	srv := &http.Server{Addr: *listen, Handler: api.New(db, raw).Handler(), ReadHeaderTimeout: 10 * time.Second}

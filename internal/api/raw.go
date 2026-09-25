@@ -56,7 +56,7 @@ func (s *Server) observation(w http.ResponseWriter, r *http.Request, tx pgx.Tx) 
 	rows, err := tx.Query(ctx, `
 		SELECT r.step_id, r.command, r.hash, o.size
 		FROM observation_raw r JOIN raw_object o ON o.hash = r.hash
-		WHERE r.snapshot_id = $1 AND r.observation_id = $2 ORDER BY r.step_id`, o.SnapshotID, o.ID)
+		WHERE r.snapshot_id = $1 AND r.observation_id = $2 ORDER BY length(r.step_id), r.step_id`, o.SnapshotID, o.ID)
 	if err != nil {
 		return err
 	}
