@@ -29,6 +29,15 @@ the ones to challenge first in `/speckit-clarify`.
   its endpoints already carry stable names, so an edge's name is derivable from them and needs no
   registry, no mint and no operator decision. This keeps the feature far smaller than 003.
 
+## Clarifications
+
+### Session 2026-09-25
+
+- Q: When a neighbour report names a remote device only by its system name, should the link attach to a device entity whose hostname matches? → A: No. Chassis identifier, then management address, in that order; the system name is recorded but never resolves an endpoint.
+- Q: If one device reports the same cable under two discovery protocols, one link or two? → A: One link. The protocol is evidence, not identity: the link records every protocol that reported it and cites each report.
+- Q: When a remote identifier in a neighbour report matches more than one device entity, which one does the link attach to? → A: None. The link stays one-sided, carrying the identifier; the identity conflict that split the entities already reports the cause.
+- Q: What makes two reports about one pair of devices a contradiction rather than two separate cables? → A: They name one port in common and a different port opposite it. Reports sharing no port are two cables, each known from one side.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A device has ports, and they are called one thing (Priority: P1)
@@ -135,12 +144,16 @@ it, and confirm the link exists, is marked as one-sided, and names what little i
 - A neighbour reports a remote port spelled in a way no naming rule matches. The spelling is kept as the
   alias it is, and the canonical name falls back to the spelling itself rather than to nothing.
 - Three or more devices report the same link, which a shared medium or a mistaken report can produce. The
-  result must not silently pick two of them and discard the rest.
+  result must not silently pick two of them and discard the rest. Each pair of them agrees with itself, so
+  a shared segment is several links and not a contradiction.
 - Two devices report each other but disagree about which ports are cabled. That is a contradiction of the
   same shape identity resolution already reports, and the result must not invent a link neither side
   described.
 - A device is reached on two addresses, so resolution collapsed two observations into one entity. Its
   interfaces must not be duplicated per address.
+- A neighbour reports a chassis identifier that two entities of the snapshot both carry, which identity
+  resolution produces when it refuses to merge a component that contradicts itself. The link attaches to
+  neither and stays known from one side.
 - A snapshot has an entity set but no interface and no neighbour observation at all. It projects to nothing
   and is recorded as projected, not as pending.
 - A snapshot is projected again after a parser fix changed which interfaces or neighbours exist. The result
@@ -176,14 +189,24 @@ it, and confirm the link exists, is marked as one-sided, and names what little i
 - **FR-010**: A link reported by one end only MUST still be recorded, MUST be marked as known from one side,
   and MUST carry whatever the report said about the far end.
 - **FR-011**: A link MUST be identified by the pair of interfaces it connects, so that two devices cabled on
-  several ports produce one link per cable.
-- **FR-012**: When a neighbour report names a remote device by an identifier or an address that the
-  snapshot's entity set already accounts for, the link MUST attach to that entity; when it names one that
-  nothing accounts for, the link MUST still be recorded against what is known.
+  several ports produce one link per cable. The discovery protocol a report arrived on MUST NOT be part of
+  that identity: two reports of one cable under two protocols are one link, which MUST record every
+  protocol that reported it and MUST cite the observation behind each report.
+- **FR-012**: When a neighbour report names a remote device by a chassis identifier or a management
+  address that the snapshot's entity set already accounts for, the link MUST attach to that entity,
+  matching on the chassis identifier first and the management address second. A remote system name MUST
+  be recorded against the link but MUST NOT on its own attach it to an entity, because a name is a weak
+  identifier and two devices may share one. When a report names a remote device that nothing accounts
+  for, the link MUST still be recorded against what is known. When an identifier matches more than one
+  entity, the link MUST NOT attach to any of them and MUST be recorded as known from one side, because
+  attributing it to one of several candidates is a guess the result could not be told apart from a fact.
 - **FR-013**: The system MUST record, as its own kind of edge, each address a device entity answered on.
-- **FR-014**: When two devices report each other but disagree about which ports are cabled, the system MUST
-  NOT invent a link neither side described, and MUST report the disagreement where the crawl and resolution
-  already report data quality problems.
+- **FR-014**: Two reports about the same pair of devices contradict each other when they name one port in
+  common and a different port opposite it, because one port cannot face two different far ends. Two reports
+  about one pair of devices that share no port are two separate cables, each known from one side, and are
+  not a contradiction. When reports contradict each other, the system MUST NOT invent a link neither side
+  described, MUST keep each side's own report as a link known from that side, and MUST report the
+  disagreement where the crawl and resolution already report data quality problems.
 - **FR-015**: An edge MUST carry a name derived from its endpoints, stable across runs for as long as the
   endpoints are, so that a later consumer can follow a link from one run to the next without rebuilding the
   graph. That name MUST NOT require a registry, a mint or an operator decision.
