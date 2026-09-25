@@ -148,65 +148,44 @@ because 003 made it so, and a canonical name is stable because the pack's rules 
 
 ### `attributes` shape
 
-For an agreed `l1_link`, where both endpoints are resolved ports:
+**The shapes themselves are asserted in `TestEdgeAttributeShapes`
+(`internal/graph/shapes_test.go`), and that test is the source of truth.** It projects a fixture
+covering every case the projector can produce and compares the exact key set of each. This section
+explains why the fields are what they are; the enumeration lives with the code, because it used to live
+in both places and the two disagreed four times running.
 
-```json
-{ "protocols": ["lldp"] }
-```
-
-For a one-sided one whose far end did resolve to an entity, which happens when that device never
-reported back:
-
-```json
-{ "protocols": ["lldp"], "to_spelling": "Et1" }
-```
-
-For a one-sided one whose far end no entity accounts for:
-
-```json
-{
-  "protocols": ["lldp"],
-  "to_spelling": "Et1",
-  "remote_system_name": "sw2",
-  "remote_chassis_id": "aa:bb:cc:00:00:02",
-  "remote_mgmt_address": "10.0.0.2",
-  "remote_mgmt_address_type": "ipv4"
-}
-```
-
-`protocols` is the set of discovery protocols that reported this cable, sorted. It is a set and not a
+`protocols` is the set of discovery protocols that reported a cable, sorted. It is a set and not a
 value because the protocol is not part of an edge's identity: one device reporting one cable over both
 LLDP and CDP produces one edge citing both observations (FR-011).
 
-Three shapes, and two conditions draw them apart.
-
-**`to_spelling` is on a one-sided link whose report named a far-end port, and nothing else carries a
-spelling.** Only the far end's wording can differ from the reference beside it: the parser
-canonicalises `local_interface` at collection time, so the near end has one form and it is already
-inside `from_ref`. An agreed link carries no spelling at all, because `interface_alias` is where a
-spelling lives, keyed to the port it names and to the observation that used it, and repeating one on
-the edge would give the same fact two homes that can disagree.
-
-A `from_spelling` attribute existed until T095 and never held anything but a copy of the canonical
-name, which is what a fourth pass over this section finally noticed.
+**`to_spelling` is carried by a one-sided link whose report named a far-end port, and nothing else
+carries a spelling.** Only the far end's wording can differ from the reference beside it: the parser
+canonicalises `local_interface` at collection time, so the near end has exactly one form and it is
+already inside `from_ref`. An agreed link carries no spelling at all, because `interface_alias` is
+where a spelling lives, keyed to the port it names and to the observation that used it, and repeating
+one on the edge would give the same fact two homes that can disagree.
 
 **The `remote_*` fields are carried only when the far end resolved to nothing**, because that is the
 case where no entity and no interface row holds them; FR-010 calls them "whatever the report said about
 the far end". Only the ones the report supplied are present, so a report giving a system name and
 nothing else carries `remote_system_name` alone.
 
-Four convergence passes were needed to get this section right, and it is worth knowing why. The first
-found the document promising spellings on every link where the projector writes them only for a
-one-sided one (T084). The second found that correction had replaced one wrong description with an
-incomplete one: two shapes where there are three, and the far spelling tied to an unresolved far end
-when the code does not do that (T088); the undocumented shape was the one the cEOS lab produced on its
-first run. The third found the sentence that replaced it still overstated, because `to_spelling`
-follows what the report named (T093). The fourth found that `from_spelling`, which all three earlier
-passes had argued about, could never hold anything but a copy of the canonical name, and removed it
-(T095). Prose describing a value that code assembles drifts every time either moves, and this section
-would hold still better as a grammar with a test asserting the shapes it produces.
+A `has_address` edge carries its address and nothing else.
 
-For a `has_address`: `{"address": "10.0.0.1"}`.
+#### Why this section points at a test
+
+Four convergence passes were needed to get it right, and every one of them was the prose being wrong
+about code that had not moved. The first found the document promising spellings on every link where the
+projector writes them only for a one-sided one (T084). The second found that correction had replaced
+one wrong description with an incomplete one, two shapes where there were three, and tied the far
+spelling to an unresolved far end when the code does not (T088); the undocumented shape was the one the
+cEOS lab produced on its first run. The third found the replacement sentence still overstated, because
+`to_spelling` follows what the report named (T093). The fourth found that `from_spelling`, which all
+three earlier passes had argued over, could never hold anything but a copy of the canonical name, and
+removed it (T095).
+
+The fix was not a better proof-read. A document that carries its own copy of a value code assembles
+drifts every time either one moves, so the copy is gone and the reasoning stayed.
 
 ## New table: `edge_evidence`
 
