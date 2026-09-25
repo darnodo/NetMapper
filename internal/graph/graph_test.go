@@ -409,3 +409,49 @@ func TestQuarantinedSnapshotIsProjected(t *testing.T) {
 		t.Error("the quarantined snapshot has no address edges")
 	}
 }
+
+// Code review, FR-013: a device entity that carries no identifier claim is still projected. Identity
+// resolution mints such a device on the address it answered on and marks it weak, which is what its
+// registry does when nothing strong is left to name a device with. Reaching entities through an inner
+// join on entity_claim dropped them silently: no ports, no address edge, and a projection row whose
+// count excluded them while reporting success.
+//
+// The claim rows are removed here rather than built absent, because every fakeos device emits at least
+// a weak hostname claim. What the projector sees is the same either way: an entity with attributes and
+// nothing in entity_claim.
+func TestEntityWithoutClaimsIsStillProjected(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p1 sw2 10.0.0.2 p1 "+MAC("S002")),
+		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1 p1 "+MAC("S001")),
+	})
+	ctx := context.Background()
+	before := l.Int(`SELECT count(*) FROM edge WHERE type = 'has_address'`)
+	if before != 2 {
+		t.Fatalf("%d address edges to begin with, want two", before)
+	}
+
+	if _, err := l.DB.Exec(ctx, `
+		DELETE FROM entity_claim WHERE entity_id = (SELECT id FROM entity WHERE device_key = $1)`,
+		key("S002")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := graph.Project(ctx, l.DB, l.Registry, snap(l)); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := l.Int(`SELECT count(*) FROM edge g JOIN entity e ON e.id = g.from_entity_id
+		WHERE g.type = 'has_address' AND e.device_key = $1`, key("S002")); n != 1 {
+		t.Errorf("%d address edges for the claimless entity, want the one it answered on (FR-013)", n)
+	}
+	if n := l.Int(`SELECT count(*) FROM interface i JOIN entity e ON e.id = i.entity_id
+		WHERE e.device_key = $1`, key("S002")); n == 0 {
+		t.Error("the claimless entity lost every port")
+	}
+	// And the count the projection reports still matches what is there.
+	got := l.Strings(`SELECT (p.interfaces = (SELECT count(*) FROM interface WHERE snapshot_id = p.snapshot_id))
+		|| ' ' || (p.edges = (SELECT count(*) FROM edge WHERE snapshot_id = p.snapshot_id))
+		FROM projection p WHERE p.snapshot_id = $1`, snap(l))
+	if len(got) != 1 || got[0] != "true true" {
+		t.Errorf("projection counts %v, want them to match the rows written", got)
+	}
+}

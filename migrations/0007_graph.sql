@@ -152,6 +152,11 @@ GRANT USAGE ON SEQUENCE interface_id_seq, edge_id_seq TO netmapper_operator;
 -- The collector gains nothing: it never reads an interface or an edge.
 
 -- +goose Down
+-- The narrower constraint is validated against the rows already there, so the findings this feature
+-- raised have to go first or the rollback fails on any snapshot that had a disagreement.
+DELETE FROM finding_evidence WHERE finding_id IN (
+    SELECT id FROM finding WHERE category = 'link_disagreement');
+DELETE FROM finding WHERE category = 'link_disagreement';
 ALTER TABLE finding DROP CONSTRAINT finding_category_check;
 ALTER TABLE finding ADD CONSTRAINT finding_category_check
     CHECK (category IN ('unknown_platform', 'parse_failed', 'credential_denied', 'identity_conflict'));

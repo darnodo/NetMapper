@@ -248,3 +248,36 @@ func TestInterfaceMACIsNotADevice(t *testing.T) {
 		}
 	}
 }
+
+// Code review, FR-004 and Principle I: an alias records who wrote a spelling and the observation that
+// proves it, and those two always come from the same report. A spelling first seen in a neighbour's
+// report and later written by the owner used to keep the neighbour's lower observation id while
+// flipping the source to `device`, so the row claimed the owner had named its own port while citing
+// evidence from another device entirely.
+//
+// The shape needed for it: a port the owner's interfaces recipe never listed, named by a neighbour
+// first, under a spelling that is already canonical so both sides record the same string. The fakeos
+// rule is `^p(\d+)$`, which leaves `port9` alone, so a report naming `port9` hides nothing.
+func TestAliasSourceAndEvidenceAgree(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		// sw1 is the seed, so its neighbours observation is written first and carries the lower id.
+		// It names port9 on sw2, a port sw2's own interfaces output never lists.
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p1 sw2 10.0.0.2 port9 "+MAC("S002")),
+		// sw2 then names that same port as the local end of its own report.
+		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p9 sw1 10.0.0.1 p1 "+MAC("S001")),
+	})
+
+	got := l.Strings(`SELECT a.source || ' ' || host(o.target)
+		FROM interface_alias a
+		JOIN interface i ON i.id = a.interface_id
+		JOIN entity e ON e.id = i.entity_id
+		JOIN observation o ON o.snapshot_id = a.snapshot_id AND o.id = a.observation_id
+		WHERE e.device_key = $1 AND i.canonical_name = 'port9' AND a.spelling = 'port9'`, key("S002"))
+	if len(got) != 1 {
+		t.Fatalf("%d alias rows for port9 on sw2, want one: %v", len(got), got)
+	}
+	// Whichever source won, the observation has to be one collected from the device that source names.
+	if got[0] != "device 10.0.0.2" {
+		t.Errorf("alias %q, want the owner's own naming cited by the owner's own observation", got[0])
+	}
+}

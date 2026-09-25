@@ -54,8 +54,6 @@ type entity struct {
 	// of these and must carry that one's range, not the entity's (FR-008).
 	answeredOn map[string]answer
 	ports      map[string]*iface
-	first      time.Time
-	last       time.Time
 }
 
 // answer is one identity observation an address produced.
@@ -129,30 +127,26 @@ type alias struct {
 // device named it while reporting the far end of a cable. That is the distinction US1 scenario 2 is
 // about, and it is not the one interface.source draws.
 //
-// The lowest observation id wins when the same spelling arrives twice, and a spelling the owner wrote
-// stays `device` however low the other observation's id is: a tie on the id must not flip the
-// meaning. Both are tie-breaks and both are tested with inputs that tie (research R5).
+// The source and the observation always come from the same report. A spelling first seen in a
+// neighbour's report and later written by the owner is replaced outright rather than keeping the
+// earlier observation, because an alias that says `device` while citing another device's observation
+// breaks the chain Principle I exists for: the row would claim the owner named its own port and point
+// at evidence where it did not. Within one source the earliest observation wins, which is the
+// tie-break tested with inputs that tie (research R5).
 func (p *iface) see(spelling, source string, obs int64) {
 	if spelling == "" {
 		return
 	}
-	a, ok := p.aliases[spelling]
-	if ok && a.source == sourceDevice && source != sourceDevice {
-		return
+	switch a, ok := p.aliases[spelling]; {
+	case !ok:
+	case a.source == source:
+		if a.obs <= obs {
+			return
+		}
+	case a.source == sourceDevice:
+		return // the owner's own naming outranks a neighbour's, whatever the observation ids are
 	}
-	if ok && a.obs <= obs && (a.source == source || source != sourceDevice) {
-		return
-	}
-	p.aliases[spelling] = alias{spelling: spelling, source: source, obs: min(obs, existing(a, ok, obs))}
-}
-
-// existing is the observation id already recorded for a spelling, or the new one when there is none,
-// so promoting a spelling to `device` keeps the earliest evidence rather than resetting it.
-func existing(a alias, ok bool, obs int64) int64 {
-	if ok {
-		return a.obs
-	}
-	return obs
+	p.aliases[spelling] = alias{spelling: spelling, source: source, obs: obs}
 }
 
 // edge is one relationship between two endpoints, named by them.
@@ -188,6 +182,7 @@ type disagreement struct {
 type projection struct {
 	snap     snapshot
 	entities []*entity // by device key
+	byTask   map[int64]*entity
 	edges    []*edge
 	findings []disagreement
 }
@@ -276,13 +271,17 @@ type snapshot struct {
 
 // describe reads the snapshot, the job that produced it, and whether it carries an entity set. A
 // snapshot with no resolution row is not projected and is not an error either (FR-001).
+//
+// The job comes from snapshot.job_id, which is NOT NULL and points at the one job that opened the
+// snapshot. job.snapshot_id is the back-pointer and carries no unique constraint, so reading the job
+// through it would pick an arbitrary row if one ever existed twice, and readFamily would then match
+// no task at all.
 func describe(ctx context.Context, db store.DB, id int64) (snapshot, error) {
 	s := snapshot{id: id}
 	var at *time.Time
 	err := db.QueryRow(ctx, `
-		SELECT s.state, j.id, r.computed_at
+		SELECT s.state, s.job_id, r.computed_at
 		FROM snapshot s
-		JOIN job j ON j.snapshot_id = s.id
 		LEFT JOIN resolution r ON r.snapshot_id = s.id
 		WHERE s.id = $1`, id).Scan(&s.state, &s.jobID, &at)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -294,58 +293,108 @@ func describe(ctx context.Context, db store.DB, id int64) (snapshot, error) {
 	return s, err
 }
 
-// readEntities reads the entity set with the find tasks behind it. An entity is reached from its
-// claims, each claim from its identity observation, and that observation's task is the find that
-// collected for the device: the neighbours observation carries the same task id, and the interfaces
-// observation is the child scrape's (research R2). Ordered by device key, then task, so the whole
-// projection runs in one fixed order (FR-017).
+// readEntities reads the entity set and the find tasks behind it. An entity is normally reached from
+// its claims: each claim carries its identity observation, and that observation's task is the find
+// that collected for the device, so the neighbours observation shares the task id and the interfaces
+// observation is the child scrape's (research R2).
+//
+// An entity can carry no claim at all. Identity resolution mints such a device on the address it
+// answered on and marks it weak, which is the case its registry handles explicitly when nothing
+// strong is left to name a device with. Reaching entities through an inner join on entity_claim
+// dropped those silently: no ports, no has_address edge, and a projection row reporting a count that
+// excluded them. So the entities are read on their own, the identity observations are read on their
+// own, and an observation with no claim is matched to the entity that recorded its address.
 func (p *projection) readEntities(ctx context.Context, db store.DB) error {
 	rows, err := db.Query(ctx, `
-		SELECT e.id, e.device_key, e.attributes, e.first_seen, e.last_seen,
-		       o.task_id, host(o.target), o.id, o.collected_at
-		FROM entity e
-		JOIN entity_claim ec ON ec.entity_id = e.id
-		JOIN identifier_claim c
-		  ON c.snapshot_id = ec.snapshot_id AND c.id = ec.identifier_claim_id
-		JOIN observation o ON o.snapshot_id = c.snapshot_id AND o.id = c.observation_id
-		WHERE e.snapshot_id = $1 AND o.fact_family = 'identity'
-		GROUP BY e.id, e.device_key, e.attributes, e.first_seen, e.last_seen,
-		         o.task_id, host(o.target), o.id, o.collected_at
-		ORDER BY e.device_key, o.task_id, o.id`, p.snap.id)
+		SELECT e.id, e.device_key, e.attributes
+		FROM entity e WHERE e.snapshot_id = $1 ORDER BY e.device_key`, p.snap.id)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
 	byID := map[int64]*entity{}
+	byTarget := map[string]*entity{}
 	for rows.Next() {
 		var (
-			id, task, obs   int64
-			key, target     string
-			attrs           []byte
-			first, last, at time.Time
+			id    int64
+			key   string
+			attrs []byte
 		)
-		if err := rows.Scan(&id, &key, &attrs, &first, &last, &task, &target, &obs, &at); err != nil {
+		if err := rows.Scan(&id, &key, &attrs); err != nil {
 			return err
 		}
-		e := byID[id]
+		var a struct {
+			Platform    string            `json:"platform"`
+			Targets     []string          `json:"targets"`
+			Identifiers map[string]string `json:"identifiers"`
+		}
+		if err := json.Unmarshal(attrs, &a); err != nil {
+			return err
+		}
+		e := &entity{id: id, key: key, platform: a.Platform, targets: a.Targets,
+			identifiers: a.Identifiers, answeredOn: map[string]answer{},
+			ports: map[string]*iface{}}
+		byID[id] = e
+		p.entities = append(p.entities, e)
+		for _, t := range a.Targets {
+			// An address belongs to one device, so a second claimant means neither can be matched on
+			// it and the fallback below simply finds nothing.
+			if seen, ok := byTarget[t]; ok && seen != e {
+				byTarget[t] = nil
+			} else if !ok {
+				byTarget[t] = e
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return p.readIdentities(ctx, db, byID, byTarget)
+}
+
+// readIdentities attaches each identity observation of the snapshot to the entity it belongs to, by
+// claim where there is one and by the address it answered on where there is not. Ordered by task then
+// observation, so the tasks of an entity and the first observation recorded per address are the same
+// on every run (FR-017).
+func (p *projection) readIdentities(ctx context.Context, db store.DB, byID map[int64]*entity, byTarget map[string]*entity) error {
+	rows, err := db.Query(ctx, `
+		SELECT o.task_id, host(o.target), o.id, o.collected_at,
+		       (SELECT min(ec.entity_id) FROM entity_claim ec
+		        JOIN identifier_claim c
+		          ON c.snapshot_id = ec.snapshot_id AND c.id = ec.identifier_claim_id
+		        WHERE c.snapshot_id = o.snapshot_id AND c.observation_id = o.id)
+		FROM observation o
+		WHERE o.snapshot_id = $1 AND o.fact_family = 'identity' AND o.status = 'collected'
+		ORDER BY o.task_id, o.id`, p.snap.id)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	p.byTask = map[int64]*entity{}
+	for rows.Next() {
+		var (
+			task, obs int64
+			target    string
+			at        time.Time
+			entityID  *int64
+		)
+		if err := rows.Scan(&task, &target, &obs, &at, &entityID); err != nil {
+			return err
+		}
+		var e *entity
+		if entityID != nil {
+			e = byID[*entityID]
+		} else {
+			e = byTarget[target]
+		}
 		if e == nil {
-			var a struct {
-				Platform    string            `json:"platform"`
-				Targets     []string          `json:"targets"`
-				Identifiers map[string]string `json:"identifiers"`
-			}
-			if err := json.Unmarshal(attrs, &a); err != nil {
-				return err
-			}
-			e = &entity{id: id, key: key, platform: a.Platform, targets: a.Targets,
-				identifiers: a.Identifiers, answeredOn: map[string]answer{},
-				ports: map[string]*iface{}, first: first, last: last}
-			byID[id] = e
-			p.entities = append(p.entities, e)
+			continue // an observation resolution did not account for
 		}
 		if !slices.Contains(e.tasks, task) {
 			e.tasks = append(e.tasks, task)
+			p.byTask[task] = e
 		}
 		if _, ok := e.answeredOn[target]; !ok {
 			e.answeredOn[target] = answer{obs: obs, at: at}
@@ -367,12 +416,6 @@ type famRow struct {
 // the find; a `neighbours` observation belongs to the find itself, so both are reached by resolving
 // the observation's task to its find.
 func (p *projection) readFamily(ctx context.Context, db store.DB, family string) ([]famRow, error) {
-	byTask := map[int64]*entity{}
-	for _, e := range p.entities {
-		for _, t := range e.tasks {
-			byTask[t] = e
-		}
-	}
 	rows, err := db.Query(ctx, `
 		SELECT coalesce(t.parent_task_id, o.task_id), o.task_id, o.id, o.collected_at, o.parsed
 		FROM observation o
@@ -396,9 +439,9 @@ func (p *projection) readFamily(ctx context.Context, db store.DB, family string)
 		}
 		// The observation's own task first: a neighbours observation is written by the find itself.
 		// Its parent second: an interfaces observation is written by the find's scrape.
-		owner := byTask[task]
+		owner := p.byTask[task]
 		if owner == nil {
-			owner = byTask[parent]
+			owner = p.byTask[parent]
 		}
 		if owner == nil {
 			continue // collected for a device the entity set does not account for

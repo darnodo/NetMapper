@@ -1,10 +1,12 @@
 package graph
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -96,9 +98,9 @@ func (p *projection) writePorts(ctx context.Context, tx pgx.Tx) error {
 // writeEdges writes the edges in name order with one evidence row per side. The interface ids come
 // from writePorts, which is why the order of the two is not an accident.
 func (p *projection) writeEdges(ctx context.Context, tx pgx.Tx) error {
-	slices.SortFunc(p.edges, func(a, b *edge) int {
-		return cmpString(a.name(), b.name())
-	})
+	// strings.Compare orders by byte, the way the edge_l1_link_is_ordered constraint does under the C
+	// collation, so the projector and the database never disagree about order (research R7).
+	slices.SortFunc(p.edges, func(a, b *edge) int { return strings.Compare(a.name(), b.name()) })
 	for _, e := range p.edges {
 		attrs, err := json.Marshal(e.attributes)
 		if err != nil {
@@ -115,10 +117,10 @@ func (p *projection) writeEdges(ctx context.Context, tx pgx.Tx) error {
 		}
 		b := &pgx.Batch{}
 		slices.SortFunc(e.evidence, func(x, y edgeEvidence) int {
-			if x.obs != y.obs {
-				return int(x.obs - y.obs)
+			if c := cmp.Compare(x.obs, y.obs); c != 0 {
+				return c
 			}
-			return cmpString(x.side, y.side)
+			return strings.Compare(x.side, y.side)
 		})
 		for _, ev := range e.evidence {
 			b.Queue(`INSERT INTO edge_evidence (edge_id, snapshot_id, observation_id, side)
@@ -134,7 +136,7 @@ func (p *projection) writeEdges(ctx context.Context, tx pgx.Tx) error {
 // writeFindings raises the disagreements this projection found, on the surface 001 established and
 // 003 already writes to (research R9).
 func (p *projection) writeFindings(ctx context.Context, tx pgx.Tx) error {
-	slices.SortFunc(p.findings, func(a, b disagreement) int { return cmpString(a.subject, b.subject) })
+	slices.SortFunc(p.findings, func(a, b disagreement) int { return strings.Compare(a.subject, b.subject) })
 	for _, d := range p.findings {
 		if err := store.RaiseFinding(ctx, tx, p.snap.id, "data_quality", "link_disagreement",
 			"warning", d.subject, d.detail, d.evidence...); err != nil {
@@ -163,16 +165,4 @@ func null(s string) any {
 		return nil
 	}
 	return s
-}
-
-// cmpString compares by byte, the way the edge_l1_link_is_ordered constraint does under the C
-// collation, so the projector and the database never disagree about order (research R7).
-func cmpString(a, b string) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
 }

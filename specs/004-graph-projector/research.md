@@ -34,10 +34,21 @@ reached on two addresses for free: resolution collapsed those claim groups into 
 find tasks map to it, and the interfaces they collected land on the same entity rather than being
 duplicated per address.
 
-**Alternatives considered**: matching on `observation.target`, which breaks precisely on the
-two-addresses case the spec calls out and on a device whose management address changed mid-run;
-adding an `entity_id` column to `observation`, which would put a computed value in the collected zone
-and break the rebuildability boundary Principle II draws.
+One entity cannot be reached that way: identity resolution mints a device on the address it answered
+on, and marks it weak, when nothing strong is left to name it with, and such an entity carries no
+claim at all. Reaching entities through an inner join on `entity_claim` dropped those silently, with
+no ports, no `has_address` edge and a `projection` row whose count excluded them while reporting
+success. So the entities and the identity observations are read separately, and an observation with no
+claim behind it is matched to the entity whose `attributes.targets` records its address. An address
+claimed by two entities matches neither, for the same reason an ambiguous identifier does. Added after
+a code review found the gap; no test had produced a claimless entity, because every fakeos device
+emits at least a weak hostname.
+
+**Alternatives considered**: matching on `observation.target` for *every* entity, which breaks
+precisely on the two-addresses case the spec calls out and on a device whose management address
+changed mid-run, and which is why the address is a fallback rather than the rule; adding an
+`entity_id` column to `observation`, which would put a computed value in the collected zone and break
+the rebuildability boundary Principle II draws.
 
 ## R3. Canonicalising the far end, and the engine reading packs
 
@@ -93,6 +104,14 @@ observations, the lowest observation id is kept.
 else calls this port something else" should not have to reconstruct the canonical spelling from the
 absence of a row. The lowest observation id is a tie-break, so it is tested with two observations
 carrying the same spelling for one port rather than assumed.
+
+The source and the observation always come from the same report. A spelling first seen in a
+neighbour's report and later written by the owner is replaced outright rather than keeping the earlier
+observation: an alias that reads `device` while citing another device's observation claims the owner
+named its own port and points at evidence where it did not, which is the chain Principle I exists for.
+The earliest observation wins only within one source. Added after a code review; the original rule
+kept the lower id across a change of source, and no test caught it because the fakeos naming rules
+make the two spellings differ, while a real platform reports the far end verbatim.
 
 **Alternatives considered**: recording only the spellings that differ from the canonical name, which
 makes the table a diff against a value stored elsewhere and loses which observation used it; storing
