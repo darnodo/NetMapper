@@ -45,13 +45,23 @@ func Root() string {
 	return filepath.Join(filepath.Dir(file), "..", "..")
 }
 
-func NewLab(t testing.TB, net *fake.Network) *Lab {
-	db := DB(t)
-	raw := S3(t)
-	reg, err := pack.Load(filepath.Join(Root(), "packs", "_base"), filepath.Join(Root(), "internal", "pack", "testdata", "fakeos"))
+// Packs loads the pack set every test runs against: the _base probe pack and the fakeos test
+// platform. The graph projector takes a registry too, so a test that ticks the job runner without a
+// whole lab needs one of these.
+func Packs(t testing.TB) *pack.Registry {
+	t.Helper()
+	reg, err := pack.Load(filepath.Join(Root(), "packs", "_base"),
+		filepath.Join(Root(), "internal", "pack", "testdata", "fakeos"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	return reg
+}
+
+func NewLab(t testing.TB, net *fake.Network) *Lab {
+	db := DB(t)
+	raw := S3(t)
+	reg := Packs(t)
 	return &Lab{T: t, DB: db, Operator: As(t, db, "netmapper_operator"), Engine: As(t, db, "netmapper_engine"),
 		Col: As(t, db, "netmapper_collector"), Raw: raw, Registry: reg, Net: net, Log: io.Discard}
 }
@@ -103,7 +113,7 @@ func (l *Lab) RunCollector(c *collector.Collector) (stop func()) {
 // RunEngine runs the job runner until stop.
 func (l *Lab) RunEngine() (stop func()) {
 	return Go(func(ctx context.Context) {
-		jobrunner.Run(ctx, l.Engine, 20*time.Millisecond, slog.New(slog.NewJSONHandler(l.Log, nil)))
+		jobrunner.Run(ctx, l.Engine, l.Registry, 20*time.Millisecond, slog.New(slog.NewJSONHandler(l.Log, nil)))
 	})
 }
 
@@ -135,27 +145,32 @@ func (l *Lab) Crawl(doc string) int64 {
 	return job
 }
 
-// Settle waits for the verdict and the entity set of the snapshot this job closed. Crawl calls it; a
-// test that builds its own crawl, to start a job on another perimeter for instance, has to call it too.
+// Settle waits for the verdict, the entity set and the projection of the snapshot this job closed.
+// Crawl calls it; a test that builds its own crawl, to start a job on another perimeter for instance,
+// has to call it too.
 //
-// A job reaches succeeded inside the tick that closes its snapshot, before that same tick judges and
-// resolves it, so Wait returning is not the engine being done. Without this, stopping the engine can
-// cancel the sweep mid-way and a test reads a snapshot that closed but was never judged or resolved.
-// It gives up at once on a snapshot that did not close, since nothing will sweep it.
+// A job reaches succeeded inside the tick that closes its snapshot, before that same tick judges,
+// resolves and projects it, so Wait returning is not the engine being done. Without this, stopping the
+// engine can cancel the sweep mid-way and a test reads a snapshot that closed but was never judged,
+// resolved or projected. It gives up at once on a snapshot that did not close, since nothing will
+// sweep it.
 func (l *Lab) Settle(job int64) {
 	ctx := context.Background()
 	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
 		var state string
-		var judged, resolved bool
+		var judged, resolved, projected bool
 		err := l.DB.QueryRow(ctx, `
 			SELECT s.state,
 			       EXISTS (SELECT 1 FROM snapshot_judgement x WHERE x.snapshot_id = s.id AND x.active),
-			       EXISTS (SELECT 1 FROM resolution r WHERE r.snapshot_id = s.id)
-			FROM snapshot s JOIN job j ON j.snapshot_id = s.id WHERE j.id = $1`, job).Scan(&state, &judged, &resolved)
+			       EXISTS (SELECT 1 FROM resolution r WHERE r.snapshot_id = s.id),
+			       EXISTS (SELECT 1 FROM projection p JOIN resolution r ON r.snapshot_id = p.snapshot_id
+			               WHERE p.snapshot_id = s.id AND p.resolution_at = r.computed_at)
+			FROM snapshot s JOIN job j ON j.snapshot_id = s.id WHERE j.id = $1`,
+			job).Scan(&state, &judged, &resolved, &projected)
 		if err != nil || state != "closed" {
 			return
 		}
-		if judged && resolved {
+		if judged && resolved && projected {
 			return
 		}
 	}
@@ -209,8 +224,10 @@ type Shape struct {
 var Both = Shape{Serial: true, MAC: true}
 
 // FakeOS is a device of the fakeos test pack, printing both its strong identifiers. Neighbours are
-// "<local port> <name> <address>", where the address is an IP, a MAC or "-" for none; its fakeos
-// type is derived from it.
+// "<local port> <name> <address> [<remote port>] [<chassis id>]", where the address is an IP, a MAC
+// or "-" for none and its fakeos type is derived from it. The last two fields are optional and
+// default to "-", which the pack maps to nothing: a report that names no far-end port and no chassis
+// identifier, which is all 001 and 003 ever needed.
 func FakeOS(name, serial string, neighbours ...string) *fake.Device {
 	return FakeOSShaped(name, serial, Both, neighbours...)
 }
@@ -229,7 +246,8 @@ func FakeOSShaped(name, serial string, shape Shape, neighbours ...string) *fake.
 		} else if f[2] == "-" {
 			typ = "-"
 		}
-		fmt.Fprintf(&nb, "%s %s %s %s %s\n", f[0], f[1], typ, f[2], "aa:bb:cc:ff:ff:ff")
+		remote, chassis := field(f, 3), field(f, 4)
+		fmt.Fprintf(&nb, "%s %s %s %s %s %s\n", f[0], f[1], typ, f[2], chassis, remote)
 	}
 	version := "FakeOS 1.2\nHostname: " + name + "\n"
 	if shape.Serial {
@@ -254,6 +272,16 @@ func FakeOSShaped(name, serial string, shape Shape, neighbours ...string) *fake.
 		},
 		SNMP: snmp,
 	}
+}
+
+// field reads an optional neighbour field, "-" when the entry stopped short. A chassis identifier
+// omitted this way is "-" rather than a shared fake value: the graph projector matches a far end on
+// it, so every device declaring the same one would make every cable land on the same device.
+func field(f []string, i int) string {
+	if i < len(f) {
+		return f[i]
+	}
+	return "-"
 }
 
 // MAC is the chassis MAC FakeOS derives from a serial, for a test that needs to name it.

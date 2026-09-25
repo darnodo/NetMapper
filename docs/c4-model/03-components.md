@@ -35,7 +35,7 @@ Two of these carry the extensibility. The pack registry is the only component th
 
 ![Engine components](diagrams/components-engine.svg)
 
-Nothing here touches a device. The engine reads what the collector wrote, computes, and writes back.
+Nothing here touches a device. The engine reads what the collector wrote, computes, and writes back. It loads platform packs for one thing only, the interface naming rules the graph projector needs for the far end of a cable.
 
 The scheduler fires and the job runner enqueues a run. When a run's queue empties, the same runner closes the snapshot and the chain of computation follows: the identity resolver turns claims into entities, the graph projector builds vertices and edges with their evidence, the gate measures coverage and decides how the snapshot is published, the diff engine compares it to the previous one, and the reconciler compares it to intent.
 
@@ -44,7 +44,7 @@ The scheduler fires and the job runner enqueues a run. When a run's queue emptie
 | Scheduler | cron definitions, one active run per perimeter, missed occurrences skipped |
 | Job runner | job states, progress counters, the final retry pass before a snapshot closes |
 | Identity resolver | groups identifier claims, merges on strong ones, quarantines conflicts, applies splits |
-| Graph projector | entities and typed edges, each with its evidence and its confidence |
+| Graph projector | interfaces with every spelling ever seen, and typed edges, each with its evidence and how well it is known. Builds `l1_link` and `has_address` today; `attached` and `protocol_adjacency` wait on fact families nothing collects yet |
 | Snapshot gate | coverage metrics, then published, degraded or quarantined |
 | Diff engine | two snapshots compared, with the rule that only a successful collection allows a disappearance |
 | Reconciler | matches the observed graph against an intent version, produces the gap findings |

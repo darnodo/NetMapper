@@ -134,7 +134,13 @@ because 003 made it so, and a canonical name is stable because the pack's rules 
 
 ### `attributes` shape
 
-For an `l1_link`:
+For an agreed `l1_link`, where both endpoints are resolved ports:
+
+```json
+{ "protocols": ["lldp"] }
+```
+
+For a one-sided one whose far end no entity accounts for:
 
 ```json
 {
@@ -150,10 +156,18 @@ For an `l1_link`:
 
 `protocols` is the set of discovery protocols that reported this cable, sorted. It is a set and not a
 value because the protocol is not part of an edge's identity: one device reporting one cable over both
-LLDP and CDP produces one edge citing both observations (FR-011). The spellings are what each side
-actually wrote, kept so a reader sees the disagreement in vocabulary that the aliases resolved. The four `remote_*` fields are what FR-010 calls "whatever the report said
-about the far end"; they are present on a `one_end` edge whose far end resolved to nothing, and
-omitted when they add nothing to a resolved endpoint.
+LLDP and CDP produces one edge citing both observations (FR-011).
+
+Everything else is carried by a one-sided link only. The four `remote_*` fields are what FR-010 calls
+"whatever the report said about the far end", and they exist because there is no endpoint row to hold
+them; on an agreed link the two endpoints already say all of it. The spellings go with them for the
+same reason: `interface_alias` is where a spelling lives, keyed to the port it names and to the
+observation that used it, and repeating one on an agreed edge would give the same fact two homes that
+can disagree. On a one-sided link whose far end resolved to nothing there is no port row to hang the
+far spelling off, so the edge keeps it.
+
+This was the other way round until a convergence pass found the document describing spellings the
+projector writes only for a one-sided link (T084).
 
 For a `has_address`: `{"address": "10.0.0.1"}`.
 

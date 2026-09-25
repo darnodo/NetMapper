@@ -41,7 +41,7 @@ One binary, one image, three roles selected by subcommand. Three binaries would 
 
 The frontier lives in PostgreSQL rather than in a collector's memory, which is what makes three things possible at once: a crash loses nothing, a device is never visited twice after a restart, and several collectors can share one frontier the day network reach requires it.
 
-The `engine` never opens a session to a device, so the component doing the heavy computation has no reason to hold a secret and no path to the network. The `api` never does either, so the component anyone can reach cannot log into anything.
+The `engine` never opens a session to a device, so the component doing the heavy computation has no reason to hold a secret and no path to the network. It does load platform packs, as read-only data: the graph projector applies a pack's interface naming rules to the port a neighbour reports for the far end of a cable, and it is the first component that knows both the spelling and the far end's platform. A pack holds no secret and loading one opens nothing. The `api` never does either, so the component anyone can reach cannot log into anything.
 
 Splitting the finder from the scraper inside the collector is a separate question, and it is not about throughput. One Go process handles thousands of concurrent sessions.
 

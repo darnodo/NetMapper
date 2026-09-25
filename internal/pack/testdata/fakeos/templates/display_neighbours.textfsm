@@ -3,8 +3,9 @@ Value NAME (\S+)
 Value TYPE (\S+)
 Value ADDRESS (\S+)
 Value CHASSIS (\S+)
+Value REMOTE (\S+)
 
 Start
-  ^${LOCAL}\s+${NAME}\s+${TYPE}\s+${ADDRESS}\s+${CHASSIS}\s*$$ -> Record
+  ^${LOCAL}\s+${NAME}\s+${TYPE}\s+${ADDRESS}\s+${CHASSIS}\s+${REMOTE}\s*$$ -> Record
   ^\s*$$
   ^. -> Error

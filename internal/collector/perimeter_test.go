@@ -60,7 +60,10 @@ func TestNeighbourOutsidePerimeter(t *testing.T) {
 	}
 	row := l.Strings(`SELECT r::text FROM observation, jsonb_array_elements(parsed) r
 		WHERE fact_family = 'neighbours' AND r ->> 'remote_system_name' = 'byname'`)
-	if len(row) != 1 || row[0] != `{"protocol": "lldp", "local_interface": "port3", "remote_chassis_id": "aa:bb:cc:ff:ff:ff", "remote_system_name": "byname"}` {
+	// No chassis identifier: the neighbour entry names none, and the fakeos pack maps its "-" to
+	// nothing. Until 004 the helper printed one shared fake chassis for every device, which the graph
+	// projector would have read as every cable landing on the same box.
+	if len(row) != 1 || row[0] != `{"protocol": "lldp", "local_interface": "port3", "remote_system_name": "byname"}` {
 		t.Errorf("name-only neighbour row %v", row)
 	}
 	if n := l.Int(`SELECT count(*) FROM task WHERE target_name IN ('byname', 'macnb')`); n != 0 {

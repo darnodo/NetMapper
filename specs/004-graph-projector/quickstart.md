@@ -220,3 +220,37 @@ Expected: true again once the sweep has run.
 
 Recorded here as they are found, the way 003's quickstart did, so the reference and the behaviour stay
 corrected in the same change.
+
+1. **"Projects to nothing" does not include the addresses.** The spec's edge case says a snapshot with
+   an entity set but no interface and no neighbour observation "projects to nothing". That holds for
+   everything those two families feed, so no interface and no link, and it does not hold for the
+   `has_address` edges: FR-013 builds those from the entity set rather than from a fact family, so a
+   device that answered still gets one. The test asserts `0 interfaces, 1 edge` rather than nothing.
+2. **`interface.source` and `interface_alias.source` answer two different questions**, and sharing a
+   pair of values made that easy to miss. On the interface, `neighbour` means the interfaces recipe
+   never listed this port. On the alias, `neighbour` means another device wrote this spelling while
+   reporting a cable; a device naming its own port as the local end of its own neighbours row is
+   `device`, even though that same row is what created the port. The first implementation labelled the
+   owner's own spelling `neighbour`, which the alias test caught.
+3. **The empty far end had to be tested before the references were sorted.** A report saying nothing
+   about the far end yields an empty reference, which sorts before every other, so after sorting it is
+   indistinguishable from a near end that happens to sort low. The first implementation checked the
+   sorted pair and produced an edge with no resolved endpoint, which `edge_from_is_resolved` rejected.
+   The constraint did its job; the check moved before the sort.
+4. **`testutil.Settle` had to learn about projections.** A job reaches `succeeded` inside the tick that
+   closes its snapshot, before that same tick judges, resolves and now projects it, so stopping the
+   engine could cancel the sweep mid-way. 003 added `Settle` for the entity set; it now waits for a
+   `projection` row whose `resolution_at` matches the resolution too.
+5. **The fakeos neighbours template gained a column, and an older test was feeding it the old one.**
+   `internal/parse` TestOutcomes passed a five-column line to a six-column template, got
+   `parse_failed` and no rows, and panicked indexing them. Adding a far-end port to a pack's data is a
+   pack change that reaches every test built on that pack, which is the cost of vendor specifics being
+   data rather than code, and a cheap one.
+6. **`pack.LoadRoot` does not follow symlinks.** It lists a directory with `os.ReadDir` and keeps the
+   entries reporting themselves as directories, which a symlink does not. A test that assembles a pack
+   root has to copy. Worth knowing before anyone deploys a pack directory built out of links.
+7. **An engine pointed at the wrong pack directory degrades quietly.** With no pack for a platform,
+   `Normalise` returns the spelling unchanged, which is correct for an unknown platform (FR-005) and,
+   for a known one loaded from the wrong directory, silently produces a second interface per port and
+   links that never pair. It is not an error and nothing reports it. Worth a thought when the API
+   feature gives these rows a surface.

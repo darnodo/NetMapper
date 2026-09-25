@@ -33,7 +33,7 @@ func TestSweepResolvesClosedSnapshots(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := jobrunner.Tick(ctx, l.Engine); err != nil {
+	if err := jobrunner.Tick(ctx, l.Engine, l.Registry); err != nil {
 		t.Fatal(err)
 	}
 	if n := l.Int(`SELECT count(*) FROM resolution WHERE snapshot_id = $1`, snap); n != 1 {
@@ -45,7 +45,7 @@ func TestSweepResolvesClosedSnapshots(t *testing.T) {
 
 	// And it does not redo one it has already done, whatever changed since (FR-017).
 	before := l.Strings(`SELECT computed_at::text FROM resolution WHERE snapshot_id = $1`, snap)
-	if err := jobrunner.Tick(ctx, l.Engine); err != nil {
+	if err := jobrunner.Tick(ctx, l.Engine, l.Registry); err != nil {
 		t.Fatal(err)
 	}
 	if after := l.Strings(`SELECT computed_at::text FROM resolution WHERE snapshot_id = $1`, snap); after[0] != before[0] {

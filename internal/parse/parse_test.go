@@ -56,9 +56,20 @@ func TestOutcomes(t *testing.T) {
 	if s, _, err := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("Neighbour table v2\n---\n")}); s != ParseFailed || err == nil {
 		t.Errorf("drift: %s %v", s, err)
 	}
-	s, rows, err := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("p1 sw2 ip4 10.0.0.2 aa:bb:cc:00:00:02\np2 sw3 mac AABB.CCDD.EEFF aa:bb:cc:00:00:03\n")})
+	// Six columns: local port, name, address type, address, chassis id, far-end port. The last is what
+	// 004 added, and it is the one the parser leaves alone: a far end's spelling cannot be
+	// canonicalised until that device's platform is known, which is the graph projector's job.
+	s, rows, err := Parse(r, "fakeos", "neighbours", im, [][]byte{[]byte("p1 sw2 ip4 10.0.0.2 aa:bb:cc:00:00:02 p7\np2 sw3 mac AABB.CCDD.EEFF aa:bb:cc:00:00:03 -\n")})
 	if s != Collected || err != nil || rows[0]["protocol"] != "lldp" || rows[0]["local_interface"] != "port1" {
-		t.Errorf("neighbours: %s %v %v", s, rows, err)
+		t.Fatalf("neighbours: %s %v %v", s, rows, err)
+	}
+	// The local port is canonical, p1 becoming port1; the far end's is kept exactly as reported, and a
+	// "-" means the report named no port at all.
+	if rows[0]["remote_interface"] != "p7" {
+		t.Errorf("far-end spelling %v, want it kept verbatim", rows[0]["remote_interface"])
+	}
+	if _, ok := rows[1]["remote_interface"]; ok {
+		t.Errorf("a report naming no far-end port still carries one: %v", rows[1])
 	}
 	// The address keeps its type; a MAC is normalised, an IP is left as given.
 	if rows[0]["remote_mgmt_address_type"] != "ipv4" || rows[0]["remote_mgmt_address"] != "10.0.0.2" ||

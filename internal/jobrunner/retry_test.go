@@ -46,7 +46,7 @@ func TestTaskThatKeepsCrashing(t *testing.T) {
 	if got := state(); got[0] != "failed:lease_expired:_2_attempts" {
 		t.Fatalf("after crashes: %v", got)
 	}
-	if err := jobrunner.Tick(ctx, eng); err != nil {
+	if err := jobrunner.Tick(ctx, eng, testutil.Packs(t)); err != nil {
 		t.Fatal(err)
 	}
 	var attempts int
@@ -55,7 +55,7 @@ func TestTaskThatKeepsCrashing(t *testing.T) {
 		t.Fatalf("final pass did not requeue: %v, attempts %d", got, attempts)
 	}
 	crashUntilFailed()
-	jobrunner.Tick(ctx, eng) // nothing pending or claimed, final pass done: close
+	jobrunner.Tick(ctx, eng, testutil.Packs(t)) // nothing pending or claimed, final pass done: close
 	var jobState, snapState string
 	db.QueryRow(ctx, `SELECT j.state, s.state FROM job j JOIN snapshot s ON s.id = j.snapshot_id WHERE j.id = $1`, job).Scan(&jobState, &snapState)
 	if got := state(); got[0] != "failed:lease_expired:_2_attempts" || jobState != "succeeded" || snapState != "closed" {
