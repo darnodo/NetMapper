@@ -701,3 +701,37 @@ there, which is noted at the end of this phase.
 > section is hand-written prose describing a string that code builds. It would drift less as a short
 > grammar with a test asserting the shapes it produces. That is a change to how the artifact is
 > written rather than a gap in this feature, so it is recorded here rather than made a task.
+
+---
+
+## Phase 10: Convergence
+
+Found by `/speckit-converge` after two code-review passes and their fixes. F1 is the first plain
+requirement violation this feature has produced; everything before it was documentation drift.
+
+- [ ] T094 Make one cable produce one link when only one side names a far-end port, per FR-009
+  (partial). `farRef` in internal/graph/links.go returns `dev:<key>` when the far end resolved to an
+  entity but the report named no port, because FR-011 identifies a link by its interfaces and there is
+  no interface to name. The consequence is that the two ends of one cable build different references
+  and land in different groups: A reporting B with a port keys `if:A/pA|if:B/port1`, while B reporting
+  A without one keys `dev:A|if:B/port1`. Two `one_end` edges for one cable, where FR-009 says two
+  reports describing the same cable from opposite ends must produce one link marked as agreed by both
+  ends. `remote_interface` is optional in internal/fact/fact.go:41, so this fires on any platform that
+  omits a far-end port id, which CDP and some LLDP implementations do.
+  This is a change to the endpoint model, not a patch: a `dev:` endpoint has to be able to merge into
+  an `if:` group of the same device once another report names the port, which means grouping cannot
+  stay a plain map keyed on the sorted reference pair. Weigh it against simply recording the
+  limitation: a `one_end` edge to `dev:B` is not wrong, it is less precise, and FR-009's "not two" is
+  what it breaks. Whichever way it goes, the test is two reports of one cable where one names the
+  far-end port and the other does not
+- [ ] T095 Decide what `from_spelling` is for, then make the code and data-model.md agree (contradicts).
+  `readReports` in internal/graph/links.go sets `fromPort: local, fromSpelling: local` from one value,
+  `local_interface`, which internal/fact/fact.go marks `Canonical: true` and the parser has already
+  normalised. So `from_spelling` on a one-sided edge is always byte-identical to the name inside
+  `from_ref`, and the sentence in data-model.md, "a one-sided link has exactly one report, so the edge
+  is the only place recording how that report worded things", is true of `to_spelling` and false of
+  `from_spelling`. Two ways out: drop the attribute, which is the smaller change and loses nothing
+  since the canonical name is already in the reference and in `interface_alias`; or add a
+  pre-canonical local spelling to the `neighbours` fact family so the parser keeps what the device
+  actually printed, which is the only way the attribute earns its name. The second is a pack and
+  schema change reaching back into collection, so it is a real decision rather than a cleanup
