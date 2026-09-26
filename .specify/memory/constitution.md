@@ -93,6 +93,9 @@ being a directory of data and becomes a patch.
   that happens to be convenient. A suite that connects as one role proves one role.
 - A document that describes behaviour MUST be corrected in the same change as the behaviour, not
   only in the record of divergences. A divergence note explains why; the reference says what ships.
+  The README and the guides in `docs/how-to/` are such documents: a change to a command, a flag, an
+  environment variable, a configuration key, an endpoint or the pack format updates them in the same
+  change.
 - A rule that settles a tie MUST be tested with inputs that actually tie. Determinism assumed on
   one input is determinism untested.
 
@@ -105,4 +108,4 @@ principle, MINOR for adding one or materially expanding guidance, PATCH for clar
 Reviews verify compliance with the five principles. Complexity that violates one is either
 justified in writing at the point it is introduced or removed. Principle III admits no exception.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-25
+**Version**: 1.2.1 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-26
