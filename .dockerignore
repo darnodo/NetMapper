@@ -1,0 +1,11 @@
+.git
+.github
+.claude
+.specify
+.devcontainer
+specs
+docs
+test
+deploy
+/netmapper
+packs/*.go

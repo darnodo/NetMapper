@@ -1,0 +1,55 @@
+# Code quality: runs on every pull request, and from release.yml before anything is built.
+name: quality
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt-formatted:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+      # The integration tests need PostgreSQL and Garage; they run against the same compose file
+      # developers use, so the CI cannot drift from it.
+      - name: start PostgreSQL and Garage
+        run: |
+          docker compose -f deploy/compose.yaml up -d --wait postgres garage
+          docker compose -f deploy/compose.yaml run --rm garage-init
+
+      - name: go test
+        env:
+          NETMAPPER_TEST_DSN: postgres://netmapper:netmapper@localhost:5432/netmapper?sslmode=disable
+          NETMAPPER_TEST_S3_ENDPOINT: localhost:3900
+        run: go test -count=1 ./...
+
+      # A test that skips for want of a database proves nothing, so a skip fails the job.
+      - name: no skipped test
+        env:
+          NETMAPPER_TEST_DSN: postgres://netmapper:netmapper@localhost:5432/netmapper?sslmode=disable
+          NETMAPPER_TEST_S3_ENDPOINT: localhost:3900
+        run: |
+          if go test -count=1 -v ./... | grep -- '--- SKIP'; then
+            echo "tests were skipped"; exit 1
+          fi
