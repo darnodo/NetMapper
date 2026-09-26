@@ -115,7 +115,7 @@ go test ./...
 ```
 
 Without the two variables the integration tests skip; the CI refuses a skipped test. Pull requests
-run gofmt, go vet, govulncheck and the full suite. Pushing a `v*` tag publishes the binaries and the
+run gofmt, go vet, govulncheck, the full suite, and gitleaks over the whole history. Pushing a `v*` tag publishes the binaries and the
 image.
 
 ## License
