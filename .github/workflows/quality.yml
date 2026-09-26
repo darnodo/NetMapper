@@ -53,3 +53,21 @@ jobs:
           if go test -count=1 -v ./... | grep -- '--- SKIP'; then
             echo "tests were skipped"; exit 1
           fi
+
+  # Every commit of the history, not only the diff: a secret removed in a later commit is still
+  # published. Known development values are allowlisted in .gitleaks.toml.
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gitleaks
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          gitleaks git --no-banner --redact .
