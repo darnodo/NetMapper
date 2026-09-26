@@ -1,6 +1,6 @@
-// Command netmapper is the one binary: `collector` and `engine` roles, and the operator
-// subcommands `migrate`, `run`, `cancel`, `judge`, `resolve`, `decide` and `project`
-// (contracts/cli.md).
+// Command netmapper is the one binary: `collector`, `engine` and `api` roles, and the operator
+// subcommands `migrate`, `run`, `cancel`, `judge`, `resolve`, `decide`, `project` and `token`
+// (contracts/cli.md, 005 contracts/rest.md).
 package main
 
 import (
@@ -35,6 +35,8 @@ var commands = map[string]func(ctx context.Context, args []string) int{
 	"project":   cmdProject,
 	"collector": cmdCollector,
 	"engine":    cmdEngine,
+	"api":       cmdAPI,
+	"token":     cmdToken,
 }
 
 func main() {
@@ -42,7 +44,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	if len(os.Args) < 2 || commands[os.Args[1]] == nil {
-		fmt.Fprintln(os.Stderr, "usage: netmapper migrate|run|cancel|judge|resolve|decide|project|collector|engine [flags]")
+		fmt.Fprintln(os.Stderr, "usage: netmapper migrate|run|cancel|judge|resolve|decide|project|token|collector|engine|api [flags]")
 		os.Exit(exitInvalid)
 	}
 	os.Exit(commands[os.Args[1]](ctx, os.Args[2:]))

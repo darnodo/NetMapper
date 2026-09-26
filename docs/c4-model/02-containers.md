@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | `collector` | Go | crawls, fingerprints, probes candidates, runs recipes, writes observations and raw output | no | yes, and it is the only one |
 | `engine` | Go | resolves identities, projects the graph, closes snapshots and applies the gate, computes diffs, reconciles with intent, schedules jobs, runs maintenance | no | no |
-| `api` | Go | REST and MCP, configuration, jobs, reads of the graph and the findings | yes, and it is the only one | no |
+| `api` | Go | REST reads of the snapshots, the graph, the findings and the raw output behind them (005). MCP, configuration and jobs are not built yet | yes, and it is the only one | no device credential; read-only object-store access, to serve raw output |
 | Web UI | React | device tables and one-hop neighbourhood views | through `api` | no |
 | PostgreSQL | database | configuration, jobs, task frontier, observations, projected graph, findings | no | secret references only |
 | Object store | S3 API, Garage | raw command output, addressed by content hash | no | no |
@@ -27,7 +27,8 @@ One binary, one image, three roles selected by subcommand. Three binaries would 
 |---|---|---|---|
 | Web UI | `api` | HTTPS, JSON | the only path a browser takes |
 | AI agent | `api` | MCP | topology questions with provenance |
-| `api` | PostgreSQL | SQL | configuration, jobs, reads of the graph |
+| `api` | PostgreSQL | SQL, as `netmapper_api` | reads of the graph, and `last_used_at` on its own tokens |
+| `api` | Object store | S3 API, read only | the raw output an observation references |
 | `engine` | PostgreSQL | SQL | projections, gate, diffs, and enqueuing scheduled jobs |
 | `collector` | PostgreSQL | SQL, `FOR UPDATE SKIP LOCKED` | claims tasks from the frontier, writes observations |
 | `collector` | Object store | S3 | writes raw output under its hash |
@@ -41,7 +42,7 @@ One binary, one image, three roles selected by subcommand. Three binaries would 
 
 The frontier lives in PostgreSQL rather than in a collector's memory, which is what makes three things possible at once: a crash loses nothing, a device is never visited twice after a restart, and several collectors can share one frontier the day network reach requires it.
 
-The `engine` never opens a session to a device, so the component doing the heavy computation has no reason to hold a secret and no path to the network. It does load platform packs, as read-only data: the graph projector applies a pack's interface naming rules to the port a neighbour reports for the far end of a cable, and it is the first component that knows both the spelling and the far end's platform. A pack holds no secret and loading one opens nothing. The `api` never does either, so the component anyone can reach cannot log into anything.
+The `engine` never opens a session to a device, so the component doing the heavy computation has no reason to hold a secret and no path to the network. It does load platform packs, as read-only data: the graph projector applies a pack's interface naming rules to the port a neighbour reports for the far end of a cable, and it is the first component that knows both the spelling and the far end's platform. A pack holds no secret and loading one opens nothing. The `api` never does either, so the component anyone can reach cannot log into anything. It does hold read-only access to the object store, to serve the raw output an answer's evidence points at; that access can write nothing, is never returned, and reaches no device (constitution Principle III, v1.2.0).
 
 Splitting the finder from the scraper inside the collector is a separate question, and it is not about throughput. One Go process handles thousands of concurrent sessions.
 
