@@ -1,0 +1,78 @@
+# Release: pushing a tag v* runs the quality checks, then publishes the binaries as a GitHub release
+# with notes generated from the merged pull requests, and the container image on ghcr.io.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  binaries:
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # One archive per platform: the binary, the platform packs it loads with --packs, and the
+      # licence. Migrations are embedded in the binary.
+      - name: build
+        run: |
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${target%/*} arch=${target#*/}
+            name=netmapper_${GITHUB_REF_NAME}_${os}_${arch}
+            mkdir -p "build/$name"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags="-s -w" \
+              -o "build/$name/netmapper" ./cmd/netmapper
+            cp -r packs LICENSE "build/$name/"
+            rm -f "build/$name"/packs/*.go
+            tar -czf "dist/$name.tar.gz" -C build "$name"
+          done
+          (cd dist && sha256sum ./*.tar.gz > checksums.txt)
+
+      - name: publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+
+  image:
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/darnodo/netmapper:${{ github.ref_name }}
+            ghcr.io/darnodo/netmapper:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/darnodo/NetMapper
+            org.opencontainers.image.licenses=MIT
