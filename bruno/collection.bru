@@ -1,0 +1,17 @@
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+docs {
+  The read API of NetMapper: eight GET endpoints behind a bearer token.
+  
+  Pick the "local" environment and set `token` to the value printed by
+  `netmapper token create --name bruno --scope read`. It is a secret variable:
+  Bruno keeps its value on this machine and never writes it to the repository.
+  
+  Contract: specs/005-read-api/contracts/rest.md
+}

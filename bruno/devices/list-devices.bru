@@ -1,0 +1,15 @@
+meta {
+  name: List devices
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/devices
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}
