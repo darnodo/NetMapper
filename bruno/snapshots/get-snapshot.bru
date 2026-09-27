@@ -1,0 +1,11 @@
+meta {
+  name: Get snapshot
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/snapshots/{{snapshot}}
+  body: none
+  auth: inherit
+}

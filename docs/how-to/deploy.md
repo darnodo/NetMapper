@@ -164,6 +164,9 @@ Every answer names the snapshot it was built from and that snapshot's coverage v
 and you decide whether to trust it. `?snapshot=<id>` reads an older one. Endpoints, fields and
 errors are in [contracts/rest.md](../../specs/005-read-api/contracts/rest.md).
 
+The same calls are in a [Bruno](https://www.usebruno.com) collection, [bruno/](../../bruno/): open
+the folder in Bruno, pick the `local` environment and set its secret `token` variable.
+
 ## Exposing the API
 
 The API speaks plain HTTP and has no rate limit. Keep it on a private network (a VPN or an overlay

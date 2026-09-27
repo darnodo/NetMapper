@@ -1,0 +1,11 @@
+meta {
+  name: Get raw output
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/observations/{{observation}}/raw/{{step}}
+  body: none
+  auth: inherit
+}

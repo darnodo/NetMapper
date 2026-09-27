@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "NetMapper",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

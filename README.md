@@ -97,6 +97,7 @@ anything else: [deploying NetMapper](docs/how-to/deploy.md) sets up one login pe
 ## Reference
 
 - API contract: [specs/005-read-api/contracts/rest.md](specs/005-read-api/contracts/rest.md)
+- API requests for Bruno: [bruno/](bruno/)
 - Configuration document: [specs/001-crawl-loop/contracts/config.md](specs/001-crawl-loop/contracts/config.md)
 - Pack format: [specs/001-crawl-loop/contracts/pack-format.md](specs/001-crawl-loop/contracts/pack-format.md)
 - Architecture: [docs/c4-model/](docs/c4-model/00-overview.md)
