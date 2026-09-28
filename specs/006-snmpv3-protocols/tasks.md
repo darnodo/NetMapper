@@ -205,3 +205,7 @@ case that started the issue: T033's first half can be run right after T014.
    first when a set does not work.
 4. US2: authNoPriv.
 5. US4 and Polish: documentation, lab, manual validation.
+
+## Phase 8: Convergence
+
+- [X] T035 Extend `TestRepositoryDocuments` in internal/config/config_test.go to also load the complete configuration examples of the documentation: extract each fenced `yaml` block that contains `credential_sets:` from README.md and docs/how-to/deploy.md, and check that each parses with `Parse` (the README quick start example predates 006; deploy.md now carries a `snmp_v3` set) per SC-002 (partial)

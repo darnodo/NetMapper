@@ -144,7 +144,8 @@ func TestSNMPv3Protocols(t *testing.T) {
 	}
 }
 
-// 006 SC-002: the configuration documents shipped in the repository load.
+// 006 SC-002: the configuration documents shipped in the repository load, and so do the complete
+// examples in the documentation (every yaml block with credential_sets, so fragments are left out).
 func TestRepositoryDocuments(t *testing.T) {
 	for _, p := range []string{"../../test/lab/netmapper.yaml"} {
 		b, err := os.ReadFile(p)
@@ -153,6 +154,26 @@ func TestRepositoryDocuments(t *testing.T) {
 		}
 		if _, err := Parse(b); err != nil {
 			t.Errorf("%s: %v", p, err)
+		}
+	}
+	for _, p := range []string{"../../README.md", "../../docs/how-to/deploy.md"} {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := 0
+		for i, block := range strings.Split(string(b), "```yaml\n")[1:] {
+			block, _, _ = strings.Cut(block, "```")
+			if !strings.Contains(block, "credential_sets:") {
+				continue
+			}
+			found++
+			if _, err := Parse([]byte(block)); err != nil {
+				t.Errorf("%s, yaml block %d: %v", p, i+1, err)
+			}
+		}
+		if found == 0 {
+			t.Errorf("%s: no configuration example found", p)
 		}
 	}
 }
