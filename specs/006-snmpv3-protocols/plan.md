@@ -113,6 +113,9 @@ for the test agent, next to the other development-stack files.
   available to confirm interoperability.
 - A device that stays silent on a protocol mismatch, instead of sending a report, is recorded as
   silence. Not made more precise here (spec, Assumptions).
+- Found during implementation: gosnmp does not expose the reason of an unauthenticated SNMPv3 report,
+  so a wrong protocol, a wrong passphrase and an unknown user carry the same `denied` evidence
+  (research R6, revised). Telling them apart needs a change in gosnmp.
 
 ## Complexity Tracking
 

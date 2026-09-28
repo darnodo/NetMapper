@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-28
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Configurable SNMPv3 authentication and privacy (GitHub issue #13).
 `snmp_v3` credential sets only work with SHA-1 authentication, AES-128 privacy and the authPriv
@@ -110,12 +110,14 @@ reported for each.
    **When** the document is loaded, **Then** it is rejected with an error saying that a v3 set must
    reference the whole secret.
 3. **Given** an authPriv set whose resolved secret has no `priv` field (or no `auth` field, or an
-   empty one), **When** the collector tries it, **Then** it is recorded as `credential_unresolved`,
-   naming the missing field and not its value, and no request is sent to the device with that set.
+   empty one), **When** the collector tries it, **Then** no request is sent to the device with that
+   set, and the set is reported as unresolved naming the missing field and not its value: in the
+   log, and in the task's `credential_unresolved` (or `credential_partial`) error when no other set
+   opens a session.
 4. **Given** a set whose protocols differ from the device's, **When** the device answers with an
-   SNMPv3 error report, **Then** the attempt is recorded as `denied` and the recorded evidence
-   carries the device's reason (unknown user, wrong digest, decryption error), so a wrong protocol
-   can be told apart from a wrong user.
+   SNMPv3 error report, **Then** the attempt is recorded as `denied`, with the device's answer as
+   evidence. (Divergence found during implementation: the SNMP library cannot read the report's
+   reason, so a wrong protocol and an unknown user carry the same evidence. See research R6.)
 
 ---
 
@@ -170,13 +172,17 @@ guide alone.
 - **FR-005**: Loading a configuration document MUST reject a `snmp_v3` set whose `vault:` reference
   names a single field (`#field`).
 - **FR-006**: When the resolved secret of an authPriv set lacks a non-empty `auth` or `priv` field,
-  or that of an authNoPriv set lacks a non-empty `auth` field, the collector MUST record the attempt
-  as `credential_unresolved`, naming the missing field, and MUST NOT send any request with that set.
+  or that of an authNoPriv set lacks a non-empty `auth` field, the collector MUST treat the set as
+  unresolved: it MUST NOT send any request with it, MUST NOT count an attempt, and MUST log the set
+  and the missing field, never a value. If no other set opens a session, the task ends
+  `credential_unresolved`, or `credential_partial` when another set was rejected, and the message
+  names the set and the field.
 - **FR-007**: The collector MUST use the protocols and security level of the set for every SNMP
   request made with it.
 - **FR-008**: When a device answers an SNMPv3 request with an authentication error (unknown user,
   wrong digest, decryption error, unsupported security level), the attempt MUST be recorded as
-  `denied`, with the device's reason in the recorded evidence.
+  `denied`, with the device's answer in the recorded evidence. The reason itself is recorded when the
+  SNMP library exposes it, which it does not for unauthenticated reports (research R6).
 - **FR-009**: A configuration document written before this feature MUST load and behave as before.
 - **FR-010**: The protocol fields MUST hold protocol names only. No passphrase, key or derived key
   MUST be accepted in the configuration document, stored, logged or returned by any interface.
@@ -207,8 +213,9 @@ guide alone.
 - **SC-002**: Every configuration document in the repository and in the documentation written before
   this feature loads without change and produces the same credential behaviour.
 - **SC-003**: Each of the four mistakes of User Story 3 (bad protocol name, `#field` reference,
-  missing secret field, protocol mismatch) produces a distinct message or record that names its cause,
-  checked by one test each.
+  missing secret field, protocol mismatch) produces a distinct message or record, checked by one test
+  each. The first three name their cause; a protocol mismatch is recorded as `denied` and cannot be
+  told apart from an unknown user (research R6).
 - **SC-004**: An operator can set up a working `snmp_v3` set from the deployment guide alone, without
   reading the source.
 

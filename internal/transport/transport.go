@@ -42,6 +42,10 @@ type Credential struct {
 	Kind     string // ssh, snmp_v2c, snmp_v3
 	Username string
 	Secret   secret.Secret
+	// Protocol names as written in the configuration document (sha256, aes, none...), set for
+	// snmp_v3 only. Never key material.
+	AuthProtocol string
+	PrivProtocol string
 }
 
 // Step is one command (SSH) or one request (SNMP GET of OIDs, or a walk).

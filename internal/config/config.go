@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -37,6 +38,9 @@ type CredentialSet struct {
 	SecretRef            string   `yaml:"secret_ref"`
 	MaxAttemptsPerDevice int      `yaml:"max_attempts_per_device"`
 	Perimeters           []string `yaml:"perimeters"`
+	// snmp_v3 only; Parse fills the defaults, sha and aes.
+	AuthProtocol string `yaml:"auth_protocol"`
+	PrivProtocol string `yaml:"priv_protocol"`
 }
 
 type SeedSet struct {
@@ -70,7 +74,24 @@ func Parse(raw []byte) (*Document, error) {
 		return nil, err
 	}
 	d.Discovery.fill()
+	for i := range d.CredentialSets {
+		d.CredentialSets[i].fill()
+	}
 	return d, d.validate()
+}
+
+// fill applies the snmp_v3 defaults, which are what the collector used before the protocols could be
+// chosen. Other kinds keep empty protocols, so validate can refuse them there.
+func (c *CredentialSet) fill() {
+	if c.Kind != "snmp_v3" {
+		return
+	}
+	if c.AuthProtocol == "" {
+		c.AuthProtocol = "sha"
+	}
+	if c.PrivProtocol == "" {
+		c.PrivProtocol = "aes"
+	}
 }
 
 func (d *Discovery) fill() {
@@ -93,6 +114,12 @@ func (d *Discovery) fill() {
 		d.PollInterval = Defaults.PollInterval
 	}
 }
+
+// Accepted snmp_v3 protocol names (contracts/config.md); the error lists them in this order.
+var (
+	authProtocols = []string{"md5", "sha", "sha224", "sha256", "sha384", "sha512"}
+	privProtocols = []string{"none", "des", "aes", "aes192", "aes256", "aes192c", "aes256c"}
+)
 
 func (d *Document) validate() error {
 	var errs []error
@@ -129,6 +156,25 @@ func (d *Document) validate() error {
 		}
 		if !strings.HasPrefix(c.SecretRef, "env:") && !strings.HasPrefix(c.SecretRef, "vault:") {
 			fail("credential set %q: secret_ref must be a reference, not a value", c.Name)
+		}
+		if c.Kind == "snmp_v3" {
+			if !slices.Contains(authProtocols, c.AuthProtocol) {
+				fail("credential set %q: auth_protocol must be one of %s", c.Name, strings.Join(authProtocols, ", "))
+			}
+			if !slices.Contains(privProtocols, c.PrivProtocol) {
+				fail("credential set %q: priv_protocol must be one of %s", c.Name, strings.Join(privProtocols, ", "))
+			}
+			// With #field the vault resolver keeps one unnamed value, and auth and priv read empty.
+			if strings.HasPrefix(c.SecretRef, "vault:") && strings.Contains(c.SecretRef, "#") {
+				fail("credential set %q: a snmp_v3 secret_ref must reference the whole secret, without #field", c.Name)
+			}
+		} else {
+			if c.AuthProtocol != "" {
+				fail("credential set %q: auth_protocol applies to snmp_v3 only", c.Name)
+			}
+			if c.PrivProtocol != "" {
+				fail("credential set %q: priv_protocol applies to snmp_v3 only", c.Name)
+			}
 		}
 		if c.MaxAttemptsPerDevice < 1 {
 			fail("credential set %q: max_attempts_per_device is required and must be at least 1", c.Name)

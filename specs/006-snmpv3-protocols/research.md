@@ -79,6 +79,19 @@ load-time check catches it once, before any run.
 
 ## R6. Protocol mismatch and denial evidence
 
+**Revised during implementation (T021, T024).** The original decision below assumed gosnmp surfaces
+`ErrWrongDigest` and `ErrUnknownUsername`. It does not on the client path: once the engine is
+discovered, gosnmp checks every v3 answer against the sender's key before reading it, and an agent
+sends its wrong-digest and unknown-user reports unauthenticated, so both end as the plain error
+`incoming packet is not authentic, discarding`, which has no sentinel. Before this feature such a
+refusal fell to the collector's generic error path (task retried, then failed), not `denied`.
+`classify` now also maps that message to `transport.AuthError`: the device answered, and not to this
+credential. The evidence is that message, the same for a wrong protocol, a wrong passphrase and an
+unknown user. Reading the report's reason would need a change in gosnmp (or parsing the raw answer
+here); left open.
+
+Original decision, kept for the record:
+
 **Decision**: no change. `snmp.classify` already maps `ErrUnknownUsername`, `ErrWrongDigest`,
 `ErrDecryption` and `ErrUnknownSecurityLevel` to `transport.AuthError` with the error text as
 evidence, and the attempt loop records `denied` with that evidence. The tests of R8 pin it.
@@ -137,6 +150,10 @@ test a pack that exists only for the test.
 **Decision**: in `test/lab`, sw2 drops `snmp-server community public ro` and gets an SNMPv3 user
 with `auth sha256` and `priv aes256`; `test/lab/netmapper.yaml` gains a `ro-snmp-v3` set after
 `ro-snmp`. sw1 and sw4 keep v2c, sw3 keeps no SNMP.
+
+**Found during T032**: EOS refuses `snmp-server user` in a startup-config until an engineID exists,
+and generates one only later in the boot, so sw2.cfg pins `snmp-server engineID local` before the
+user line. Interactive configuration does not hit this, which is why the standalone check passed.
 
 **Rationale**: sw2 then answers v2c with silence, so the collector reaches the v3 set on it, and the
 other switches keep exercising the paths they already cover. sw2 is found through LLDP, so the v3

@@ -89,3 +89,32 @@ func TestStart(t *testing.T) {
 		t.Errorf("second cancel: %v", err)
 	}
 }
+
+// 006 research R3: the protocols are stored with the set, defaults applied, and only for snmp_v3.
+func TestStartStoresSNMPv3Protocols(t *testing.T) {
+	db := testutil.DB(t)
+	op := testutil.As(t, db, "netmapper_operator")
+	ctx := context.Background()
+
+	v3 := strings.Replace(doc, "credential_sets:\n", `credential_sets:
+  - {name: v3-named, kind: snmp_v3, username: nm, auth_protocol: sha256, priv_protocol: aes256, secret_ref: env:V3, max_attempts_per_device: 1, perimeters: [lab]}
+  - {name: v3-default, kind: snmp_v3, username: nm, secret_ref: env:V3, max_attempts_per_device: 1, perimeters: [lab]}
+`, 1)
+	if _, err := jobrunner.Start(ctx, op, []byte(v3), "lab", "good", "test"); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.Query(ctx, `SELECT name, coalesce(auth_protocol, 'NULL'), coalesce(priv_protocol, 'NULL') FROM credential_set ORDER BY position`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for rows.Next() {
+		var n, a, p string
+		rows.Scan(&n, &a, &p)
+		got = append(got, n+" "+a+"/"+p)
+	}
+	want := "v3-named sha256/aes256, v3-default sha/aes, ro-ssh NULL/NULL"
+	if strings.Join(got, ", ") != want {
+		t.Errorf("got %q, want %q", strings.Join(got, ", "), want)
+	}
+}

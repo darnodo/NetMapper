@@ -161,3 +161,52 @@ func TestCredentials(t *testing.T) {
 		}
 	})
 }
+
+// 006 FR-006, research R4: a snmp_v3 secret missing a field it needs is unresolved: nothing is sent
+// with the set and no attempt is counted. authNoPriv needs no priv.
+func TestSNMPv3SecretFields(t *testing.T) {
+	run := func(t *testing.T, priv, secret string) (*Lab, int64) {
+		t.Setenv("NM_V3", secret)
+		doc := `
+perimeters: [{name: lab, include: [10.0.0.0/24]}]
+credential_sets:
+  - {name: v3-a, kind: snmp_v3, username: nm, priv_protocol: ` + priv + `, secret_ref: env:NM_V3, max_attempts_per_device: 1, perimeters: [lab]}
+seed_sets: [{name: seeds, targets: [10.0.0.1]}]
+discovery: {lease: 2s, poll_interval: 20ms, step_idle_timeout: 1s, step_deadline: 5s}
+`
+		dev := FakeOS("sw1", "S001")
+		dev.Transports = []string{"snmp"}
+		l := NewLab(t, &fake.Network{Devices: map[netip.Addr]*fake.Device{Addr("10.0.0.1"): dev}})
+		job := l.Start(doc)
+		stopC, stopE := l.RunCollector(l.Collector("c1")), l.RunEngine()
+		l.Wait(job, "succeeded")
+		stopE()
+		stopC()
+		return l, job
+	}
+	for _, c := range []struct{ name, secret, want string }{
+		{"missing priv", `{"auth": "a"}`, "credential_unresolved: v3-a (missing priv)"},
+		{"missing auth", `{"priv": "p"}`, "credential_unresolved: v3-a (missing auth)"},
+		{"empty priv", `{"auth": "a", "priv": ""}`, "credential_unresolved: v3-a (missing priv)"},
+		{"not an object", `plain`, "credential_unresolved: v3-a (missing auth)"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			l, job := run(t, "aes", c.secret)
+			if le := lastError(l, job); le != c.want {
+				t.Errorf("last_error %q, want %q", le, c.want)
+			}
+			if n := len(l.Net.Opens()); n != 0 {
+				t.Errorf("%d sessions opened with an incomplete secret", n)
+			}
+			if got := l.Strings(`SELECT cred_attempts::text FROM task WHERE kind = 'find'`)[0]; got != "{}" {
+				t.Errorf("unresolved set counted an attempt: %s", got)
+			}
+		})
+	}
+	t.Run("authNoPriv without priv", func(t *testing.T) {
+		l, _ := run(t, "none", `{"auth": "a"}`)
+		if opens := l.Net.Opens(); len(opens) == 0 || opens[0].Set != "v3-a" || opens[0].Transport != "snmp" {
+			t.Errorf("opens %+v, want v3-a over snmp", opens)
+		}
+	})
+}
