@@ -5,6 +5,7 @@ package ssh
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -65,7 +66,21 @@ func (t *Transport) Open(ctx context.Context, target transport.Target, cred tran
 		if err != nil {
 			return nil, err
 		}
-		d, open = gd, gd.Open
+		// The generic driver sends the first command as soon as the channel is up. A CLI that is
+		// still starting echoes it, drops it and prints its prompt, and the echo comes back as the
+		// whole answer (issue #15). Wait for the first prompt; nothing is sent to the device.
+		d, open = gd, func() error {
+			if err := gd.Open(); err != nil {
+				return err
+			}
+			pctx, cancel := context.WithTimeout(ctx, t.SocketTimeout)
+			defer cancel()
+			if _, err := gd.Channel.ReadUntilPrompt(pctx); err != nil {
+				gd.Close()
+				return fmt.Errorf("%w: no prompt after login", transport.ErrIdleTimeout)
+			}
+			return nil
+		}
 	}
 	opened := make(chan error, 1)
 	go func() { opened <- open() }()

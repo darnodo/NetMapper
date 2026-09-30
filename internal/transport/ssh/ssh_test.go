@@ -19,7 +19,8 @@ import (
 )
 
 // server is a minimal device: it echoes input and answers a few commands after a "sw1>" prompt.
-func server(t *testing.T) int {
+// Its CLI starts boot after the SSH channel is up.
+func server(t *testing.T, boot time.Duration) int {
 	_, key, _ := ed25519.GenerateKey(rand.Reader)
 	signer, _ := gossh.NewSignerFromKey(key)
 	cfg := &gossh.ServerConfig{PasswordCallback: func(c gossh.ConnMetadata, pw []byte) (*gossh.Permissions, error) {
@@ -53,7 +54,7 @@ func server(t *testing.T) int {
 							r.Reply(r.Type == "pty-req" || r.Type == "shell", nil)
 						}
 					}()
-					go shell(ch)
+					go shell(ch, boot)
 				}
 			}()
 		}
@@ -61,18 +62,42 @@ func server(t *testing.T) int {
 	return ln.Addr().(*net.TCPAddr).Port
 }
 
-func shell(ch gossh.Channel) {
+func shell(ch gossh.Channel, boot time.Duration) {
 	defer ch.Close()
+	in := make(chan byte)
+	go func() {
+		defer close(in)
+		b := make([]byte, 1)
+		for {
+			if _, err := ch.Read(b); err != nil {
+				return
+			}
+			in <- b[0]
+		}
+	}()
+	// While the CLI starts, the terminal echoes what is typed and the CLI then drops it, as cEOS
+	// does under load (issue #15).
+	for started := time.After(boot); started != nil; {
+		select {
+		case c, ok := <-in:
+			if !ok {
+				return
+			}
+			ch.Write([]byte{c})
+		case <-started:
+			started = nil
+		}
+	}
 	fmt.Fprint(ch, "sw1>")
 	var line []byte
-	b := make([]byte, 1)
 	for {
-		if _, err := ch.Read(b); err != nil {
+		c, ok := <-in
+		if !ok {
 			return
 		}
-		if b[0] != '\n' && b[0] != '\r' {
-			ch.Write(b)
-			line = append(line, b[0])
+		if c != '\n' && c != '\r' {
+			ch.Write([]byte{c})
+			line = append(line, c)
 			continue
 		}
 		switch cmd := strings.TrimSpace(string(line)); cmd {
@@ -104,7 +129,7 @@ func open(t *testing.T, port int, password string) (transport.Session, error) {
 }
 
 func TestOpen(t *testing.T) {
-	port := server(t)
+	port := server(t, 0)
 	_, err := open(t, port, "bad")
 	var ae *transport.AuthError
 	if !errors.As(err, &ae) || len(ae.Evidence) == 0 {
@@ -118,8 +143,26 @@ func TestOpen(t *testing.T) {
 	}
 }
 
+// A command sent before the CLI is up comes back as its own echo. The session waits for the first
+// prompt, and gives up with ErrIdleTimeout when the CLI never starts.
+func TestOpenSlowCLI(t *testing.T) {
+	s, err := open(t, server(t, 500*time.Millisecond), "good")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	out, err := s.Run(context.Background(), transport.Step{Command: "show version", IdleTimeout: time.Second, Deadline: 5 * time.Second})
+	if err != nil || !strings.Contains(string(out.Bytes), "Test OS 1.0") {
+		t.Errorf("show version: %q %v", out.Bytes, err)
+	}
+	start := time.Now()
+	if _, err := open(t, server(t, time.Hour), "good"); !errors.Is(err, transport.ErrIdleTimeout) || time.Since(start) > 4*time.Second {
+		t.Errorf("no prompt: %v after %s", err, time.Since(start))
+	}
+}
+
 func TestRun(t *testing.T) {
-	port := server(t)
+	port := server(t, 0)
 	run := func(cmd string, idle, deadline time.Duration) (string, error) {
 		s, err := open(t, port, "good")
 		if err != nil {
