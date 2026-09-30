@@ -110,7 +110,9 @@ The scrapligo platform definition is used as given, with two rules for a read-on
 no `on-open` or `on-close` commands (they would reach the device without going through a recipe or
 the audit log), and privilege levels that never escalate. Paging is turned off in the recipe
 command itself where the platform allows it (`| no-more` on EOS). While a target is not yet
-identified, the fingerprint session uses scrapligo's generic driver.
+identified, the fingerprint session uses scrapligo's generic driver. That session reads until the
+device's first prompt before sending the fingerprint command, without writing anything: a command
+sent while the CLI is still starting comes back as its own echo (issue #15).
 
 ## Load-time checks (collector refuses to start if any fails)
 
