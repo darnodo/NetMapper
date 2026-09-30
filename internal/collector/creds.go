@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/darnodo/NetMapper/internal/frontier"
+	"github.com/darnodo/NetMapper/internal/secret"
 	"github.com/darnodo/NetMapper/internal/transport"
 )
 
@@ -24,6 +25,9 @@ type credSet struct {
 	Username  string
 	SecretRef string
 	Max       int
+	// snmp_v3 only, as stored by jobrunner with defaults applied.
+	AuthProtocol string
+	PrivProtocol string
 }
 
 func (c credSet) transport() string {
@@ -132,13 +136,21 @@ func (d *device) open(ctx context.Context, tr string, first *transport.Step) (*o
 			o.unresolved = append(o.unresolved, cs.Name)
 			continue
 		}
+		// A v3 secret missing a field it needs is the same as a reference to nothing: sending an
+		// empty passphrase would only earn a denial for the wrong reason (006 research R4).
+		if field := missingField(cs, sec); field != "" {
+			d.c.Log.Warn("credential set secret has no "+field+" field", "set", cs.Name, "target", d.t.Target)
+			o.unresolved = append(o.unresolved, cs.Name+" (missing "+field+")")
+			continue
+		}
 		if !n.OK {
 			if err := count(cs, 1, false); err != nil {
 				return nil, err
 			}
 		}
 		o.presented = true
-		s, err := d.c.Transports[tr].Open(ctx, d.target, transport.Credential{Set: cs.Name, Kind: cs.Kind, Username: cs.Username, Secret: sec})
+		s, err := d.c.Transports[tr].Open(ctx, d.target, transport.Credential{Set: cs.Name, Kind: cs.Kind, Username: cs.Username, Secret: sec,
+			AuthProtocol: cs.AuthProtocol, PrivProtocol: cs.PrivProtocol})
 		var out transport.RawOutput
 		if err == nil && first != nil {
 			if out, err = s.Run(ctx, *first); err != nil {
@@ -175,6 +187,20 @@ func (d *device) open(ctx context.Context, tr string, first *transport.Step) (*o
 		}
 	}
 	return o, nil
+}
+
+// missingField names the first field a snmp_v3 secret needs and lacks: auth always, priv unless
+// the set is authNoPriv. Other kinds are not checked here.
+func missingField(cs credSet, sec secret.Secret) string {
+	switch {
+	case cs.Kind != "snmp_v3":
+		return ""
+	case sec.Field("auth") == "":
+		return "auth"
+	case cs.PrivProtocol != "none" && sec.Field("priv") == "":
+		return "priv"
+	}
+	return ""
 }
 
 // verdict states why no session opened on any of os (research R6). unreachable only when nothing

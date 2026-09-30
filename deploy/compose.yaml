@@ -1,6 +1,7 @@
-# PostgreSQL and Garage for development and integration tests.
+# PostgreSQL, Garage and an SNMP test agent for development and integration tests.
 #   docker compose -f deploy/compose.yaml up -d
 # S3 access: endpoint localhost:3900, bucket netmapper, key below (dev only).
+# SNMP agent: 127.0.0.1:1161/udp, SNMPv3 users in snmpd/snmpd.conf (NETMAPPER_TEST_SNMP).
 services:
   postgres:
     image: postgres:17
@@ -11,6 +12,15 @@ services:
     ports: ["5432:5432"]
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "netmapper"]
+      interval: 2s
+      retries: 30
+
+  snmpd:
+    build: ./snmpd
+    ports: ["1161:161/udp"]
+    healthcheck:
+      test: ["CMD", "snmpget", "-v3", "-l", "authPriv", "-u", "nm-sha-aes", "-a", "SHA", "-A", "auth-nm-sha-aes",
+             "-x", "AES", "-X", "priv-nm-sha-aes", "127.0.0.1", "1.3.6.1.2.1.1.5.0"]
       interval: 2s
       retries: 30
 

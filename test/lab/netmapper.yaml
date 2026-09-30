@@ -1,5 +1,8 @@
 # Lab configuration (quickstart.md). Secrets come from the collector's environment:
 #   export LAB_SNMP_COMMUNITY=public LAB_SSH_PASSWORD=admin
+#   export LAB_SNMP_V3='{"auth":"lab-auth-sw2","priv":"lab-priv-sw2"}'
+# sw2 has no community and an SNMPv3 user (SHA-256 / AES-256): it is silent to ro-snmp and answers
+# ro-snmp-v3 (006 research R9).
 perimeters:
   - name: lab
     include: [172.20.20.0/24]
@@ -9,6 +12,14 @@ credential_sets:                    # tried in this order (FR-018)
   - name: ro-snmp
     kind: snmp_v2c
     secret_ref: env:LAB_SNMP_COMMUNITY
+    max_attempts_per_device: 1
+    perimeters: [lab]
+  - name: ro-snmp-v3
+    kind: snmp_v3
+    username: netmapper
+    auth_protocol: sha256
+    priv_protocol: aes256
+    secret_ref: env:LAB_SNMP_V3
     max_attempts_per_device: 1
     perimeters: [lab]
   - name: ro-ssh

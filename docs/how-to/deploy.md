@@ -72,8 +72,19 @@ it needs it:
 | `env:NAME`                    | the environment variable `NAME` of the collector process       |
 | `vault:<kv v2 path>#<field>`  | a field of a Vault or OpenBao secret; reads `VAULT_ADDR` and `VAULT_TOKEN` |
 
-`snmp_v3` sets need a secret holding `auth` and `priv` fields. Give the collector a Vault token that
-can read those paths and nothing else.
+`snmp_v3` sets need a secret with two fields, `auth` and `priv` (only `auth` when the set has
+`priv_protocol: none`). How to reference it:
+
+| Reference         | The secret must be                                                                |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `env:NAME`        | a JSON object in the variable: `NAME='{"auth": "...", "priv": "..."}'`            |
+| `vault:<kv path>` | a KV v2 secret with string fields `auth` and `priv`, referenced without `#field`  |
+
+With `#field` a reference resolves to that one value, so a v3 set would get empty passphrases; the
+configuration is refused when it is loaded. A secret that lacks a field the set needs is reported as
+`credential_unresolved`, naming the set and the field, and nothing is sent to the device with it.
+
+Give the collector a Vault token that can read those paths and nothing else.
 
 ## 4. The configuration document
 
@@ -90,6 +101,14 @@ credential_sets:                     # tried in this order
     secret_ref: vault:kv/data/netmapper/campus#community
     max_attempts_per_device: 1
     perimeters: [campus]
+  - name: ro-snmp-v3
+    kind: snmp_v3
+    username: netmapper
+    auth_protocol: sha256            # md5 | sha | sha224 | sha256 | sha384 | sha512, default sha
+    priv_protocol: aes               # none | des | aes | aes192 | aes256 | aes192c | aes256c, default aes
+    secret_ref: vault:kv/data/netmapper/campus-v3   # fields auth and priv, no #field
+    max_attempts_per_device: 1
+    perimeters: [campus]
   - name: ro-ssh
     kind: ssh
     username: netmapper
@@ -104,6 +123,13 @@ discovery:                           # optional, defaults shown
   step_deadline: 30m
   lease: 5m
 ```
+
+The protocols of a `snmp_v3` set must match the device's user: `sha` is SHA-1 and `aes` is AES-128,
+the protocols used before they could be chosen. `aes192c` and `aes256c` are the key-extension
+variants some Cisco platforms use; `aes192` and `aes256` are what most other platforms call AES-192
+and AES-256. `none` selects authNoPriv. A set whose protocols do not match is refused by the device
+and the attempt is recorded as `denied`; the device's answer does not say whether the protocol, the
+passphrase or the user was wrong.
 
 Nothing outside a perimeter is ever contacted, including neighbours a device reports. The full
 reference is [config.md](../../specs/001-crawl-loop/contracts/config.md).

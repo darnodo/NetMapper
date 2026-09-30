@@ -111,9 +111,10 @@ func Start(ctx context.Context, db *pgxpool.Pool, doc []byte, perimeterName, see
 				ids = append(ids, perimeterIDs[p])
 			}
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO credential_set (config_version, name, position, kind, username, secret_ref, max_attempts_per_device, perimeter_ids)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-				cv, c.Name, i, c.Kind, nullable(c.Username), c.SecretRef, c.MaxAttemptsPerDevice, ids); err != nil {
+				INSERT INTO credential_set (config_version, name, position, kind, username, secret_ref, max_attempts_per_device, perimeter_ids, auth_protocol, priv_protocol)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+				cv, c.Name, i, c.Kind, nullable(c.Username), c.SecretRef, c.MaxAttemptsPerDevice, ids,
+				nullable(c.AuthProtocol), nullable(c.PrivProtocol)); err != nil {
 				return err
 			}
 		}

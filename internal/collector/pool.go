@@ -205,7 +205,8 @@ func (c *Collector) running(ctx context.Context) ([]*job, error) {
 			return nil, err
 		}
 		rows, err := c.DB.Query(ctx, `
-			SELECT id, name, kind, coalesce(username, ''), secret_ref, max_attempts_per_device
+			SELECT id, name, kind, coalesce(username, ''), secret_ref, max_attempts_per_device,
+			       coalesce(auth_protocol, ''), coalesce(priv_protocol, '')
 			FROM credential_set WHERE $1 = ANY(perimeter_ids) ORDER BY position`, j.PerimeterID)
 		if err != nil {
 			return nil, err

@@ -108,15 +108,17 @@ Each feature's specification, plan and design decisions are in [specs/](specs/).
 ## Development
 
 ```sh
-docker compose -f deploy/compose.yaml up -d --wait postgres garage
+docker compose -f deploy/compose.yaml up -d --wait postgres garage snmpd
 docker compose -f deploy/compose.yaml run --rm garage-init
 export NETMAPPER_TEST_DSN='postgres://netmapper:netmapper@localhost:5432/netmapper?sslmode=disable'
 export NETMAPPER_TEST_S3_ENDPOINT=localhost:3900
+export NETMAPPER_TEST_SNMP=127.0.0.1:1161
 go test ./...
 ```
 
-Without the two variables the integration tests skip; the CI refuses a skipped test. Pull requests
-run gofmt, go vet, govulncheck, the full suite, and gitleaks over the whole history. Pushing a `v*` tag publishes the binaries and the
+Without the first two variables the integration tests skip, and without `NETMAPPER_TEST_SNMP` the
+SNMP transport tests (run against the net-snmp agent in `deploy/snmpd`) skip; the CI refuses a
+skipped test. Pull requests run gofmt, go vet, govulncheck, the full suite, and gitleaks over the whole history. Pushing a `v*` tag publishes the binaries and the
 image.
 
 ## License

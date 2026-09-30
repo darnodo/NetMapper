@@ -42,16 +42,29 @@ func (t *Transport) Open(ctx context.Context, target transport.Target, cred tran
 		g.Version = gosnmp.Version2c
 		g.Community = cred.Secret.Value()
 	case "snmp_v3":
+		auth, err := authProtocol(cred.AuthProtocol)
+		if err != nil {
+			return nil, err
+		}
+		priv, err := privProtocol(cred.PrivProtocol)
+		if err != nil {
+			return nil, err
+		}
 		g.Version = gosnmp.Version3
 		g.SecurityModel = gosnmp.UserSecurityModel
 		g.MsgFlags = gosnmp.AuthPriv
-		g.SecurityParameters = &gosnmp.UsmSecurityParameters{
+		usm := &gosnmp.UsmSecurityParameters{
 			UserName:                 cred.Username,
-			AuthenticationProtocol:   gosnmp.SHA,
+			AuthenticationProtocol:   auth,
 			AuthenticationPassphrase: cred.Secret.Field("auth"),
-			PrivacyProtocol:          gosnmp.AES,
-			PrivacyPassphrase:        cred.Secret.Field("priv"),
+			PrivacyProtocol:          priv,
 		}
+		if priv == gosnmp.NoPriv {
+			g.MsgFlags = gosnmp.AuthNoPriv // a priv field in the secret is not sent
+		} else {
+			usm.PrivacyPassphrase = cred.Secret.Field("priv")
+		}
+		g.SecurityParameters = usm
 	default:
 		return nil, fmt.Errorf("snmp transport cannot use a %s credential", cred.Kind)
 	}
@@ -59,6 +72,49 @@ func (t *Transport) Open(ctx context.Context, target transport.Target, cred tran
 		return nil, err
 	}
 	return &session{g}, nil
+}
+
+// authProtocol maps a protocol name from the configuration document (contracts/config.md) to
+// gosnmp's constant. Empty means sha, the default, so a transport used without the collector
+// behaves as before protocols could be chosen. Only the USM parameters change here: requests stay
+// GET and GETBULK (principle IV).
+func authProtocol(name string) (gosnmp.SnmpV3AuthProtocol, error) {
+	switch name {
+	case "", "sha":
+		return gosnmp.SHA, nil
+	case "md5":
+		return gosnmp.MD5, nil
+	case "sha224":
+		return gosnmp.SHA224, nil
+	case "sha256":
+		return gosnmp.SHA256, nil
+	case "sha384":
+		return gosnmp.SHA384, nil
+	case "sha512":
+		return gosnmp.SHA512, nil
+	}
+	return 0, fmt.Errorf("unknown snmp_v3 auth protocol %q", name)
+}
+
+// privProtocol does the same for privacy; empty means aes (AES-128), none means authNoPriv.
+func privProtocol(name string) (gosnmp.SnmpV3PrivProtocol, error) {
+	switch name {
+	case "", "aes":
+		return gosnmp.AES, nil
+	case "none":
+		return gosnmp.NoPriv, nil
+	case "des":
+		return gosnmp.DES, nil
+	case "aes192":
+		return gosnmp.AES192, nil
+	case "aes256":
+		return gosnmp.AES256, nil
+	case "aes192c":
+		return gosnmp.AES192C, nil
+	case "aes256c":
+		return gosnmp.AES256C, nil
+	}
+	return 0, fmt.Errorf("unknown snmp_v3 privacy protocol %q", name)
 }
 
 type session struct{ g *gosnmp.GoSNMP }
@@ -107,7 +163,12 @@ func classify(ctx context.Context, err error, partial bool) error {
 	case ctx.Err() != nil:
 		return ctx.Err()
 	case errors.Is(err, gosnmp.ErrUnknownUsername), errors.Is(err, gosnmp.ErrWrongDigest),
-		errors.Is(err, gosnmp.ErrDecryption), errors.Is(err, gosnmp.ErrUnknownSecurityLevel):
+		errors.Is(err, gosnmp.ErrDecryption), errors.Is(err, gosnmp.ErrUnknownSecurityLevel),
+		// An agent reports a wrong digest or an unknown user without authenticating the report, and
+		// gosnmp checks every v3 answer against our key before reading it, so both arrive as this
+		// message and never as the errors above. It has no sentinel. The device answered, and not
+		// to this credential (006 research R6).
+		strings.Contains(err.Error(), "incoming packet is not authentic"):
 		return &transport.AuthError{Evidence: []byte(err.Error())}
 	case transport.NoAnswer(err):
 		if partial {

@@ -52,6 +52,7 @@ export NETMAPPER_S3_ENDPOINT=localhost:3900 NETMAPPER_S3_BUCKET=netmapper NETMAP
        NETMAPPER_S3_ACCESS_KEY=GK0123456789abcdef01234567 \
        NETMAPPER_S3_SECRET_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 export LAB_SNMP_COMMUNITY=public LAB_SSH_PASSWORD=admin
+export LAB_SNMP_V3='{"auth":"lab-auth-sw2","priv":"lab-priv-sw2"}'
 go build -o netmapper ./cmd/netmapper && ./netmapper migrate
 ./netmapper engine --packs packs &
 ./netmapper collector --packs packs &
