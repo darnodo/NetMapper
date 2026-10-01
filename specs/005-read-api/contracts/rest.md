@@ -46,9 +46,13 @@ Every element that rests on evidence carries it:
 
 ```json
 "evidence": [
-  {"observation_id": 3, "collected_at": "2026-09-25T10:44:58Z", "family": "neighbours", "target": "172.20.20.2"}
+  {"observation_id": 3, "snapshot_id": 1, "collected_at": "2026-09-25T10:44:58Z", "family": "neighbours", "target": "172.20.20.2"}
 ]
 ```
+
+`snapshot_id` is the snapshot the observation belongs to. Following an item is
+`/v1/observations/{observation_id}?snapshot={snapshot_id}`, which reads one partition instead of
+all of them.
 
 An element without `evidence` and without a collection time is a defect of this feature, not a sparse
 answer (FR-002, SC-002).
@@ -75,14 +79,15 @@ it carries now. `verdict` and `coverage` are `null` for a snapshot never judged,
 | 404    | `{"error": "no_such_snapshot"}`                 | the snapshot named does not exist                           |
 | 404    | `{"error": "no_such_device", "snapshot": {…}}`  | nothing in that snapshot matches the name                   |
 | 404    | `{"error": "no_such_interface", "snapshot": {…}}` | the device has no port by that name                       |
-| 404    | `{"error": "no_such_observation"}`              |                                                             |
+| 404    | `{"error": "no_such_observation"}`              | no observation has that id, or none in the snapshot named   |
 | 404    | `{"error": "no_such_step"}`                     | the observation exists and ran no such step                 |
 | 405    |                                                 | any method but `GET`                                        |
 | 409    | `{"error": "not_projected", "snapshot": {…}}`   | the snapshot is open, unprojected, or its projection is stale; `snapshot` is `null` when no snapshot carries a graph at all |
 | 500    | `{"error": "internal"}`                         | nothing more: detail goes to the log, never to the caller   |
 
 `?snapshot=<id>` applies to `/v1/devices`, `/v1/devices/{name}`, `/v1/interfaces/{device}/{name}` and
-`/v1/findings`.
+`/v1/findings`, where it defaults to the latest snapshot carrying a graph. It also applies to the two
+observation endpoints, with no default: see below.
 
 ## Endpoints
 
@@ -136,6 +141,12 @@ it cites (FR-008). `?snapshot=<id>` as above.
 
 One observation: its family, status, target, transport, recipe, collection time, and the commands
 behind it with the hash of each.
+
+`?snapshot=<id>` is optional on this endpoint and the next. Given, the lookup reads that snapshot
+only; an observation from another snapshot is `no_such_observation`. Absent, every snapshot is
+searched, which is correct but costs one partition read per snapshot ever taken (issue #6). There is
+no default snapshot: an observation id belongs to exactly one, so defaulting to the latest would
+break evidence links from any older crawl. Every evidence item carries the `snapshot_id` to use.
 
 ### `GET /v1/observations/{id}/raw/{step}`
 

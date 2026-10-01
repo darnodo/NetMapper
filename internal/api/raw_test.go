@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	. "github.com/darnodo/NetMapper/internal/testutil"
 )
 
 // T021, FR-004, FR-004a, SC-006a, US1-3: from a port's evidence to the observation, to the bytes the
@@ -73,6 +75,47 @@ func readAll(t *testing.T, resp *http.Response) string {
 		b.Write(buf[:n])
 		if err != nil {
 			return b.String()
+		}
+	}
+}
+
+// Issue #6: every evidence item names its snapshot, and ?snapshot= pins the lookup of both
+// observation endpoints to it. Without it the lookup still finds the observation in any snapshot.
+func TestObservationPinnedToSnapshot(t *testing.T) {
+	l := standard(t)
+	c := newClient(t, l)
+
+	ev := findPort(t, c.json("/v1/devices/sw1", 200), "port1")["evidence"].([]any)[0].(map[string]any)
+	obs, snap := int(ev["observation_id"].(float64)), int(ev["snapshot_id"].(float64))
+	if body := c.json(fmt.Sprintf("/v1/observations/%d", obs), 200); int(body["observation"].(map[string]any)["snapshot_id"].(float64)) != snap {
+		t.Fatalf("evidence names snapshot %d, the observation says %v", snap, body["observation"])
+	}
+	l.Crawl(Doc)
+	other := l.Int(`SELECT max(id) FROM snapshot`)
+	if other == snap {
+		t.Fatal("the second crawl made no new snapshot")
+	}
+
+	body := c.json(fmt.Sprintf("/v1/observations/%d?snapshot=%d", obs, snap), 200)
+	step := list(body["commands"])[0]["step"].(string)
+	for _, c2 := range []struct {
+		path   string
+		status int
+		err    string
+	}{
+		{fmt.Sprintf("/v1/observations/%d/raw/%s?snapshot=%d", obs, step, snap), 200, ""},
+		{fmt.Sprintf("/v1/observations/%d/raw/%s", obs, step), 200, ""},
+		{fmt.Sprintf("/v1/observations/%d?snapshot=%d", obs, other), 404, "no_such_observation"},
+		{fmt.Sprintf("/v1/observations/%d/raw/%s?snapshot=%d", obs, step, other), 404, "no_such_observation"},
+		{fmt.Sprintf("/v1/observations/%d/raw/nonesuch?snapshot=%d", obs, snap), 404, "no_such_step"},
+		{fmt.Sprintf("/v1/observations/%d?snapshot=999999", obs), 404, "no_such_snapshot"},
+		{fmt.Sprintf("/v1/observations/%d/raw/%s?snapshot=999999", obs, step), 404, "no_such_snapshot"},
+		{fmt.Sprintf("/v1/observations/%d?snapshot=latest", obs), 400, "bad_snapshot"},
+		{fmt.Sprintf("/v1/observations/%d/raw/%s?snapshot=x", obs, step), 400, "bad_snapshot"},
+	} {
+		status, raw := c.get(c2.path)
+		if status != c2.status || (c2.err != "" && !strings.Contains(string(raw), `"`+c2.err+`"`)) {
+			t.Errorf("%s: %d %s, want %d %s", c2.path, status, raw, c2.status, c2.err)
 		}
 	}
 }
