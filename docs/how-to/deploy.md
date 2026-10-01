@@ -181,14 +181,16 @@ curl -H "$H" api:8080/v1/snapshots              # what can be asked about
 curl -H "$H" api:8080/v1/devices                # the devices of the latest graph
 curl -H "$H" api:8080/v1/devices/sw1            # by device key, hostname or address
 curl -H "$H" api:8080/v1/findings               # what the crawl reported against itself
-curl -H "$H" api:8080/v1/observations/42        # the commands behind one piece of evidence
-curl -H "$H" api:8080/v1/observations/42/raw/0  # the bytes the device printed
+curl -H "$H" api:8080/v1/observations/42?snapshot=7        # the commands behind one piece of evidence
+curl -H "$H" api:8080/v1/observations/42/raw/0?snapshot=7  # the bytes the device printed
 ```
 
 Every answer names the snapshot it was built from and that snapshot's coverage verdict. A
 `quarantined` verdict means the crawl reached much less than the previous one: the graph is served,
-and you decide whether to trust it. `?snapshot=<id>` reads an older one. Endpoints, fields and
-errors are in [contracts/rest.md](../../specs/005-read-api/contracts/rest.md).
+and you decide whether to trust it. `?snapshot=<id>` reads an older one. On the observation
+endpoints, pass the `snapshot_id` the evidence item carries: without it the lookup searches every
+snapshot ever taken and slows down as they pile up. Endpoints, fields and errors are in
+[contracts/rest.md](../../specs/005-read-api/contracts/rest.md).
 
 The same calls are in a [Bruno](https://www.usebruno.com) collection, [bruno/](../../bruno/): open
 the folder in Bruno, pick the `local` environment and set its secret `token` variable.

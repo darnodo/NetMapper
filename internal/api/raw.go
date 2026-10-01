@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -29,6 +32,49 @@ type command struct {
 	Size    int64  `json:"size"`
 }
 
+// observationScope reads the optional ?snapshot= of the observation endpoints. With it, a lookup is
+// pinned to that snapshot's partition; without it, every partition is searched (issue #6). Unlike the
+// graph endpoints there is no default snapshot: an observation id belongs to exactly one snapshot, so
+// a default would answer 404 for evidence from any older crawl. ok is false when the response has
+// already been written.
+func observationScope(w http.ResponseWriter, r *http.Request) (snapshot *int64, ok bool) {
+	q := r.URL.Query().Get("snapshot")
+	if q == "" {
+		return nil, true
+	}
+	id, err := strconv.ParseInt(q, 10, 64)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_snapshot"})
+		return nil, false
+	}
+	return &id, true
+}
+
+// pin narrows a query on observation or observation_raw to one snapshot when the request named one,
+// adding the condition as the next placeholder.
+func pin(q string, args []any, snapshot *int64) (string, []any) {
+	if snapshot == nil {
+		return q, args
+	}
+	return q + fmt.Sprintf(" AND snapshot_id = $%d", len(args)+1), append(args, *snapshot)
+}
+
+// notFound answers the 404 for an observation lookup that found nothing: no_such_snapshot when the
+// request named a snapshot that does not exist, otherwise the error given.
+func notFound(ctx context.Context, w http.ResponseWriter, tx pgx.Tx, snapshot *int64, body string) error {
+	if snapshot != nil {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM snapshot WHERE id = $1)`, *snapshot).Scan(&exists); err != nil {
+			return err
+		}
+		if !exists {
+			body = "no_such_snapshot"
+		}
+	}
+	writeJSON(w, http.StatusNotFound, map[string]string{"error": body})
+	return nil
+}
+
 // GET /v1/observations/{id}: one observation and the commands behind it, each with the hash of what it
 // printed. The parsed facts are left out: they are not evidence the contract names and can be large.
 func (s *Server) observation(w http.ResponseWriter, r *http.Request, tx pgx.Tx) error {
@@ -36,16 +82,20 @@ func (s *Server) observation(w http.ResponseWriter, r *http.Request, tx pgx.Tx) 
 	if !ok {
 		return nil
 	}
+	snapshot, ok := observationScope(w, r)
+	if !ok {
+		return nil
+	}
 	ctx := r.Context()
-	var o observation
-	err := tx.QueryRow(ctx, `
+	q, args := pin(`
 		SELECT id, snapshot_id, collected_at, host(target), transport, platform, recipe_id, fact_family,
 		       status, detail
-		FROM observation WHERE id = $1`, id).Scan(&o.ID, &o.SnapshotID, &o.CollectedAt, &o.Target,
+		FROM observation WHERE id = $1`, []any{id}, snapshot)
+	var o observation
+	err := tx.QueryRow(ctx, q, args...).Scan(&o.ID, &o.SnapshotID, &o.CollectedAt, &o.Target,
 		&o.Transport, &o.Platform, &o.RecipeID, &o.Family, &o.Status, &o.Detail)
 	if errors.Is(err, pgx.ErrNoRows) {
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no_such_observation"})
-		return nil
+		return notFound(ctx, w, tx, snapshot, "no_such_observation")
 	} else if err != nil {
 		return err
 	}
@@ -82,22 +132,30 @@ func (s *Server) rawOutput(w http.ResponseWriter, r *http.Request, tx pgx.Tx) er
 	if !ok {
 		return nil
 	}
+	snapshot, ok := observationScope(w, r)
+	if !ok {
+		return nil
+	}
+	ctx := r.Context()
+	q, args := pin(`SELECT hash FROM observation_raw WHERE observation_id = $1 AND step_id = $2`,
+		[]any{id, r.PathValue("step")}, snapshot)
 	var hash []byte
-	err := tx.QueryRow(r.Context(), `
-		SELECT hash FROM observation_raw WHERE observation_id = $1 AND step_id = $2`,
-		id, r.PathValue("step")).Scan(&hash)
+	err := tx.QueryRow(ctx, q, args...).Scan(&hash)
 	if errors.Is(err, pgx.ErrNoRows) {
-		var exists bool
-		if err := tx.QueryRow(r.Context(), `SELECT EXISTS (SELECT 1 FROM observation WHERE id = $1)`, id).Scan(&exists); err != nil {
+		// No such step, or no such observation: tell them apart.
+		q, args := pin(`SELECT 1 FROM observation WHERE id = $1`, []any{id}, snapshot)
+		var found bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (`+q+`)`, args...).Scan(&found); err != nil {
 			return err
 		}
-		body := map[bool]string{true: "no_such_step", false: "no_such_observation"}[exists]
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": body})
-		return nil
+		if found {
+			return notFound(ctx, w, tx, nil, "no_such_step")
+		}
+		return notFound(ctx, w, tx, snapshot, "no_such_observation")
 	} else if err != nil {
 		return err
 	}
-	b, err := s.raw.Get(r.Context(), hash)
+	b, err := s.raw.Get(ctx, hash)
 	if err != nil {
 		return err
 	}

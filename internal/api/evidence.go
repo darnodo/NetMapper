@@ -10,9 +10,11 @@ import (
 
 // Evidence is one observation an element rests on: which one, when it was collected, what it was
 // about and where it was collected from. The bytes behind it are one request away, at
-// /v1/observations/{observation_id} (FR-002, FR-004, research R11).
+// /v1/observations/{observation_id}?snapshot={snapshot_id} (FR-002, FR-004, research R11). Naming the
+// snapshot pins the lookup to one partition (issue #6).
 type Evidence struct {
 	ObservationID int64     `json:"observation_id"`
+	SnapshotID    int64     `json:"snapshot_id"`
 	CollectedAt   time.Time `json:"collected_at"`
 	Family        string    `json:"family"`
 	Target        string    `json:"target"`
@@ -28,7 +30,7 @@ type Evidence struct {
 // that produced no claim in the chain: the projector matches those to a device by address (004).
 func entityEvidence(ctx context.Context, tx pgx.Tx, ids []int64) (map[int64][]Evidence, error) {
 	return collect(ctx, tx, `
-		SELECT DISTINCT x.id, o.id, o.collected_at, o.fact_family, host(o.target), ''
+		SELECT DISTINCT x.id, o.id, o.collected_at, o.fact_family, host(o.target), '', o.snapshot_id
 		FROM (
 			SELECT ec.entity_id AS id, c.snapshot_id, c.observation_id
 			FROM entity_claim ec
@@ -45,7 +47,7 @@ func entityEvidence(ctx context.Context, tx pgx.Tx, ids []int64) (map[int64][]Ev
 
 func interfaceEvidence(ctx context.Context, tx pgx.Tx, ids []int64) (map[int64][]Evidence, error) {
 	return collect(ctx, tx, `
-		SELECT ie.interface_id, o.id, o.collected_at, o.fact_family, host(o.target), ''
+		SELECT ie.interface_id, o.id, o.collected_at, o.fact_family, host(o.target), '', o.snapshot_id
 		FROM interface_evidence ie
 		JOIN observation o ON o.snapshot_id = ie.snapshot_id AND o.id = ie.observation_id
 		WHERE ie.interface_id = ANY($1)
@@ -54,7 +56,7 @@ func interfaceEvidence(ctx context.Context, tx pgx.Tx, ids []int64) (map[int64][
 
 func edgeEvidence(ctx context.Context, tx pgx.Tx, ids []int64) (map[int64][]Evidence, error) {
 	return collect(ctx, tx, `
-		SELECT ev.edge_id, o.id, o.collected_at, o.fact_family, host(o.target), ev.side
+		SELECT ev.edge_id, o.id, o.collected_at, o.fact_family, host(o.target), ev.side, o.snapshot_id
 		FROM edge_evidence ev
 		JOIN observation o ON o.snapshot_id = ev.snapshot_id AND o.id = ev.observation_id
 		WHERE ev.edge_id = ANY($1)
@@ -63,7 +65,7 @@ func edgeEvidence(ctx context.Context, tx pgx.Tx, ids []int64) (map[int64][]Evid
 
 func findingEvidence(ctx context.Context, tx pgx.Tx, ids []int64) (map[int64][]Evidence, error) {
 	return collect(ctx, tx, `
-		SELECT fe.finding_id, o.id, o.collected_at, o.fact_family, host(o.target), ''
+		SELECT fe.finding_id, o.id, o.collected_at, o.fact_family, host(o.target), '', o.snapshot_id
 		FROM finding_evidence fe
 		JOIN observation o ON o.snapshot_id = fe.snapshot_id AND o.id = fe.observation_id
 		WHERE fe.finding_id = ANY($1)
@@ -83,7 +85,7 @@ func collect(ctx context.Context, tx pgx.Tx, sql string, ids []int64) (map[int64
 	for rows.Next() {
 		var id int64
 		var e Evidence
-		if err := rows.Scan(&id, &e.ObservationID, &e.CollectedAt, &e.Family, &e.Target, &e.Side); err != nil {
+		if err := rows.Scan(&id, &e.ObservationID, &e.CollectedAt, &e.Family, &e.Target, &e.Side, &e.SnapshotID); err != nil {
 			return nil, err
 		}
 		out[id] = append(out[id], e)
