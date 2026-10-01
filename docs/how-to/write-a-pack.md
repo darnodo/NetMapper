@@ -115,6 +115,17 @@ A recipe says how to collect one fact family. The families and their fields are 
 platform-neutral, listed in [fact-families.md](../../specs/001-crawl-loop/contracts/fact-families.md):
 today `neighbours` and `interfaces` (`identity` comes from the fingerprint and identifiers above).
 
+Every recipe is optional: a pack only has to fingerprint its platform. What a missing recipe costs:
+
+| Family       | Without a recipe |
+| ------------ | ---------------- |
+| `neighbours` | The crawl does not expand from these devices and they report no link. A device can still appear at the far end of a link a neighbour reports. |
+| `interfaces` | Only ports named by a neighbour exist, with no description, state, speed or MTU. |
+
+NetMapper logs a warning when it loads the packs, once for each family a pack has no recipe for,
+and each device gets an observation `unsupported` with detail `no_recipe` for it. A recipe whose
+`versions` fits none of a device's software gives `no_matching_version` instead.
+
 `recipes/interfaces.yaml`:
 
 ```yaml
@@ -196,7 +207,8 @@ netmapper engine --packs ./packs
 
 After a crawl, check `/v1/findings` for `unknown_platform` (the fingerprint did not match) and
 `parse_failed` (a template did not fit the output). Each finding cites the observation whose raw
-output shows what the device actually printed.
+output shows what the device actually printed. An observation `unsupported` with detail `no_recipe`
+or `no_matching_version` means a family was never asked for (step 6).
 
 When you change a template or a recipe, bump `version` in `pack.yaml` so people can tell the
 releases apart. Each observation also records a `recipe_id` of the form

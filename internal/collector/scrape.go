@@ -3,10 +3,12 @@ package collector
 import (
 	"context"
 	"errors"
+	"maps"
 	"slices"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/darnodo/NetMapper/internal/fact"
 	"github.com/darnodo/NetMapper/internal/frontier"
 	"github.com/darnodo/NetMapper/internal/parse"
 	"github.com/darnodo/NetMapper/internal/perimeter"
@@ -14,8 +16,9 @@ import (
 	"github.com/darnodo/NetMapper/internal/transport"
 )
 
-// scrape collects every family the device's pack defines, except identity and neighbours which
-// the find wrote, in one session per transport. Each family is written as soon as it is known;
+// scrape collects every fact family, except identity and neighbours which the find wrote, in one
+// session per transport. A family the device's pack has no recipe for is still written, as
+// unsupported, so the gap shows in the snapshot instead of passing silently. Each family is written as soon as it is known;
 // a retried scrape skips the families it already wrote.
 func (c *Collector) scrape(ctx context.Context, j *job, t *frontier.Task) error {
 	addr, err := j.resolve(ctx, t.Target)
@@ -43,7 +46,7 @@ func (c *Collector) scrape(ctx context.Context, j *job, t *frontier.Task) error 
 
 	d := c.device(j, t, t.Platform)
 	defer d.close()
-	for _, family := range c.Registry.Families(t.Platform) {
+	for _, family := range slices.Sorted(maps.Keys(fact.Families)) {
 		if family == "identity" || family == "neighbours" || slices.Contains(written, family) {
 			continue
 		}
@@ -59,14 +62,19 @@ func (c *Collector) scrape(ctx context.Context, j *job, t *frontier.Task) error 
 }
 
 // family runs the first implementation of family whose version fits and whose transport opens,
-// uploads each step's output, and parses it. The step's output is held in memory once
+// uploads each step's output, and parses it. With none to run, it records the family unsupported
+// with detail no_recipe (the pack has no recipe for it) or no_matching_version (no implementation
+// fits the device's version). The step's output is held in memory once
 // (research R12). An idle timeout records the family unreachable with detail timeout; a deadline
 // fails the task with no observation for the family.
 func (c *Collector) family(ctx context.Context, d *device, j *job, t *frontier.Task, platform, version, family string) (obs store.Observation, parseErr, err error) {
 	obs = c.observation(j, t, family, platform)
 	impls := c.Registry.Implementations(platform, family, version)
 	if len(impls) == 0 {
-		obs.Status = "unsupported"
+		obs.Status, obs.Detail = "unsupported", "no_matching_version"
+		if !slices.Contains(c.Registry.Families(platform), family) {
+			obs.Detail = "no_recipe"
+		}
 		return obs, nil, nil
 	}
 	var tried []*opened

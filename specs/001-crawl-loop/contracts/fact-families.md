@@ -61,5 +61,16 @@ was sent. The dial check still refuses the address if anything else ever tries t
 | mtu         | int    | no                                  |
 | mac         | string | no, normalised lowercase colon form |
 
+## A family with nothing to run
+
+Every family is written for every identified device, whether or not its pack has a recipe for it.
+When nothing can run, the observation is `unsupported` with one of two details:
+
+- `no_recipe`: the pack defines no recipe for the family;
+- `no_matching_version`: the pack has a recipe, but no implementation's `versions` fits the device's
+  version.
+
+Neither changes the snapshot verdict, which counts `identity` observations only.
+
 Other families (`mac_table`, `arp_table`, ...) follow the same rule: added here first, then in packs.
 This feature ships `identity`, `neighbours` and `interfaces`.

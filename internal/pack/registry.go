@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -114,7 +116,14 @@ func LoadRoot(root string) (*Registry, error) {
 	return Load(dirs...)
 }
 
-// Load loads the given pack directories and refuses the whole set if any check fails.
+// missingCost says what a platform gives up without a recipe for a family, for the load warning.
+var missingCost = map[string]string{
+	"neighbours": "the crawl will not expand from these devices and they report no link",
+	"interfaces": "only ports named by a neighbour will exist, with no description, state, speed or MTU",
+}
+
+// Load loads the given pack directories and refuses the whole set if any check fails. A platform
+// pack missing a family's recipe still loads, with one warning per missing family.
 func Load(dirs ...string) (*Registry, error) {
 	r := &Registry{}
 	var errs []error
@@ -143,6 +152,16 @@ func Load(dirs ...string) (*Registry, error) {
 	}
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
+	}
+	for _, p := range r.packs {
+		if len(p.Fingerprint.SNMP)+len(p.Fingerprint.SSH) == 0 {
+			continue // matches no device, so it collects nothing
+		}
+		for _, f := range slices.Sorted(maps.Keys(fact.Families)) {
+			if f != "identity" && p.Recipes[f] == nil {
+				slog.Warn("pack has no recipe for a fact family", "pack", p.Name, "family", f, "effect", missingCost[f])
+			}
+		}
 	}
 	return r, nil
 }
