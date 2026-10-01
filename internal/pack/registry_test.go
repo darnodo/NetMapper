@@ -1,6 +1,8 @@
 package pack
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,5 +111,29 @@ func TestRefusals(t *testing.T) {
 	}
 	if _, err := Load("testdata/fakeos"); err == nil || !strings.Contains(err.Error(), "_base") {
 		t.Errorf("no base: %v", err)
+	}
+}
+
+// Issue #14: a platform pack missing a family's recipe loads, with one warning per missing family;
+// _base, which fingerprints nothing, is not warned about.
+func TestLoadWarnsMissingFamily(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "fakeos")
+	if err := os.CopyFS(dir, os.DirFS("testdata/fakeos")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(dir, "recipes", "neighbours.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	defer slog.SetDefault(prev)
+
+	if _, err := Load(base, dir); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 1 || !strings.Contains(lines[0], "pack=fakeos family=neighbours") {
+		t.Errorf("warnings = %q", buf.String())
 	}
 }
