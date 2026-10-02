@@ -9,3 +9,12 @@ get {
   body: none
   auth: inherit
 }
+
+script:post-response {
+  // Point the other requests at the newest snapshot that carries a graph.
+  // Runtime variables win over the environment, so local.bru stays untouched.
+  const snap = (res.getBody().snapshots || []).find((s) => s.has_graph);
+  if (res.getStatus() === 200 && snap) {
+    bru.setVar("snapshot", snap.id);
+  }
+}
