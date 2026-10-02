@@ -13,3 +13,17 @@ get {
 params:query {
   ~snapshot: {{snapshot}}
 }
+
+script:post-response {
+  // Use the first interface for "Get interface", and the first piece of
+  // evidence for "Get observation" and "Get raw output".
+  const body = res.getBody();
+  const interfaces = body.interfaces || [];
+  const evidence = body.evidence || [];
+  if (res.getStatus() === 200 && interfaces.length > 0) {
+    bru.setVar("interface", interfaces[0].canonical_name);
+  }
+  if (res.getStatus() === 200 && evidence.length > 0) {
+    bru.setVar("observation", evidence[0].observation_id);
+  }
+}

@@ -13,3 +13,12 @@ get {
 params:query {
   ~snapshot: {{snapshot}}
 }
+
+script:post-response {
+  // Use the first device for "Get device" and "Get interface".
+  // The device key is used rather than the hostname, which can be ambiguous (409).
+  const devices = res.getBody().devices || [];
+  if (res.getStatus() === 200 && devices.length > 0) {
+    bru.setVar("device", devices[0].device_key);
+  }
+}

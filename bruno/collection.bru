@@ -12,6 +12,12 @@ docs {
   Pick the "local" environment and set `token` to the value printed by
   `netmapper token create --name bruno --scope read`. It is a secret variable:
   Bruno keeps its value on this machine and never writes it to the repository.
-  
+
+  Run "List snapshots", "List devices" then "Get device" first: their post-response
+  scripts fill `snapshot`, `device`, `interface` and `observation` with the first
+  real value from the answer, for the requests that follow. They are runtime
+  variables, so the environment file is not modified; the values in "local" are
+  only the fallback until those requests have run.
+
   Contract: specs/005-read-api/contracts/rest.md
 }
