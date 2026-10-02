@@ -19,4 +19,6 @@ Changes:
   port-channel with LACP fallback and the upstream template rejects.
   The catch-all rule for lines starting with a number takes one word after it instead of two, so
   a VXLAN flood list line ("40 10.0.255.13") no longer fails the parse.
+  The VXLAN rules also accept "Dynamic VLAN to VNI mapping" and a mapping line with a VRF name
+  ("[gold, 100001]"), which an EVPN leaf prints.
 - testdata/ntc/show_interfaces*.yml: the interface key became port, to match the template.
