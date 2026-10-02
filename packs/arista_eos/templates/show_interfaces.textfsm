@@ -45,10 +45,10 @@ Start
   ^\s+Replication/Flood\s+Mode
   ^\s+Remote\s+MAC\s+learning
   ^\s+VNI\s+mapping
-  ^\s+\[(\d+(,\s+)?)+\]
+  ^\s+\[.*\]
   ^\s+Note:
   ^\s+Use\s+'show.*'
-  ^\s+Static\s+V(RF|LAN)
+  ^\s+(Static|Dynamic)\s+V(RF|LAN)
   ^\s+Headend\s+replication
   ^\s+\d+\s+\S+
   ^\s+MLAG\s+Shared\s+Router\s+MAC

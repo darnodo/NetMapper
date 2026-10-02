@@ -1,0 +1,9 @@
+Port       Name           Status       Vlan     Duplex Speed  Type            Flags Encapsulation
+Et1        campus-access2 connected    in Po1   full   1G     EbraTestPhyPort                   
+Et10       mlag peer link connected    in Po999 full   1G     EbraTestPhyPort                   
+Et11       campus-spine1  connected    routed   full   1G     EbraTestPhyPort                   
+Et12       campus-spine2  connected    routed   full   1G     EbraTestPhyPort                   
+Ma0                       connected    routed   a-full a-1G   10/100/1000                       
+Po1        campus-access2 connected    trunk    full   2G     N/A                               
+Po999      MLAG Peer      connected    trunk    full   1G     N/A                               
+
