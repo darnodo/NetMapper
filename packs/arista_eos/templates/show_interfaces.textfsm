@@ -33,7 +33,7 @@ Start
   ^\s+\d+\s+late\s+collision,
   ^\s+Loopback\s+Mode\s*:
   ^\s+Active\s+members
-  ^\s+Fallback\s+mode
+  ^\s+Fallback\s+(mode|timeout)
   ^\s+IPv6\s+link-local
   ^\s+.+IPv6\s+global\s+unicast
   ^\s+[\dA-Fa-f:]+,\s+subnet\s+is
@@ -50,7 +50,7 @@ Start
   ^\s+Use\s+'show.*'
   ^\s+Static\s+V(RF|LAN)
   ^\s+Headend\s+replication
-  ^\s+\d+\s+\S+\s+\S+
+  ^\s+\d+\s+\S+
   ^\s+MLAG\s+Shared\s+Router\s+MAC
   ^\s*$$
   ^. -> Error

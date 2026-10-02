@@ -1,0 +1,196 @@
+Ethernet1 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.abdb.401f (bia aac1.abdb.401f)
+  Description: dc-access1
+  Member of Port-Channel1
+  Ethernet MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 52 minutes, 17 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 586 bps (0.0% with framing overhead), 1 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     3776 packets input, 496695 bytes
+     Received 0 broadcasts, 3776 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     7 packets output, 636 bytes
+     Sent 0 broadcasts, 7 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet10 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.abb5.2b69 (bia aac1.abb5.2b69)
+  Description: mlag peer link
+  Member of Port-Channel999
+  Ethernet MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 54 minutes, 26 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 1.85 kbps (0.0% with framing overhead), 3 packets/sec
+  5 minutes output rate 1.95 kbps (0.0% with framing overhead), 3 packets/sec
+     18963 packets input, 1617548 bytes
+     Received 1 broadcasts, 465 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     18511 packets output, 1698761 bytes
+     Sent 7 broadcasts, 9 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet11 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.ab64.e08f (bia aac1.ab64.e08f)
+  Description: dc-spine1
+  Internet address is 10.0.1.3/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 52 minutes, 17 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 93 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     505 packets input, 79340 bytes
+     Received 4 broadcasts, 225 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     0 packets output, 0 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet12 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.ab8f.43c6 (bia aac1.ab8f.43c6)
+  Description: dc-spine2
+  Internet address is 10.0.2.3/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 52 minutes, 17 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 145 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     1143 packets input, 138272 bytes
+     Received 0 broadcasts, 226 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     10 packets output, 910 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Loopback0 is up, line protocol is up (connected)
+  Hardware is Loopback
+  Description: Router-ID
+  Internet address is 10.0.250.12/32
+  Broadcast address is 255.255.255.255
+  IP MTU 65535 bytes (default)
+  Up 1 hour, 55 minutes, 20 seconds
+Loopback1 is up, line protocol is up (connected)
+  Hardware is Loopback
+  Description: VTEP
+  Internet address is 10.0.255.11/32
+  Broadcast address is 255.255.255.255
+  IP MTU 65535 bytes (default)
+  Up 1 hour, 55 minutes, 20 seconds
+Management0 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is 001c.73ee.5623 (bia 001c.73ee.5623)
+  Internet address is 172.16.0.50/24
+  Broadcast address is 255.255.255.255
+  IP MTU 1500 bytes (default), BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: on, uni-link: n/a
+  Up 1 hour, 55 minutes, 20 seconds
+  Loopback Mode : None
+  3 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 7.35 kbps (0.0% with framing overhead), 10 packets/sec
+  5 minutes output rate 106 kbps (0.0% with framing overhead), 17 packets/sec
+     68987 packets input, 6144654 bytes
+     Received 0 broadcasts, 0 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     108313 packets output, 86961816 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Port-Channel1 is up, line protocol is up (connected)
+  Hardware is Port-Channel, address is aac1.abdb.401f
+  Description: dc-access1
+  Ethernet MTU 9214 bytes, BW 2000000 kbit
+  Full-duplex, 2Gb/s 
+  Active members in this channel: 2
+  ... Ethernet1 , Full-duplex, 1Gb/s
+  ... PeerEthernet1 , Full-duplex, 1Gb/s
+  Fallback mode is: individual
+  Fallback mode status: Monitoring
+  Fallback timeout is 5 seconds
+  Up 1 hour, 52 minutes, 14 seconds
+  2 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 588 bps (0.0% with framing overhead), 1 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     3754 packets input, 493517 bytes
+     Received 0 broadcasts, 3754 multicast
+     0 input errors, 0 input discards
+     5 packets output, 390 bytes
+     Sent 0 broadcasts, 5 multicast
+     0 output errors, 0 output discards
+Port-Channel999 is up, line protocol is up (connected)
+  Hardware is Port-Channel, address is aac1.abb5.2b69
+  Description: MLAG Peer
+  Ethernet MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s 
+  Active members in this channel: 1
+  ... Ethernet10 , Full-duplex, 1Gb/s
+  Fallback mode is: off
+  Up 1 hour, 52 minutes, 34 seconds
+  2 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 1.84 kbps (0.0% with framing overhead), 3 packets/sec
+  5 minutes output rate 1.94 kbps (0.0% with framing overhead), 3 packets/sec
+     18952 packets input, 1616520 bytes
+     Received 1 broadcasts, 457 multicast
+     0 input errors, 0 input discards
+     18508 packets output, 1698459 bytes
+     Sent 7 broadcasts, 9 multicast
+     0 output errors, 0 output discards
+Vlan4090 is up, line protocol is up (connected)
+  Hardware is Vlan, address is 001c.73ee.5624 (bia 001c.73ee.5624)
+  Description: MLAG Peer-Link
+  Internet address is 10.0.199.255/31
+  Broadcast address is 255.255.255.255
+  IP MTU 1500 bytes (default)
+  Up 1 hour, 55 minutes, 22 seconds
+Vlan4091 is up, line protocol is up (connected)
+  Hardware is Vlan, address is 001c.73ee.5624 (bia 001c.73ee.5624)
+  Description: MLAG iBGP Peering
+  Internet address is 10.0.3.1/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes
+  Up 1 hour, 52 minutes, 16 seconds
+Vxlan1 is up, line protocol is up (connected)
+  Hardware is Vxlan
+  Source interface is Loopback1 and is active with 10.0.255.11
+  Listening on UDP port 4789
+  Replication/Flood Mode is headend with Flood List Source: EVPN
+  Remote MAC learning via EVPN
+  VNI mapping to VLANs
+  Static VLAN to VNI mapping is 
+    [40, 110040]     
+  Note: All Dynamic VLANs used by VCS are internal VLANs.
+        Use 'show vxlan vni' for details.
+  Static VRF to VNI mapping is not configured
+  Headend replication flood vtep list is:
+    40 10.0.255.13    
+  MLAG Shared Router MAC is 0000.0000.0000
