@@ -13,3 +13,10 @@ Changes:
 - testdata/ntc/show_lldp_neighbors_detail.yml: each row gained mgmt_address_subtype, read from the
   "Management Address Subtype" line of the same neighbour in the .raw file.
 - testdata/ntc/: test fixtures renamed without the arista_eos_ prefix.
+- templates/show_interfaces.textfsm: renamed from arista_eos_show_interfaces.textfsm; the
+  INTERFACE value became PORT, so the interfaces recipe maps the port of both its steps with one
+  name. The Fallback rule also accepts "Fallback timeout is N seconds", which EOS prints on a
+  port-channel with LACP fallback and the upstream template rejects.
+  The catch-all rule for lines starting with a number takes one word after it instead of two, so
+  a VXLAN flood list line ("40 10.0.255.13") no longer fails the parse.
+- testdata/ntc/show_interfaces*.yml: the interface key became port, to match the template.

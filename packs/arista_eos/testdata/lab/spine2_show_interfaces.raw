@@ -1,0 +1,166 @@
+Ethernet1 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.abf7.c875 (bia aac1.abf7.c875)
+  Description: campus-leaf1
+  Internet address is 10.1.2.0/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 52 minutes, 19 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 119 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     819 packets input, 107507 bytes
+     Received 5 broadcasts, 226 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     0 packets output, 0 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet2 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.ab35.834b (bia aac1.ab35.834b)
+  Description: campus-leaf2
+  Internet address is 10.1.2.2/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 52 minutes, 19 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 120 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     786 packets input, 104573 bytes
+     Received 3 broadcasts, 225 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     0 packets output, 0 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet3 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.ab04.3be1 (bia aac1.ab04.3be1)
+  Description: campus-leaf3
+  Internet address is 10.1.2.4/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 50 minutes, 14 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 120 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     770 packets input, 103476 bytes
+     Received 0 broadcasts, 221 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     0 packets output, 0 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet4 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.ab5c.f246 (bia aac1.ab5c.f246)
+  Description: campus-leaf4
+  Internet address is 10.1.2.6/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 50 minutes, 14 seconds
+  Loopback Mode : None
+  6 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 122 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     777 packets input, 104007 bytes
+     Received 4 broadcasts, 228 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     0 packets output, 0 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet5 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.ab4e.9a0f (bia aac1.ab4e.9a0f)
+  Description: campus-border-leaf1
+  Internet address is 10.1.2.8/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 50 minutes, 17 seconds
+  Loopback Mode : None
+  6 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 122 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     784 packets input, 105729 bytes
+     Received 4 broadcasts, 228 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     0 packets output, 0 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Ethernet6 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is aac1.ab72.47a0 (bia aac1.ab72.47a0)
+  Description: campus-border-leaf2
+  Internet address is 10.1.2.10/31
+  Broadcast address is 255.255.255.255
+  IP MTU 9214 bytes, BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: off, uni-link: n/a
+  Up 1 hour, 50 minutes, 17 seconds
+  Loopback Mode : None
+  4 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 121 bps (0.0% with framing overhead), 0 packets/sec
+  5 minutes output rate 0 bps (0.0% with framing overhead), 0 packets/sec
+     790 packets input, 105741 bytes
+     Received 5 broadcasts, 222 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     0 packets output, 0 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output
+Loopback0 is up, line protocol is up (connected)
+  Hardware is Loopback
+  Internet address is 10.1.250.2/32
+  Broadcast address is 255.255.255.255
+  IP MTU 65535 bytes (default)
+  Up 1 hour, 53 minutes, 24 seconds
+Management0 is up, line protocol is up (connected)
+  Hardware is Ethernet, address is 001c.73d3.d08a (bia 001c.73d3.d08a)
+  Internet address is 172.16.0.21/24
+  Broadcast address is 255.255.255.255
+  IP MTU 1500 bytes (default), BW 1000000 kbit
+  Full-duplex, 1Gb/s, auto negotiation: on, uni-link: n/a
+  Up 1 hour, 53 minutes, 31 seconds
+  Loopback Mode : None
+  3 link status changes since last clear
+  Last clearing of "show interface" counters never
+  5 minutes input rate 7.43 kbps (0.0% with framing overhead), 11 packets/sec
+  5 minutes output rate 115 kbps (0.0% with framing overhead), 18 packets/sec
+     70140 packets input, 6166116 bytes
+     Received 0 broadcasts, 0 multicast
+     0 runts, 0 giants
+     0 input errors, 0 CRC, 0 alignment, 0 symbol, 0 input discards
+     0 PAUSE input
+     117212 packets output, 94034741 bytes
+     Sent 0 broadcasts, 0 multicast
+     0 output errors, 0 collisions
+     0 late collision, 0 deferred, 0 output discards
+     0 PAUSE output

@@ -6,11 +6,16 @@ implementations:
     steps:
       - command: show interfaces status | no-more
         template: show_interfaces_status.textfsm
-    map:
+      - command: show interfaces | no-more   # MTU and MAC, absent from the status table
+        template: show_interfaces.textfsm
+    merge_on: [name]
+    map:                             # shared by both steps: PORT is the port in both templates
       name: PORT
       description: NAME
       admin_state: STATUS
       oper_state: STATUS
+      mtu: MTU
+      mac: MAC_ADDRESS
     values:
       admin_state: { disabled: down, '*': up }
       oper_state: { connected: up, notconnect: down, disabled: down, errdisabled: down, inactive: down, '*': other }
