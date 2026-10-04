@@ -275,3 +275,10 @@ dc-leaf1 and campus-access1 (eAPI, text format), cEOS 4.36.0F. No recording hold
 - **Out of scope, tracked as #26**: on the full lab, sw1 and sw4 (same serial, different chassis MAC)
   resolve to one entity with no `identity_conflict`, against 003 quickstart section 4. `main` does
   the same and this feature changes nothing in resolution (T050).
+- **Cleartext eAPI is its own row** (found when checking the crawl against issue #25). The eAPI
+  template read the HTTPS line only, so `protocol http` went unseen. A second step, `show management
+  api http-commands | include ^HTTP server`, gives an `eapi` row with `transport: http` when that
+  server is `running` or `starting`; `shutdown`, and `enabled` (API off), are declared empty.
+  Recorded on dc-leaf1 with `protocol http` set for the recording, then removed. The SSH and telnet
+  port and the names of authorization and accounting method lists are not printed by the commands
+  used: tracked as an issue.

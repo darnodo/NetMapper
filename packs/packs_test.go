@@ -158,6 +158,9 @@ func TestSNMPAgentDisabled(t *testing.T) {
 			name = "sw1nosnmp_show_snmp.raw"
 		}
 		b, err := os.ReadFile(filepath.Join("arista_eos/testdata/lab", name))
+		if os.IsNotExist(err) {
+			b, err = os.ReadFile(filepath.Join("arista_eos/testdata/lab", strings.TrimSuffix(name, ".raw")+"_empty.raw"))
+		}
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,6 +179,43 @@ func TestSNMPAgentDisabled(t *testing.T) {
 		}
 	}
 	t.Error("no snmp row")
+}
+
+// eAPI with `protocol http` (recorded on the EVPN lab's dc-leaf1, cEOS 4.36, then reverted): a
+// second eapi row says cleartext HTTP is served, which is what an audit looks for (issue #25).
+func TestEAPIOverHTTP(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "management_apis", "4.36.0F")[0]
+	var outputs [][]byte
+	for _, st := range im.Steps {
+		base := strings.TrimSuffix(st.Template, ".textfsm")
+		sw := "dc-leaf1"
+		if strings.HasPrefix(base, "show_management_api_http") {
+			sw = "dc-leaf1http"
+		}
+		b, err := os.ReadFile(filepath.Join("arista_eos/testdata/lab", sw+"_"+base+".raw"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		outputs = append(outputs, b)
+	}
+	status, rows, err := parse.Parse(reg, "arista_eos", "management_apis", im, outputs)
+	if status != parse.Collected {
+		t.Fatalf("%s %v", status, err)
+	}
+	var eapi []string
+	for _, r := range rows {
+		if r["api"] == "eapi" {
+			eapi = append(eapi, fmt.Sprint(r["transport"], " ", r["port"], " ", r["enabled"]))
+		}
+	}
+	slices.Sort(eapi)
+	if want := []string{"http 80 yes", "https 443 yes"}; !slices.Equal(eapi, want) {
+		t.Errorf("eapi rows %v, want %v", eapi, want)
+	}
 }
 
 // The management address is stored with its LLDP subtype, so an IP and a MAC are never confused.

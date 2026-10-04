@@ -127,7 +127,8 @@ One row per local account.
 
 ### management_apis
 
-One row per management API.
+One row per management API and transport: gNMI gives a row per transport, and eAPI a second row,
+`transport: http`, when its cleartext HTTP server runs.
 
 | Field     | Type    | Required | Values / notes |
 | --------- | ------- | -------- | -------------- |

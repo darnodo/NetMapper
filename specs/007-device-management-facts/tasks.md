@@ -231,3 +231,9 @@ session around it: record everything in one sitting, then everything up to T041 
 ## Phase 9: Convergence
 
 - [X] T052 Done 2026-10-04: darnodo/NetMapper#26. Open a GitHub issue for the identity-resolution defect found in T050 (sw1 and sw4 of test/lab, same serial and different chassis MAC, resolve to one entity keyed on sw1's previous MAC with no identity_conflict finding; same result with `netmapper resolve` from `main`), and link it from specs/007-device-management-facts/research.md R13 as out of scope for this feature, per FR-013 (partial)
+
+---
+
+## Phase 10: Follow-up from the live crawl
+
+- [X] T053 Report eAPI's cleartext HTTP server as a second `eapi` row (`transport: http`) when it runs: new step `show management api http-commands | include ^HTTP server` in packs/arista_eos/recipes/management_apis.yaml, template show_management_api_http_server.textfsm, recording dc-leaf1http_* (EVPN lab dc-leaf1 with `protocol http` set for the recording, then removed), `_empty` recordings for sw1, sw2, dc-leaf1 and campus-access1 taken from the `HTTP server` line of their existing recordings, TestEAPIOverHTTP, per FR-005 (partial)
