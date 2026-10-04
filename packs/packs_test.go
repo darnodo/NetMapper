@@ -118,7 +118,6 @@ func parseRecorded(t *testing.T, p *pack.Pack, raw string) {
 	}
 }
 
-// The management address is stored with its LLDP subtype, so an IP and a MAC are never confused.
 // A management output the template does not understand is parse_failed, never empty: an auditor
 // reads empty as "nothing configured" (feature 007, FR-012).
 func TestDriftIsNotEmpty(t *testing.T) {
@@ -143,6 +142,7 @@ func TestDriftIsNotEmpty(t *testing.T) {
 	}
 }
 
+// The management address is stored with its LLDP subtype, so an IP and a MAC are never confused.
 func TestLLDPAddressKeepsItsType(t *testing.T) {
 	reg, err := pack.LoadRoot(".")
 	if err != nil {

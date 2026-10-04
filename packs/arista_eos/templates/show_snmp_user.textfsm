@@ -1,11 +1,12 @@
 Value USER (\S+)
+Value MODEL (\S+)
 Value AUTH (\S+)
 Value PRIV (\S+)
 Value GROUP (\S+)
 
 Start
   ^User name\s+:\s+${USER}\s*$$
-  ^Security model\s+:
+  ^Security model\s+:\s+${MODEL}\s*$$
   ^Engine ID\s+:
   ^Authentication\s+:\s+${AUTH}\s*$$
   ^Privacy\s+:\s+${PRIV}\s*$$

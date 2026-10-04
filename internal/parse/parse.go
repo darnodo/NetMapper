@@ -30,10 +30,16 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 	p := reg.Pack(platform)
 	empty := true
 	for i, st := range im.Steps {
+		fields := im.Map
+		if len(st.Map) > 0 {
+			fields = map[string]string{} // im.Map may be nil: a recipe can map per step only
+			maps.Copy(fields, im.Map)
+			maps.Copy(fields, st.Map)
+		}
 		var raw []map[string]any
 		switch {
 		case st.Walk != "":
-			raw, err = walkRows(outputs[i], im.Map)
+			raw, err = walkRows(outputs[i], fields)
 		case nothing(st.EmptyLines, outputs[i]):
 		default:
 			raw, err = textFSM(p.Templates[st.Template], outputs[i])
@@ -48,12 +54,6 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 			continue
 		}
 		empty = false
-		fields := im.Map
-		if len(st.Map) > 0 {
-			fields = map[string]string{} // im.Map may be nil: a recipe can map per step only
-			maps.Copy(fields, im.Map)
-			maps.Copy(fields, st.Map)
-		}
 		var mapped []map[string]any
 		for _, r := range raw {
 			m, err := mapRow(reg, platform, family, im, fields, r)

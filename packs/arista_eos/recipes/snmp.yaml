@@ -9,9 +9,11 @@ implementations:
       - command: show running-config sanitized | include ^snmp-server community | no-more
         template: show_running_config_sanitized_snmp_community.textfsm
         map: { version: '=v2c', access: ACCESS, acl: ACL }
+      # The security model as printed (v3, or v2c for a user mapped to a v2c group). A v1 user is
+      # outside the schema: the family is parse_failed rather than mislabelled.
       - command: show snmp user | no-more
         template: show_snmp_user.textfsm
-        map: { version: '=v3', user: USER, group: GROUP, auth_protocol: AUTH, priv_protocol: PRIV }
+        map: { version: MODEL, user: USER, group: GROUP, auth_protocol: AUTH, priv_protocol: PRIV }
     values:
-      auth_protocol: { MD5: md5, SHA: sha, SHA-224: sha224, SHA-256: sha256, SHA-384: sha384, SHA-512: sha512 }
+      auth_protocol: { None: '', MD5: md5, SHA: sha, SHA-224: sha224, SHA-256: sha256, SHA-384: sha384, SHA-512: sha512 }
       priv_protocol: { None: '', DES: des, 3DES: 3des, AES-128: aes, AES-192: aes192, AES-256: aes256 }

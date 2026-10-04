@@ -1,8 +1,11 @@
-# The SNMP agent as a management API: the VRFs it runs in. MAXSIZE is always printed and keeps
-# one row when the agent runs nowhere.
+# The SNMP agent as a management API: the VRFs it runs in. MAXSIZE is always printed when the agent
+# is configured and keeps one row when it runs nowhere. With no community or user, EOS prints only
+# "SNMP agent disabled: ...": DISABLED keeps a row then too, so the recipe can say enabled: no.
 Value VRFS (.+?)
 Value MAXSIZE (\d+)
+Value DISABLED (\S.*?)
 
 Start
+  ^SNMP agent disabled:\s+${DISABLED}\s*$$
   ^SNMP agent enabled in VRFs:\s+${VRFS}\s*$$
   ^Transmit message maximum size:\s+${MAXSIZE}\s*$$
