@@ -56,8 +56,8 @@ One file per step command of the recipes, sent exactly as the recipe writes it, 
 `<switch>_<template name>.raw`; sw1 outputs that give no row get `_empty` in their name. Three
 details (research R13):
 
-- the configuration reads use `| include ^snmp-server community` and `| include ^ntp server`, not
-  `| section`, which would take `| no-more` into its pattern and print nothing;
+- a step that filters ends with the filter, with no `| no-more` after it: `include` and `section`
+  take the rest of the line, pipe included, as their pattern (research R13);
 - syslog is `show logging | include Logging to`, never the full `show logging` and its log buffer;
 - `Cli -c` echoes a piped command as a first line `> <command>` that the collector's SSH session
   does not see: strip it (`sed -i '1{/^> /d}' *.raw`).

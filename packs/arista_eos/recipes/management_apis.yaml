@@ -10,8 +10,9 @@ implementations:
       - command: show management api http-commands | no-more
         template: show_management_api_http_commands.textfsm
         map: { api: '=eapi', transport: '=https' }
-      # A second eapi row when the cleartext HTTP server runs (protocol http).
-      - command: show management api http-commands | include ^HTTP server | no-more
+      # A second eapi row when the cleartext HTTP server runs (protocol http). No `| no-more` after
+      # `include`: with it, the pattern became '^HTTP server | no-more' and matched nothing.
+      - command: show management api http-commands | include ^HTTP server
         template: show_management_api_http_server.textfsm
         empty_lines: ['^HTTP server: (shutdown|enabled), .*$']
         map: { api: '=eapi', transport: '=http', enabled: '=yes' }

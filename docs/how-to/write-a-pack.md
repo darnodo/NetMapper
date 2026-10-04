@@ -180,7 +180,8 @@ implementations:                     # the first one whose version and transport
 - **No command may print a secret.** Every output is stored as evidence and served by the API: a
   community string, a server key or a password hash in it is a secret in the database. Use a
   command that does not print it, or the platform's sanitized configuration (`show running-config
-  sanitized` on EOS) filtered with `include`. `TestNoSecretInRecordedOutput` scans every recording
+  sanitized` on EOS) filtered with `include`. On EOS a filter takes the rest of the line as its
+  pattern, so end such a command with the filter, not with `| no-more`. `TestNoSecretInRecordedOutput` scans every recording
   under `testdata/lab/` for the lab secrets, hashes and type 7 keys; record from a lab whose
   secrets are distinctive strings so that scan means something.
 - SNMP steps use `walk: <oid>` instead of a command and template. The parser supports them, but no

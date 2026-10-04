@@ -216,10 +216,13 @@ warning still says what is lost.
 Recorded from `test/lab` sw1 and sw2 (`docker exec ... Cli`) and from arista-evpn-vxlan-clab
 dc-leaf1 and campus-access1 (eAPI, text format), cEOS 4.36.0F. No recording holds a secret.
 
-- **`| section` swallows the next pipe.** `show running-config sanitized | section snmp-server
-  community | no-more` prints nothing: `section` takes the rest of the line, `| no-more` included,
-  as its pattern. Both configuration reads use `| include ^snmp-server community` and
-  `| include ^ntp server` instead; each item is one line, so nothing is lost.
+- **A filter swallows the next pipe.** `section` and `include` both take the rest of the line,
+  `| no-more` included, as their pattern: `| include ^ntp server | no-more` is the regular
+  expression `^ntp server | no-more`, which matched only because the wanted lines have a space
+  after `server`; `^HTTP server | no-more` matched nothing (found by a crawl of the EVPN lab after
+  T053). So a step that filters ends with the filter, never with `| no-more`; the filtered output
+  is a few lines and does not page. Configuration reads use `| include ^snmp-server community` and
+  `| include ^ntp server`, each item being one line.
 - **`show logging` prints the whole log buffer** (12 KB on dc-leaf1 and growing): stored on every
   crawl and full of messages nobody reviewed for secrets. The step is `show logging | include
   Logging to`, which keeps the host lines only.

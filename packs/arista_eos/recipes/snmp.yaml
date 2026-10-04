@@ -5,8 +5,9 @@ implementations:
     transport: ssh
     steps:
       # v2c from the sanitized configuration: `show snmp community` prints the strings (research R1).
-      # `include`, not `section`: section would take `| no-more` as part of its pattern (R13).
-      - command: show running-config sanitized | include ^snmp-server community | no-more
+      # No `| no-more` after `include`: EOS takes the rest of the line, pipe included, as the pattern
+      # (research R13). The filtered output is a few lines, so nothing pages.
+      - command: show running-config sanitized | include ^snmp-server community
         template: show_running_config_sanitized_snmp_community.textfsm
         map: { version: '=v2c', access: ACCESS, acl: ACL }
       # The security model as printed (v3, or v2c for a user mapped to a v2c group). A v1 user is
