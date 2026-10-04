@@ -281,4 +281,4 @@ dc-leaf1 and campus-access1 (eAPI, text format), cEOS 4.36.0F. No recording hold
   server is `running` or `starting`; `shutdown`, and `enabled` (API off), are declared empty.
   Recorded on dc-leaf1 with `protocol http` set for the recording, then removed. The SSH and telnet
   port and the names of authorization and accounting method lists are not printed by the commands
-  used: tracked as an issue.
+  used: tracked as #28.
