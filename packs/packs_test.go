@@ -142,6 +142,42 @@ func TestDriftIsNotEmpty(t *testing.T) {
 	}
 }
 
+// An EOS switch with no SNMP community and no user still prints "SNMP agent enabled in VRFs:
+// default", then "SNMP agent disabled" (recorded on test/lab sw1, cEOS 4.36). The agent row must say
+// enabled: no and list no VRF.
+func TestSNMPAgentDisabled(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "management_apis", "4.36.0F")[0]
+	var outputs [][]byte
+	for _, st := range im.Steps {
+		name := "sw1_" + strings.TrimSuffix(st.Template, ".textfsm") + ".raw"
+		if st.Template == "show_snmp.textfsm" {
+			name = "sw1nosnmp_show_snmp.raw"
+		}
+		b, err := os.ReadFile(filepath.Join("arista_eos/testdata/lab", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		outputs = append(outputs, b)
+	}
+	status, rows, err := parse.Parse(reg, "arista_eos", "management_apis", im, outputs)
+	if status != parse.Collected {
+		t.Fatalf("%s %v", status, err)
+	}
+	for _, r := range rows {
+		if r["api"] == "snmp" {
+			if r["enabled"] != "no" || r["vrfs"] != nil {
+				t.Errorf("snmp row %v, want enabled no and no vrfs", r)
+			}
+			return
+		}
+	}
+	t.Error("no snmp row")
+}
+
 // The management address is stored with its LLDP subtype, so an IP and a MAC are never confused.
 func TestLLDPAddressKeepsItsType(t *testing.T) {
 	reg, err := pack.LoadRoot(".")

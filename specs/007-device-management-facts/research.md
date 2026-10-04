@@ -133,7 +133,9 @@ and evidence.
 - The active parse generation is the one replay produced; reading another would serve rows a parser
   fix has superseded.
 - `netmapper_api` already holds SELECT on `observation`; the task table is not needed and stays
-  ungranted.
+  ungranted. Filtering on the active parse generation needs SELECT on `parse_generation`, which the
+  role did not have: migration 0010 grants it (found during implementation). The table holds ids, a
+  timestamp and the `active` flag; the collector and engine roles already read it.
 - `internal/fact` is not on the API's forbidden import list; reading the family names from it keeps
   one source of truth.
 - `not_collected` (clarification Q2): the device exists and no observation of the family matches.
@@ -251,3 +253,8 @@ dc-leaf1 and campus-access1 (eAPI, text format), cEOS 4.36.0F. No recording hold
   `parse_failed`. The SSH, telnet and SNMP templates capture one line that is always there (a
   session or size limit), not mapped to any field, so a switch with SSH off in every VRF still gives
   an `ssh` row with `enabled: no` (from `defaults`).
+- **Versions: `>=4.36` until an older release is recorded.** Every recording, and so the secret scan,
+  comes from cEOS 4.36.0F. A recipe that declared `>=4.20` would run commands on releases where
+  nobody checked what they print. An older device gets `unsupported` with `no_matching_version`
+  for the six families, which is visible, instead of an unchecked output in the database. Widening
+  the range means recording that release and passing `TestNoSecretInRecordedOutput` on it.

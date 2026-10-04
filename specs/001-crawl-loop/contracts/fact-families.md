@@ -92,9 +92,9 @@ One row per v2c community or v3 user.
 | Field         | Type   | Required | Values / notes |
 | ------------- | ------ | -------- | -------------- |
 | version       | string | yes      | `v2c`, `v3` |
-| access        | string | v2c      | `ro`, `rw` |
+| access        | string | no       | `ro`, `rw`; set for v2c |
 | acl           | string | no       | ACL name bound to the community |
-| user          | string | v3       | v3 user name |
+| user          | string | no       | set for v3 |
 | group         | string | no       | v3 group |
 | auth_protocol | string | no       | `md5`, `sha`, `sha224`, `sha256`, `sha384`, `sha512` (names of feature 006) |
 | priv_protocol | string | no       | `des`, `3des`, `aes`, `aes192`, `aes256`; absent means authNoPriv (research R4) |

@@ -197,3 +197,14 @@ then each family's recipe task (T018, T020, T022, T024, T026, T028), which touch
 
 The one hard external dependency is the `NetLab` VM, needed at T005 and again at T042/T043. Plan the
 session around it: record everything in one sitting, then everything up to T041 runs offline.
+
+---
+
+## Phase 7: Convergence
+
+- [ ] T044 [VM] Crawl test/lab (sw1, sw2, already deployed on NetLab) with quickstart.md section 4, once 172.20.20.0/24 is routed over the Tailnet or the stack runs on the VM: sw2 rows match test/lab/sw2.cfg, the sw1 empty cases hold, sw3, sw4 and the SNMPv3 read of sw2 keep their 001/006 outcomes, crawl duration within a few seconds of `main`, no `nm-lab-secret-` in parsed facts or stored raw output, per SC-002 (partial)
+- [X] T045 Record in specs/007-device-management-facts/plan.md (Technical Context "Storage") and research.md R8 that migration 0010 grants `netmapper_api` SELECT on `parse_generation`, and why the facts endpoint needs it, per plan: storage decision "No migration" (contradicts)
+- [X] T046 Narrow `versions` to '>=4.36' in the six recipes packs/arista_eos/recipes/{snmp,aaa_servers,local_users,management_apis,aaa_methods,management_servers}.yaml until an older EOS release is recorded and passes TestNoSecretInRecordedOutput, and note the reason in research.md R13, per spec edge case "version without the command" and FR-009 (partial)
+- [X] T047 Fix specs/007-device-management-facts/quickstart.md: section 3 gets the `| include` commands of the recipes, the stripping of the `> <command>` echo line that `Cli -c` adds, and `show logging | include Logging to`; section 4 expects `empty` on sw1 for `aaa_servers` and `management_servers` only (EOS always prints its method lists, research R13), per FR-014a (partial)
+- [X] T048 [VM] Done 2026-10-04. EOS prints both "SNMP agent enabled in VRFs: default" and "SNMP agent disabled", so the template now clears on the disabled line. On test/lab sw1, remove the SNMP community, record `show snmp | no-more` into packs/arista_eos/testdata/lab/sw1nosnmp_show_snmp.raw, put the community back, then check the `SNMP agent disabled` rule of packs/arista_eos/templates/show_snmp.textfsm against the recording and add a test that this output gives `{api: snmp, enabled: no}`, per FR-013a (partial)
+- [X] T049 In specs/007-device-management-facts/data-model.md and specs/001-crawl-loop/contracts/fact-families.md, change the Required column of `snmp.access` and `snmp.user` from `v2c`/`v3` to `no`, with the note "set for v2c" / "set for v3", per FR-010 (partial)

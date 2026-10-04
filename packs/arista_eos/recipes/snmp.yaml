@@ -1,7 +1,7 @@
 family: snmp
 implementations:
   - id: snmp-cli
-    versions: '>=4.20'
+    versions: '>=4.36'   # only 4.36 recorded and scanned for secrets (research R13)
     transport: ssh
     steps:
       # v2c from the sanitized configuration: `show snmp community` prints the strings (research R1).

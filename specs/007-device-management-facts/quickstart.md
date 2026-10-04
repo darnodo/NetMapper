@@ -52,8 +52,17 @@ docker exec clab-netmapper-sw2 Cli -p 15 -c 'show tacacs | no-more' \
   > packs/arista_eos/testdata/lab/sw2_show_tacacs.raw
 ```
 
-One file per command of research R1, named `<switch>_<template name>.raw`; sw1 outputs that give no
-row get `_empty` in their name. Then, with no lab:
+One file per step command of the recipes, sent exactly as the recipe writes it, named
+`<switch>_<template name>.raw`; sw1 outputs that give no row get `_empty` in their name. Three
+details (research R13):
+
+- the configuration reads use `| include ^snmp-server community` and `| include ^ntp server`, not
+  `| section`, which would take `| no-more` into its pattern and print nothing;
+- syslog is `show logging | include Logging to`, never the full `show logging` and its log buffer;
+- `Cli -c` echoes a piped command as a first line `> <command>` that the collector's SSH session
+  does not see: strip it (`sed -i '1{/^> /d}' *.raw`).
+
+Then, with no lab:
 
 ```sh
 go test -count=1 ./packs/...
@@ -76,7 +85,9 @@ Expected:
 
 - sw2: the six families `collected`, rows matching `test/lab/sw2.cfg` (SC-002), including the VRF
   MGMT rows and the syslog host on port 1514.
-- sw1: `aaa_servers`, `aaa_methods` and `management_servers` are `empty`; `management_apis` lists SSH.
+- sw1: `aaa_servers` and `management_servers` are `empty`. `aaa_methods`, `management_apis` and
+  `local_users` are `collected`: EOS always prints its default method lists, SSH and its accounts
+  (research R13).
 - sw3, sw4 and the unused address keep the outcomes of 001 and 006; sw2 is still identified over
   SNMPv3.
 - Crawl duration within a few seconds of the same crawl on `main`: no login waits on the dead AAA

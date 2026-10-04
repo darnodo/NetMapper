@@ -27,7 +27,8 @@ Spec amendments from research, made in this change: `snmp` rows carry no VRF and
 `go.yaml.in/yaml/v3` (packs). No new dependency.
 
 **Storage**: none new. Rows go to `observation.parsed`, outputs to the object store, as for every
-family. No migration: `netmapper_api` already reads `observation`.
+family. One migration, 0010: `netmapper_api` already reads `observation`, and gains SELECT on
+`parse_generation` so the facts endpoint serves the active parse generation only (research R8).
 
 **Testing**: `go test ./...`; template fixtures in `packs/arista_eos/testdata/lab/` (`TestPacks`), a
 family-level test over recorded sw2 outputs, a secret scan, API tests under the `netmapper_api` role

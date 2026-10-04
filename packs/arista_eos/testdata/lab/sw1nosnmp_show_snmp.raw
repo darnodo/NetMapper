@@ -1,0 +1,4 @@
+Chassis: C059A90B2E33A4028A044312A394CEA3
+SNMP agent enabled in VRFs: default
+Transmit message maximum size: 65536
+SNMP agent disabled: Either no communities and no users are configured, or no VRFs are configured.
