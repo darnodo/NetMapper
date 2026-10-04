@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-04
 
-**Status**: Draft
+**Status**: Planned
 
 **Input**: User description: "Implement GitHub issue darnodo/NetMapper#25: collect device management
 config (SNMP v2c/v3, AAA servers RADIUS/TACACS+, AAA method lists, local users, management APIs
@@ -24,7 +24,7 @@ test lab configuration has to be updated too."
   `local_users`, `management_apis`, `aaa_methods`, `management_servers`.
 - **A v2c community is recorded by its existence and access level, never by its string.** A
   community string is a credential (constitution III). The row says "a read-write community exists,
-  bound to ACL SNMP-RW, in VRF default", which is what an audit asks, and nothing that opens a
+  bound to ACL SNMP-RW", which is what an audit asks, and nothing that opens a
   session.
 - **Nothing configured is `empty`, not `collected` with zero rows.** `empty` already means "the
   command ran and there was nothing to report" for every family. A device with no SNMP and a device
@@ -41,6 +41,10 @@ test lab configuration has to be updated too."
   every item, but it is a separate project and is not always running. Fixtures that the test suite
   depends on must be reproducible from this repository alone, so `test/lab` gets the management
   configuration. The EVPN lab stays a second source, for the variety a two-switch lab cannot give.
+- **SNMP VRFs are on the agent, not on each community.** Added during planning (research R2): EOS
+  binds the SNMP agent, not a community or a user, to VRFs, so the agent is a `management_apis` row
+  with its VRF list, and `snmp` rows have no VRF. Same for the security level (research R4): it
+  follows from the privacy protocol and is not stored.
 - **Which commands, and whether one configuration dump feeds several families, is a planning
   choice.** It depends on what the device masks in each output, which has to be checked against the
   lab. The spec fixes the outcome (no secret stored, every row type covered by a recorded fixture),
@@ -74,7 +78,7 @@ test lab configuration has to be updated too."
 An operator crawls an Arista network. For each device, NetMapper now also records which SNMP
 communities and v3 users exist, which AAA servers it points to, which local accounts exist, which
 management APIs are on, which method lists drive login and authorization, and which NTP, syslog and
-DNS servers it uses, each with its VRF. None of the stored outputs or facts contains a community
+DNS servers it uses, with the VRFs they use. None of the stored outputs or facts contains a community
 string, a server key or a password hash.
 
 **Why this priority**: this is the data the issue asks for, and the secret constraint is the
@@ -97,9 +101,10 @@ lab stopped: they pass from the recorded fixtures alone.
 3. **Given** that switch with an account holding an SSH key and accounts without one, **When** a
    crawl runs, **Then** `local_users` has one row per account with role and privilege, the key holder
    marked as having an SSH key, and no row holds a password hash or the key itself.
-4. **Given** that switch with gNMI, eAPI and NETCONF on and telnet shut down, **When** a crawl runs,
-   **Then** `management_apis` has a row per API with its enabled state, and telnet reads as not
-   enabled.
+4. **Given** that switch with gNMI, eAPI (in VRFs default and MGMT) and NETCONF on, telnet shut
+   down, and the SNMP agent in VRFs default and MGMT, **When** a crawl runs, **Then**
+   `management_apis` has a row per API, SSH and the SNMP agent included, with its enabled state and
+   VRFs, and telnet reads as not enabled.
 5. **Given** that switch with authentication (login, enable), authorization (exec, commands) and
    accounting (exec, commands, start-stop) method lists using a server group then `local`, and a
    `console` login list using `local` only, **When** a crawl runs, **Then** `aaa_methods` has one row
@@ -170,8 +175,9 @@ comes back with its status, its rows and its evidence.
 
 ### Edge Cases
 
-- A service bound to a non-default VRF: the VRF name is recorded as given. A service with no VRF
-  stated is recorded as `default`, so every row has a VRF and a consumer never guesses.
+- A server bound to a non-default VRF: the VRF name is recorded as given. A server with no VRF
+  stated is recorded as `default`, so every server row has a VRF and a consumer never guesses. An
+  API serving several VRFs lists them all.
 - A v3 user whose group has no matching `snmp-server group` line: the row is kept with what the
   device reports.
 - Two communities with the same access and ACL: two rows, indistinguishable by design. The count is
@@ -197,15 +203,17 @@ comes back with its status, its rows and its evidence.
 - **FR-001**: The fact schema MUST define six new platform-neutral families: `snmp`, `aaa_servers`,
   `local_users`, `management_apis`, `aaa_methods`, `management_servers`, with no vendor term in any
   field name or enum value.
-- **FR-002**: `snmp` MUST hold one row per v2c community or v3 user, with version, access level,
-  ACL and VRF for v2c, and user, group, authentication protocol, privacy protocol and security level
-  for v3. It MUST NOT hold a community string or a passphrase.
+- **FR-002**: `snmp` MUST hold one row per v2c community or v3 user, with version, access level and
+  ACL for v2c, and user, group, authentication protocol and privacy protocol for v3 (no privacy
+  protocol means authNoPriv; no separate security level field). It MUST NOT hold a community string
+  or a passphrase.
 - **FR-003**: `aaa_servers` MUST hold one row per RADIUS or TACACS+ server, with protocol, address,
   port when the device's output shows one, VRF and group. It MUST NOT hold a key.
 - **FR-004**: `local_users` MUST hold one row per local account, with name, role, privilege and
   whether an SSH key is set. It MUST NOT hold a password, a hash or a key.
 - **FR-005**: `management_apis` MUST hold one row per management API (gNMI, eAPI, NETCONF, SSH,
-  telnet), with whether it is enabled, and its transport, port and VRF when the device states them.
+  telnet, and the SNMP agent), with whether it is enabled, its transport and port when the device
+  states them, and the list of VRFs it serves.
 - **FR-006**: `aaa_methods` MUST hold one row per method list, with its type (`authentication`,
   `authorization`, `accounting`), its service (`login`, `enable`, `exec`, `commands`, `system`, or
   another the device names), the list name, the ordered list of methods, for the `commands` service
@@ -217,8 +225,10 @@ comes back with its status, its rows and its evidence.
 - **FR-007a**: A `port` field in any new family MUST hold only what the device's output shows,
   including a default port the device prints itself. A pack MUST NOT fill in a protocol's default
   port the device did not print.
-- **FR-008**: Every row of `snmp`, `aaa_servers`, `management_apis` and `management_servers` MUST
-  carry a VRF; a service with no VRF configured MUST be recorded as `default`.
+- **FR-008**: Every row of `aaa_servers` and `management_servers` MUST carry a VRF, `default` when
+  none is configured. `management_apis` rows carry the VRFs the API serves. `snmp` rows carry none:
+  on EOS SNMP is bound to VRFs per agent, so the agent's VRFs are on the `management_apis` row for
+  SNMP.
 - **FR-009**: Commands in the new Arista recipes MUST NOT print a secret: community strings, RADIUS,
   TACACS+ and NTP keys in any encoding, passwords and password hashes. This holds for the stored raw
   output, not only for the facts.
@@ -253,8 +263,8 @@ comes back with its status, its rows and its evidence.
 
 ### Key Entities
 
-- **SNMP access entry**: a v2c community (by access level, ACL and VRF, never its string) or a v3
-  user (by name, group, protocols and security level).
+- **SNMP access entry**: a v2c community (by access level and ACL, never its string) or a v3 user
+  (by name, group and protocols).
 - **AAA server**: a RADIUS or TACACS+ server the device sends authentication to, with its group and
   VRF.
 - **Local account**: an account defined on the device, its role and privilege, and whether key-based
