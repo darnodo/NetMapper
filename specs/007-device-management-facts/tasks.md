@@ -225,3 +225,9 @@ session around it: record everything in one sitting, then everything up to T041 
   the same 2 entities and 0 conflicts, and this branch changes nothing in internal/entity, graph or gate: an existing
   identity-resolution defect, not a regression of feature 007, to track as its own issue. Original task: Deploy test/lab sw3 on NetLab, crawl with lab-seeds and check sw3 is still `denied`; then deploy sw4 alone (`--node-filter sw4`, per test/lab/two-switch.clab.yaml) and replay 001 quickstart section 4, checking sw4 and sw1 are still kept apart on the conflicting serial now that sw4.cfg has `privilege 15` and `aaa authorization exec default local`, per FR-013 (partial)
 - [X] T051 Update the header comment of test/lab/two-switch.clab.yaml: the netmapper account is `privilege 15 role network-operator` with exec authorization on sw1, sw2 and sw4 (feature 007, docs/how-to/deploy.md), and sw1 carries that authorization line but no other management configuration, per FR-014a (partial)
+
+---
+
+## Phase 9: Convergence
+
+- [X] T052 Done 2026-10-04: darnodo/NetMapper#26. Open a GitHub issue for the identity-resolution defect found in T050 (sw1 and sw4 of test/lab, same serial and different chassis MAC, resolve to one entity keyed on sw1's previous MAC with no identity_conflict finding; same result with `netmapper resolve` from `main`), and link it from specs/007-device-management-facts/research.md R13 as out of scope for this feature, per FR-013 (partial)

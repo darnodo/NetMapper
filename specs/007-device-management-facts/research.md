@@ -272,3 +272,6 @@ dc-leaf1 and campus-access1 (eAPI, text format), cEOS 4.36.0F. No recording hold
   the generic driver only; the SSH session now drops a first line that ends with the whole command,
   or is a suffix of it of 8 characters or more (`internal/transport/ssh`, `dropEcho`). Three
   consecutive crawls after the fix: no family outside `collected` and `empty`.
+- **Out of scope, tracked as #26**: on the full lab, sw1 and sw4 (same serial, different chassis MAC)
+  resolve to one entity with no `identity_conflict`, against 003 quickstart section 4. `main` does
+  the same and this feature changes nothing in resolution (T050).
