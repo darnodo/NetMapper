@@ -1,0 +1,26 @@
+Chassis: 64647CE70783ED4C41154939835250CC
+0 SNMP packets input
+    0 Bad SNMP version errors
+    0 Unknown community name
+    0 Illegal operation for community name supplied
+    0 Encoding errors
+    0 Number of requested variables
+    0 Number of altered variables
+    0 Get-request PDUs
+    0 Get-next PDUs
+    0 Set-request PDUs
+0 SNMP packets output
+    0 Too big errors
+    0 No such name errors
+    0 Bad value errors
+    0 General errors
+    0 Response PDUs
+    0 Trap PDUs
+    0 Trap drops
+Access Control
+    2 Users
+    2 Groups
+    1 Views
+SNMP logging: disabled
+SNMP agent enabled in VRFs: default
+Transmit message maximum size: 65536

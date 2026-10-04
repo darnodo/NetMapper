@@ -1,0 +1,5 @@
+IP Address   VRF     Priority
+------------ ------- --------
+172.16.0.77  default        0
+172.16.0.99  default        0
+

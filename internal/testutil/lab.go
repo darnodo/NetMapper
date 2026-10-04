@@ -209,6 +209,20 @@ func (l *Lab) Int(sql string, args ...any) int {
 func (l *Lab) Outcomes(job int64) []string {
 	return l.Strings(`
 		SELECT host(o.target) || ' ' || o.fact_family || ' ' || o.status || coalesce(' ' || o.detail, '')
+		FROM observation o JOIN job j ON j.snapshot_id = o.snapshot_id
+		WHERE j.id = $1 AND NOT (o.fact_family = ANY($2) AND o.status = 'unsupported' AND o.detail = 'no_recipe')
+		ORDER BY 1`, job, ManagementFamilies)
+}
+
+// ManagementFamilies are the families of feature 007. fakeos has no recipe for them, on purpose:
+// every fakeos device records each one unsupported/no_recipe, which Outcomes leaves out so the
+// crawl tests keep reading what they test. AllOutcomes keeps them.
+var ManagementFamilies = []string{"snmp", "aaa_servers", "local_users", "management_apis", "aaa_methods", "management_servers"}
+
+// AllOutcomes is Outcomes with nothing left out.
+func (l *Lab) AllOutcomes(job int64) []string {
+	return l.Strings(`
+		SELECT host(o.target) || ' ' || o.fact_family || ' ' || o.status || coalesce(' ' || o.detail, '')
 		FROM observation o JOIN job j ON j.snapshot_id = o.snapshot_id WHERE j.id = $1 ORDER BY 1`, job)
 }
 

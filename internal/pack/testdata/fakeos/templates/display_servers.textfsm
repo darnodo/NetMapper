@@ -1,0 +1,7 @@
+Value ADDR (\S+)
+Value VRF (\S+)
+Value GROUP (\S+)
+
+Start
+  ^server ${ADDR}(\s+vrf\s+${VRF})?$$ -> Record
+  ^member ${GROUP} ${ADDR}(\s+vrf\s+${VRF})?$$ -> Record

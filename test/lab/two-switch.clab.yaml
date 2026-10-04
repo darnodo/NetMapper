@@ -1,7 +1,12 @@
 # containerlab topology for the crawl loop (quickstart.md section 2).
 #   sudo containerlab deploy -t test/lab/two-switch.clab.yaml
 # sw1 and sw2: Arista cEOS (image imported as ceos:latest), LLDP between them, SSH for the netmapper
-# user; SNMP v2c on sw1, SNMPv3 (SHA-256 / AES-256) only on sw2. sw3 answers SSH but has no netmapper user and no SNMP community: it
+# user; SNMP v2c on sw1, SNMPv3 (SHA-256 / AES-256) only on sw2. sw2 also carries the management
+# configuration of feature 007 (SNMP, AAA, local users, management APIs, NTP, syslog, DNS, a VRF
+# MGMT): its v2c communities are not in netmapper.yaml, so the crawl still reads it over SNMPv3 only,
+# and its AAA servers are dead addresses behind `local`. sw1 has none of it and is the `empty` case.
+# Record outputs with: docker exec clab-netmapper-sw2 Cli -p 15 -c '<command> | no-more'
+# sw3 answers SSH but has no netmapper user and no SNMP community: it
 # rejects every lab credential set (denied). 172.20.20.9 is inside the perimeter and unused
 # (unreachable). sw4 is a clone of sw1 for quickstart.md section 4: SERIALNUMBER is pinned to sw1's
 # serial while its chassis MAC stays its own, so the two devices contradict each other on a strong

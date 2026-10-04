@@ -1,0 +1,27 @@
+RADIUS server             : 192.0.2.20, authentication port 1812, accounting port 1813
+             Messages sent:          0
+         Messages received:          0
+         Requests accepted:          0
+         Requests rejected:          0
+       Requests challenged:          0
+          Requests timeout:          0
+    Requests retransmitted:          0
+             Bad responses:          0
+         Connection errors:          0
+                DNS errors:          0
+     CoA requests received:          0
+      DM requests received:          0
+             CoA ACKs sent:          0
+              DM ACKs sent:          0
+             CoA NAKs sent:          0
+              DM NAKs sent:          0
+    Accounting Starts sent:          0
+      Interim Updates sent:          0
+     Accounting Stops sent:          0
+Last Authentication request sent:    never
+Authentication requests sent:        0
+
+RADIUS server-group: NM-RADIUS
+     0: 192.0.2.20, authentication port 1812, accounting port 1813
+
+Last time counters were cleared: never

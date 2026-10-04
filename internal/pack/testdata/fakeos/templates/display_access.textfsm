@@ -1,0 +1,8 @@
+Value List VRFS (\S+)
+Value METHODS (.+)
+Value LIMIT (\d+)
+
+Start
+  ^vrf ${VRFS}$$
+  ^methods ${METHODS}$$
+  ^limit ${LIMIT}$$ -> Record

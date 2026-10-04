@@ -1,0 +1,51 @@
+TACACS+ server            : 192.0.2.10/49
+          Connection opens:          0
+         Connection closes:          0
+    Connection disconnects:          0
+       Connection failures:          0
+       Connection timeouts:          0
+             Messages sent:          0
+         Messages received:          0
+            Receive errors:          0
+          Receive timeouts:          0
+             Send timeouts:          0
+                DNS errors:          0
+ Unknown attribute ignored:          0
+Unknown attribute failures:          0
+
+TACACS+ server            : 192.0.2.11/49
+          Connection opens:          0
+         Connection closes:          0
+    Connection disconnects:          0
+       Connection failures:          0
+       Connection timeouts:          0
+             Messages sent:          0
+         Messages received:          0
+            Receive errors:          0
+          Receive timeouts:          0
+             Send timeouts:          0
+                DNS errors:          0
+ Unknown attribute ignored:          0
+Unknown attribute failures:          0
+
+TACACS+ server            : 192.0.2.12/49 (vrf MGMT)
+          Connection opens:          0
+         Connection closes:          0
+    Connection disconnects:          0
+       Connection failures:          0
+       Connection timeouts:          0
+             Messages sent:          0
+         Messages received:          0
+            Receive errors:          0
+          Receive timeouts:          0
+             Send timeouts:          0
+                DNS errors:          0
+ Unknown attribute ignored:          0
+Unknown attribute failures:          0
+
+TACACS+ server-group: NM-TACACS
+     0: 192.0.2.10/49
+     1: 192.0.2.11/49
+     2: 192.0.2.12/49 (vrf MGMT)
+
+Last time counters were cleared: never

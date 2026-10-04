@@ -1,0 +1,11 @@
+User certificate authentication methods: none (neither trusted CA nor SSL profile configured)
+SSHD status for Default VRF: enabled
+SSH connection limit: 50
+SSH per host connection limit: 20
+FIPS status: disabled
+
+SSH User-specific Configuration:
+User: automation
+SSH Key: pri-key
+Public Key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGKPrCfwB3e2uplnqP1MyN6YNp5Yu/apoAKAZUgKiOfe automation@evpn-lab
+

@@ -1,0 +1,58 @@
+RADIUS server             : 172.16.0.76, authentication port 1812, accounting port 1813
+             Messages sent:         12
+         Messages received:         12
+         Requests accepted:          2
+         Requests rejected:          0
+       Requests challenged:         10
+          Requests timeout:          0
+    Requests retransmitted:          0
+             Bad responses:          0
+         Connection errors:          0
+                DNS errors:          0
+     CoA requests received:          0
+      DM requests received:          0
+             CoA ACKs sent:          0
+              DM ACKs sent:          0
+             CoA NAKs sent:          0
+              DM NAKs sent:          0
+    Accounting Starts sent:          1
+      Interim Updates sent:          0
+     Accounting Stops sent:          0
+Last Authentication request sent:    0:11:21 ago
+Authentication requests sent:        1
+
+RADIUS server             : 172.16.0.99, authentication port 1812, accounting port 1813
+             Messages sent:          0
+         Messages received:          0
+         Requests accepted:          0
+         Requests rejected:          0
+       Requests challenged:          0
+          Requests timeout:          0
+    Requests retransmitted:          0
+             Bad responses:          0
+         Connection errors:          0
+                DNS errors:          0
+     CoA requests received:          0
+      DM requests received:          0
+             CoA ACKs sent:          0
+              DM ACKs sent:          0
+             CoA NAKs sent:          0
+              DM NAKs sent:          0
+    Accounting Starts sent:          0
+      Interim Updates sent:          0
+     Accounting Stops sent:          0
+Last Authentication request sent:    never
+Authentication requests sent:        0
+
+RADIUS server-group: LAB-RADIUS
+     0: 172.16.0.76, authentication port 1812, accounting port 1813
+     1: 172.16.0.99, authentication port 1812, accounting port 1813
+
+Last time counters were cleared: never
+
+RADIUS source-interface: Enabled
+  RADIUS outgoing packets will be sourced with an IP address associated with interface as follows:
+
+VRF      source-interface
+-------- ----------------
+default  Management0     

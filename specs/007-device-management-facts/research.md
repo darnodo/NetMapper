@@ -14,17 +14,17 @@ recording runs from committed fixtures.
 ## R1. One dedicated `show` command per item, not one sanitized configuration dump
 
 **Decision**: each family runs the `show` commands that print the effective state of its item. The
-one exception is SNMP v2c communities, read from `show running-config sanitized | section
-snmp-server community`, since `show snmp community` prints the strings.
+one exception is SNMP v2c communities, read from `show running-config sanitized | include
+^snmp-server community` (R13 for why not `section`), since `show snmp community` prints the strings.
 
 | Family | Steps (`| no-more` appended to each) |
 | ------ | ------------------------------------ |
-| `snmp` | `show running-config sanitized \| section snmp-server community` (v2c), `show snmp user` (v3) |
+| `snmp` | `show running-config sanitized \| include ^snmp-server community` (v2c), `show snmp user` (v3) |
 | `aaa_servers` | `show tacacs`, `show radius` |
 | `local_users` | `show users accounts` |
 | `management_apis` | `show management api gnmi`, `show management api http-commands`, `show management api netconf`, `show management ssh`, `show management telnet`, `show snmp` |
 | `aaa_methods` | `show aaa methods all` |
-| `management_servers` | `show running-config sanitized \| section ntp server`, `show logging`, `show ip name-server` |
+| `management_servers` | `show running-config sanitized \| include ^ntp server`, `show logging \| include Logging to`, `show ip name-server` |
 
 **Rationale**:
 
@@ -208,3 +208,46 @@ changed lab, and compares crawl duration with the unchanged lab (no login delay)
 The six families make every other pack log six more "no recipe" warnings (issue #25, intended).
 `missingCost` gets one shared line for them ("no management inventory for these devices") so the
 warning still says what is lost.
+
+## R13. What the recordings changed (T005 to T007, 2026-10-04)
+
+Recorded from `test/lab` sw1 and sw2 (`docker exec ... Cli`) and from arista-evpn-vxlan-clab
+dc-leaf1 and campus-access1 (eAPI, text format), cEOS 4.36.0F. No recording holds a secret.
+
+- **`| section` swallows the next pipe.** `show running-config sanitized | section snmp-server
+  community | no-more` prints nothing: `section` takes the rest of the line, `| no-more` included,
+  as its pattern. Both configuration reads use `| include ^snmp-server community` and
+  `| include ^ntp server` instead; each item is one line, so nothing is lost.
+- **`show logging` prints the whole log buffer** (12 KB on dc-leaf1 and growing): stored on every
+  crawl and full of messages nobody reviewed for secrets. The step is `show logging | include
+  Logging to`, which keeps the host lines only.
+- **`docker exec ... Cli -c` echoes a piped command** as a first line `> <command>`. The collector's
+  SSH session does not, so that line is stripped from the recordings.
+- **EOS takes NTP servers in one VRF only**: a second `ntp server vrf` line in another VRF is refused
+  at boot. sw2 has both NTP servers in MGMT; the `default` NTP case comes from dc-leaf1.
+- **AAA server groups are a separate section of the same output** (`TACACS+ server-group: NM-TACACS`,
+  then one line per member). The template gives one row per server line and one per group member,
+  and `parse` merges rows of the same step on `merge_on: [protocol, address, port, vrf]` (today it
+  only merges a later step into earlier ones). A server in two groups keeps the first group. A
+  server in a VRF prints `192.0.2.12/49 (vrf MGMT)`; RADIUS prints `192.0.2.20, authentication port
+  1812, accounting port 1813`, and `port` is the authentication port.
+- **`show aaa methods all` names authorization and accounting lists after their service or level**
+  (`name=exec`, `name=privilege0-15`), not after the configured list. `list` is recorded only where
+  the device prints a list name (authentication: `default`, `console`) and is optional in the
+  schema. `level` is what follows `privilege` (`0-15`), as printed: EOS never prints `all`.
+  `default-action=startStop` maps to `start-stop`; `none` gives no `record`. `methods` can be empty
+  (`methods=` on dot1x, `default-action=none`), so it is optional; `methods=none` is kept as
+  `[none]`, as printed.
+- **EOS always prints every method list**, configured or not (`system`, `dot1x`, `exec`): `aaa_methods`
+  is never `empty` on EOS, like `management_apis` and `local_users` (an account always exists).
+  `empty` happens for `aaa_servers` and `management_servers` (sw1), and for a step of `snmp`.
+- **Management APIs**: gNMI prints `Enabled: no transports enabled` when off; eAPI prints its VRFs as
+  `VRFs: MGMT, default` or `VRFs: None`; SSH and telnet print one status line per VRF
+  (`SSHD status for Default VRF: enabled`), so their row's VRFs are the VRFs whose line says
+  enabled, and `enabled` is `yes` when there is at least one; the SNMP agent prints `SNMP agent
+  enabled in VRFs: MGMT, default`. `Default` is translated to `default` item by item: `values` now
+  applies to each item of a list field.
+- **A template must always give a row when the command answered**, or `parse` reports
+  `parse_failed`. The SSH, telnet and SNMP templates capture one line that is always there (a
+  session or size limit), not mapped to any field, so a switch with SSH off in every VRF still gives
+  an `ssh` row with `enabled: no` (from `defaults`).

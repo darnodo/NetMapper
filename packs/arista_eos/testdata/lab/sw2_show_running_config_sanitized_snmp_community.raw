@@ -1,0 +1,2 @@
+snmp-server community <removed> ro NM-SNMP-RO
+snmp-server community <removed> rw NM-SNMP-RW

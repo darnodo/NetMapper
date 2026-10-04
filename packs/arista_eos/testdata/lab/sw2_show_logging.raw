@@ -1,0 +1,3 @@
+    Logging to '192.0.2.40' port 514 in VRF default via udp
+    Logging to '192.0.2.41' port 1514 in VRF default via udp
+    Logging to '192.0.2.42' port 514 in VRF MGMT via udp

@@ -1,0 +1,6 @@
+user: admin
+       role: network-admin
+       privilege level: 15
+user: netmapper
+       role: network-operator
+       privilege level: 1

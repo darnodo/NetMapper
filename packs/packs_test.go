@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -133,6 +134,41 @@ func TestLLDPAddressKeepsItsType(t *testing.T) {
 	for _, want := range []string{"mac 2c:c2:60:81:ea:f9", "ipv4 10.0.0.31", "ipv6 fe80::250:56ff:feac:4cd9"} {
 		if !seen[want] {
 			t.Errorf("missing %q in %v", want, seen)
+		}
+	}
+}
+
+// No recorded lab output holds a secret (feature 007, FR-014). Every output under testdata/lab is
+// what a recipe would store as evidence and the API would serve, so a secret here is a secret in
+// the database. The lab secrets are listed by their distinctive values; `admin` and `public`, the
+// older test/lab values, are left out because they are ordinary words in legitimate output
+// (`role network-admin`, `ssh public key`), and they cannot reach the new outputs anyway. The
+// patterns catch a hash or a type 7 key nobody thought to list.
+func TestNoSecretInRecordedOutput(t *testing.T) {
+	literals := []string{"nm-lab-secret-", "lab-auth-sw2", "lab-priv-sw2", "evpnlab-"}
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`\$[156]\$`),
+		regexp.MustCompile(`sha512 \$`),
+		regexp.MustCompile(`key 7 [0-9A-Fa-f]{6,}`),
+	}
+	raws, _ := filepath.Glob(filepath.Join("*", "testdata", "lab", "*.raw"))
+	if len(raws) == 0 {
+		t.Fatal("no recorded lab output found")
+	}
+	for _, raw := range raws {
+		b, err := os.ReadFile(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range literals {
+			if strings.Contains(string(b), s) {
+				t.Errorf("%s holds %q", raw, s)
+			}
+		}
+		for _, re := range patterns {
+			if m := re.Find(b); m != nil {
+				t.Errorf("%s holds %q (%s)", raw, m, re)
+			}
 		}
 	}
 }

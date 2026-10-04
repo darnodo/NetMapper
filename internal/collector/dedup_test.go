@@ -31,7 +31,7 @@ func TestOneDeviceTwoAddresses(t *testing.T) {
 	if n := l.Int(`SELECT count(DISTINCT observation_id) FROM identifier_claim WHERE strength = 'strong'`); n != 2 {
 		t.Errorf("claims written by %d finds, want 2", n)
 	}
-	if n := l.Int(`SELECT count(*) FROM observation WHERE fact_family <> 'identity'`); n != 2 {
+	if n := l.Int(`SELECT count(*) FROM observation WHERE fact_family IN ('neighbours', 'interfaces')`); n != 2 {
 		t.Errorf("%d non-identity observations, want neighbours and interfaces once", n)
 	}
 	dup := l.Strings(`SELECT parsed -> 0 ->> 'duplicate_of_task' FROM observation WHERE parsed -> 0 ? 'duplicate_of_task'`)

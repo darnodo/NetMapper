@@ -85,6 +85,10 @@ type Impl struct {
 	// Values translates a device spelling into the schema's, per field; "*" is the fallback.
 	Values  map[string]map[string]string `yaml:"values"`
 	MergeOn []string                     `yaml:"merge_on"`
+	// Defaults sets a field to a literal when a row has no value for it after mapping.
+	Defaults map[string]string `yaml:"defaults"`
+	// Split turns a field's mapped string into an ordered list, cut on the separator given.
+	Split map[string]string `yaml:"split"`
 }
 
 type Step struct {
@@ -94,6 +98,9 @@ type Step struct {
 	// EmptyLines are the lines this command prints when it has nothing to report. Output whose
 	// every non-blank line matches one of them is empty, not a parse failure (research R9).
 	EmptyLines []string `yaml:"empty_lines"`
+	// Map is merged over the implementation's map for the rows of this step only, so each step of
+	// one family can set its own literal (protocol: '=tacacs', api: '=gnmi').
+	Map map[string]string `yaml:"map"`
 }
 
 // Registry is the set of loaded packs, in load order.
@@ -118,9 +125,17 @@ func LoadRoot(root string) (*Registry, error) {
 
 // missingCost says what a platform gives up without a recipe for a family, for the load warning.
 var missingCost = map[string]string{
-	"neighbours": "the crawl will not expand from these devices and they report no link",
-	"interfaces": "only ports named by a neighbour will exist, with no description, state, speed or MTU",
+	"neighbours":         "the crawl will not expand from these devices and they report no link",
+	"interfaces":         "only ports named by a neighbour will exist, with no description, state, speed or MTU",
+	"snmp":               noManagement,
+	"aaa_servers":        noManagement,
+	"local_users":        noManagement,
+	"management_apis":    noManagement,
+	"aaa_methods":        noManagement,
+	"management_servers": noManagement,
 }
+
+const noManagement = "no management inventory for these devices"
 
 // Load loads the given pack directories and refuses the whole set if any check fails. A platform
 // pack missing a family's recipe still loads, with one warning per missing family.
@@ -275,6 +290,29 @@ func loadPack(dir string) (*Pack, error) {
 			for field := range im.Map {
 				if _, ok := fact.Lookup(family, field); !ok {
 					fail("%s: map target %q is not a field of %s", where, field, family)
+				}
+			}
+			for _, s := range im.Steps {
+				for field := range s.Map {
+					if _, ok := fact.Lookup(family, field); !ok {
+						fail("%s: step map target %q is not a field of %s", where, field, family)
+					}
+				}
+			}
+			for field, v := range im.Defaults {
+				f, ok := fact.Lookup(family, field)
+				if !ok {
+					fail("%s: default for %q, not a field of %s", where, field, family)
+				} else if f.Type != fact.String || (f.Enum != nil && !slices.Contains(f.Enum, v)) {
+					fail("%s: default %q is not a valid value of %s", where, v, field)
+				}
+			}
+			for field, sep := range im.Split {
+				if f, ok := fact.Lookup(family, field); !ok || f.Type != fact.Strings {
+					fail("%s: split field %q is not a list field of %s", where, field, family)
+				}
+				if sep == "" {
+					fail("%s: split separator for %q is empty", where, field)
 				}
 			}
 			if _, err := parseConstraint(im.Versions); err != nil {

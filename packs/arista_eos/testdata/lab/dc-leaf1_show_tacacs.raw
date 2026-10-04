@@ -1,0 +1,40 @@
+TACACS+ server            : 172.16.0.75/49
+          Connection opens:        127
+         Connection closes:        127
+    Connection disconnects:          0
+       Connection failures:          0
+       Connection timeouts:          0
+             Messages sent:        150
+         Messages received:        150
+            Receive errors:          0
+          Receive timeouts:          0
+             Send timeouts:          0
+                DNS errors:          0
+ Unknown attribute ignored:          0
+Unknown attribute failures:          0
+
+TACACS+ server            : 172.16.0.99/49
+          Connection opens:          0
+         Connection closes:          0
+    Connection disconnects:          0
+       Connection failures:          0
+       Connection timeouts:          0
+             Messages sent:          0
+         Messages received:          0
+            Receive errors:          0
+          Receive timeouts:          0
+             Send timeouts:          0
+                DNS errors:          0
+ Unknown attribute ignored:          0
+Unknown attribute failures:          0
+
+TACACS+ server-group: LAB-TACACS
+     0: 172.16.0.75/49
+     1: 172.16.0.99/49
+
+Last time counters were cleared: never
+
+TACACS+ source-interface: outgoing packets will be sourced with an IP address associated with interface as follows:
+VRF      source-interface
+-------- ----------------
+default  Management0     

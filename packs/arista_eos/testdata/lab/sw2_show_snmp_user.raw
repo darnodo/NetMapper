@@ -1,0 +1,14 @@
+
+User name      : netmapper
+Security model : v3
+Engine ID      : f5717f0000000000000002
+Authentication : SHA-256
+Privacy        : AES-256
+Group          : nm-ro
+
+User name      : nm-authonly
+Security model : v3
+Engine ID      : f5717f0000000000000002
+Authentication : SHA-256
+Privacy        : None
+Group          : nm-auth

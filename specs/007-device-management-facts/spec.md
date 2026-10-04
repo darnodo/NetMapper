@@ -216,10 +216,10 @@ comes back with its status, its rows and its evidence.
   states them, and the list of VRFs it serves.
 - **FR-006**: `aaa_methods` MUST hold one row per method list, with its type (`authentication`,
   `authorization`, `accounting`), its service (`login`, `enable`, `exec`, `commands`, `system`, or
-  another the device names), the list name, the ordered list of methods, for the `commands` service
-  only the privilege level it applies to (`all` or `0` to `15`, `all` kept as given), and for
-  accounting only the record mode (`start-stop`, `stop-only`). Type, service, list name and level
-  together identify a row.
+  another the device names), the list name where the device prints one, the ordered list of
+  methods, for the `commands` service only the privilege level or range it applies to, as printed
+  (EOS prints `0-15` for `all`, research R13), and for accounting only the record mode
+  (`start-stop`, `stop-only`). Type, service, list name and level together identify a row.
 - **FR-007**: `management_servers` MUST hold one row per NTP, syslog or DNS server, with service,
   address, port when stated, and VRF.
 - **FR-007a**: A `port` field in any new family MUST hold only what the device's output shows,

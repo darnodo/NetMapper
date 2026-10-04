@@ -1,0 +1,14 @@
+
+User name      : snmp-auth
+Security model : v3
+Engine ID      : 8000757101ac10003d
+Authentication : SHA-256
+Privacy        : None
+Group          : lab-auth
+
+User name      : snmp-ro
+Security model : v3
+Engine ID      : 8000757101ac10003d
+Authentication : SHA-256
+Privacy        : AES-128
+Group          : lab-ro

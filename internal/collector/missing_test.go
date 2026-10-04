@@ -46,7 +46,7 @@ func TestMissingFamilies(t *testing.T) {
 		Addr("10.0.0.2"): old,
 	}})
 	l.Registry = reg
-	got := l.Outcomes(l.Crawl(Doc))
+	got := l.AllOutcomes(l.Crawl(Doc))
 	for _, want := range []string{
 		"10.0.0.1 neighbours collected",
 		"10.0.0.1 interfaces unsupported no_recipe",
@@ -56,6 +56,15 @@ func TestMissingFamilies(t *testing.T) {
 	} {
 		if !slices.Contains(got, want) {
 			t.Errorf("missing %q in %v", want, got)
+		}
+	}
+	// Feature 007: fakeos has no recipe for the management families, so each is recorded
+	// unsupported/no_recipe on every identified device (SC-004).
+	for _, family := range ManagementFamilies {
+		for _, target := range []string{"10.0.0.1", "10.0.0.2"} {
+			if want := target + " " + family + " unsupported no_recipe"; !slices.Contains(got, want) {
+				t.Errorf("missing %q in %v", want, got)
+			}
 		}
 	}
 }

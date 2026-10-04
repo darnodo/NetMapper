@@ -1,0 +1,5 @@
+IP Address  VRF     Priority
+----------- ------- --------
+192.0.2.51  MGMT           0
+192.0.2.50  default        0
+

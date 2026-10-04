@@ -1,0 +1,19 @@
+Authentication method lists for LOGIN:
+  name=console methods=local
+  name=default methods=local, group NM-TACACS
+Authentication method list for ENABLE:
+  name=default methods=local, group NM-TACACS
+Authentication method list for DOT1X:
+  name=default methods=
+Authorization method lists for COMMANDS:
+  name=privilege0-15 methods=local, group NM-TACACS
+Authorization method list for EXEC:
+  name=exec methods=local, group NM-TACACS
+Accounting method lists for COMMANDS:
+  name=privilege0-15 default-action=startStop default-methods=group NM-TACACS
+Accounting method list for EXEC:
+  name=exec default-action=startStop default-methods=group NM-TACACS
+Accounting method list for SYSTEM:
+  name=system default-action=none
+Accounting method list for DOT1X:
+  name=dot1x default-action=none

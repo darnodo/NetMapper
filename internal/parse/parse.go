@@ -5,6 +5,7 @@ package parse
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -47,9 +48,15 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 			continue
 		}
 		empty = false
+		fields := im.Map
+		if len(st.Map) > 0 {
+			fields = map[string]string{} // im.Map may be nil: a recipe can map per step only
+			maps.Copy(fields, im.Map)
+			maps.Copy(fields, st.Map)
+		}
 		var mapped []map[string]any
 		for _, r := range raw {
-			m, err := mapRow(reg, platform, family, im, r)
+			m, err := mapRow(reg, platform, family, im, fields, r)
 			if err != nil {
 				return ParseFailed, nil, err
 			}
@@ -123,10 +130,15 @@ func walkRows(out []byte, m map[string]string) ([]map[string]any, error) {
 	return out2, nil
 }
 
-func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, raw map[string]any) (map[string]any, error) {
+// mapRow builds one fact row from one template row, with m the step's effective map. A list field
+// keeps a template List as a list and cuts a string on its split separator; values translate each
+// item. Defaults fill the fields still absent at the end.
+func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, m map[string]string, raw map[string]any) (map[string]any, error) {
 	row := map[string]any{}
-	for field, src := range im.Map {
+	for field, src := range m {
+		f, _ := fact.Lookup(family, field)
 		var s string
+		var items []string
 		if lit, ok := strings.CutPrefix(src, "="); ok {
 			s = lit
 		} else {
@@ -134,23 +146,36 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, raw map[s
 			case string:
 				s = v
 			case []string:
-				s = strings.Join(v, " ")
+				if f.Type == fact.Strings {
+					items = v
+				} else {
+					s = strings.Join(v, " ")
+				}
 			}
 		}
-		if s = strings.TrimSpace(s); s == "" {
+		if f.Type == fact.Strings {
+			if items == nil {
+				if sep := im.Split[field]; sep != "" {
+					items = strings.Split(s, sep)
+				} else {
+					items = []string{s}
+				}
+			}
+			var list []string
+			for _, it := range items {
+				if it, ok := translate(im.Values[field], strings.TrimSpace(it)); ok {
+					list = append(list, it)
+				}
+			}
+			if len(list) > 0 {
+				row[field] = list
+			}
 			continue
 		}
-		if tr := im.Values[field]; tr != nil {
-			if t, ok := tr[s]; ok {
-				s = t
-			} else if t, ok := tr["*"]; ok {
-				s = t
-			}
-			if s == "" { // the device's way of saying "none"
-				continue
-			}
+		s, ok := translate(im.Values[field], strings.TrimSpace(s))
+		if !ok {
+			continue
 		}
-		f, _ := fact.Lookup(family, field)
 		if f.Canonical {
 			s = reg.Normalise(platform, s)
 		}
@@ -172,12 +197,34 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, raw map[s
 			row[field] = pack.NormaliseMAC(row[field].(string))
 		}
 	}
+	for field, v := range im.Defaults {
+		if _, set := row[field]; !set {
+			row[field] = v
+		}
+	}
 	return row, nil
 }
 
-// merge adds rows from a later step to the rows so far, joining on the merge_on fields.
+// translate applies a field's values table to one value. ok is false when there is nothing to
+// keep: the value is blank, or the table maps it to "" (the device's way of saying "none").
+func translate(tr map[string]string, s string) (string, bool) {
+	if s == "" {
+		return "", false
+	}
+	if tr != nil {
+		if t, ok := tr[s]; ok {
+			s = t
+		} else if t, ok := tr["*"]; ok {
+			s = t
+		}
+	}
+	return s, s != ""
+}
+
+// merge adds rows to the rows so far, joining on the merge_on fields: rows of a later step, and
+// rows of the same step that share a key.
 func merge(rows, more []map[string]any, on []string) []map[string]any {
-	if len(on) == 0 || len(rows) == 0 {
+	if len(on) == 0 {
 		return append(rows, more...)
 	}
 	key := func(r map[string]any) string {
@@ -201,6 +248,7 @@ func merge(rows, more []map[string]any, on []string) []map[string]any {
 			continue
 		}
 		rows = append(rows, r)
+		index[key(r)] = r // rows of one step merge too: a server line and its group line
 	}
 	return rows
 }

@@ -68,12 +68,13 @@ One row per method list. Key: `type`, `service`, `list`, `level`.
 | ------- | ------- | -------- | -------------- |
 | type    | string  | yes      | `authentication`, `authorization`, `accounting` |
 | service | string  | yes      | `login`, `enable`, `exec`, `commands`, `system`, `dot1x`, or another the device names, lowercase |
-| list    | string  | yes      | `default` or a named list |
-| level   | string  | no       | `commands` only: `all` or `0` to `15`, as printed |
+| list    | string  | no       | the list name, where the device prints one (EOS: authentication lists only, research R13) |
+| level   | string  | no       | `commands` only: the privilege level or range, as printed (EOS: `0-15`) |
 | record  | string  | no       | accounting only: `start-stop`, `stop-only` |
-| methods | strings | yes      | in order, as printed: `group NM-TACACS`, `local`, `logging` |
+| methods | strings | no       | in order, as printed: `local`, `group NM-TACACS`, `none`; absent when the device lists none |
 
-`level` is a string because `all` is a valid value and is not converted to a number.
+`level` is a string because a range such as `0-15` is a valid value. EOS prints every method list,
+configured or not, so this family is never `empty` on EOS.
 
 ## management_servers
 
@@ -105,6 +106,9 @@ Unchanged rules (`internal/parse`):
 | `map` | step | field → column or `=literal` | every field in the family schema, like the implementation `map` |
 | `defaults` | implementation | field → literal | field in the schema; value passes the field's enum and type |
 | `split` | implementation | field → separator | field in the schema and of type `strings`; separator not empty |
+
+`values` applies to each item of a list field. `merge_on` also merges rows of the same step (an
+AAA server line and its group membership line, research R13).
 
 Order applied to each row: step `map` over implementation `map`, then `values`, then `split`, then
 `defaults` for fields still absent, then canonical and MAC normalisation as today, then
