@@ -158,8 +158,14 @@ nothing for come out `empty`.
 - [X] T039 [P] Update docs/how-to/write-a-pack.md: the six families in the list of families a pack can fill; the three recipe keys (`map` on a step, `defaults`, `split`) with one example each taken from the Arista recipes; the rule that a recipe command must print no secret, and the secret test that enforces it on lab recordings
 - [X] T040 [P] Update README.md where it lists what is collected and the API endpoints: the six families and `GET /v1/devices/{name}/facts/{family}`
 - [X] T041 Run `gofmt -l .`, `go vet ./...` and `go test -count=1 ./...` with the test stack of quickstart.md section 1: no output from gofmt, nothing skipped
-- [ ] T042 [VM] Run quickstart.md section 4 against `test/lab`: sw2 rows match sw2.cfg, sw1 `empty` cases, sw3/sw4 and sw2-over-SNMPv3 outcomes unchanged, crawl duration within a few seconds of `main`, endpoint 200/404 cases, no `nm-lab-secret-` in parsed facts or stored raw objects. Record any difference in research.md
-- [ ] T043 [VM] When arista-evpn-vxlan-clab runs: quickstart.md section 5 (SC-003). Record dc-leaf1 and campus-access1 outputs as extra fixtures with `.yml` files, rerun `go test ./packs/`. If the lab is down, note it in the PR as not run; it does not block the merge (spec assumption: second source)
+- [ ] T042 [VM] Not run (2026-10-04): test/lab is deployed on the NetLab VM (sw1, sw2) but 172.20.20.0/24
+  is not routed over the Tailnet, so the Mac cannot crawl it. Needs a subnet route, or the stack on the VM.
+  Its recordings and the offline tests cover the parsing; T043 covered a live crawl. Original task: Run quickstart.md section 4 against `test/lab`: sw2 rows match sw2.cfg, sw1 `empty` cases, sw3/sw4 and sw2-over-SNMPv3 outcomes unchanged, crawl duration within a few seconds of `main`, endpoint 200/404 cases, no `nm-lab-secret-` in parsed facts or stored raw objects. Record any difference in research.md
+- [X] T043 [VM] Done 2026-10-04 from the Mac over the Tailnet (SSH admin, SNMPv3 snmp-ro): 28 switches, the six
+  families `collected` on all 28, none `parse_failed`; 0 lab secret, hash or type 7 key in `observation.parsed`
+  and in the 420 raw outputs read back through `/v1/observations/{id}/raw/{step}`; the facts endpoint
+  answers for campus-access1. Fixtures for dc-leaf1 and campus-access1 were recorded in T005. Original task:
+  When arista-evpn-vxlan-clab runs: quickstart.md section 5 (SC-003). Record dc-leaf1 and campus-access1 outputs as extra fixtures with `.yml` files, rerun `go test ./packs/`. If the lab is down, note it in the PR as not run; it does not block the merge (spec assumption: second source)
 
 ---
 
