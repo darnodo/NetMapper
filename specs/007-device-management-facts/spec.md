@@ -53,6 +53,19 @@ test lab configuration has to be updated too."
 - Q: How does the read interface expose these facts: a section of the existing device answer, an
   endpoint per device and family, or deferred? → A: An endpoint per device and family, reading the
   observation directly, generic over every fact family.
+- Q: Does the per-family endpoint need its own token scope, or does the existing `read` scope cover
+  it? → A: The existing `read` scope covers it, like every other endpoint.
+- Q: What does the endpoint return when the device exists in the snapshot but has no observation for
+  that family (a snapshot taken before this feature)? → A: 404 `{"error": "not_collected",
+  "snapshot": {…}}`.
+- Q: Does an `aaa_methods` row record the privilege level the list applies to? → A: Yes, an
+  optional `level` field (`all` or `0` to `15`), set only for the `commands` service.
+- Q: How does `aaa_methods` tell authentication, authorization and accounting apart on the same
+  service? → A: A `type` field (`authentication`, `authorization`, `accounting`) beside `service`,
+  and an optional `record` field (`start-stop`, `stop-only`) for accounting.
+- Q: When the device states no port for a server, is `port` left absent or filled with the
+  protocol's default? → A: Recorded only when the device's output shows it, including a default port
+  the device prints itself; absent otherwise, never filled in by the pack.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -79,17 +92,19 @@ lab stopped: they pass from the recorded fixtures alone.
    `snmp` observation is `collected` with two v2c rows giving access and ACL and no community string,
    and two v3 rows giving user, group, authentication and privacy protocols.
 2. **Given** that switch with TACACS+ servers in a named group and a RADIUS server in another,
-   **When** a crawl runs, **Then** `aaa_servers` has one row per server with protocol, address, port,
-   VRF and group, and no key.
+   **When** a crawl runs, **Then** `aaa_servers` has one row per server with protocol, address, port
+   when the output shows one, VRF and group, and no key.
 3. **Given** that switch with an account holding an SSH key and accounts without one, **When** a
    crawl runs, **Then** `local_users` has one row per account with role and privilege, the key holder
    marked as having an SSH key, and no row holds a password hash or the key itself.
 4. **Given** that switch with gNMI, eAPI and NETCONF on and telnet shut down, **When** a crawl runs,
    **Then** `management_apis` has a row per API with its enabled state, and telnet reads as not
    enabled.
-5. **Given** that switch with login, enable, exec, commands and accounting method lists using a
-   server group then `local`, and a `console` login list using `local` only, **When** a crawl runs,
-   **Then** `aaa_methods` has one row per list with its service, list name and methods in order.
+5. **Given** that switch with authentication (login, enable), authorization (exec, commands) and
+   accounting (exec, commands, start-stop) method lists using a server group then `local`, and a
+   `console` login list using `local` only, **When** a crawl runs, **Then** `aaa_methods` has one row
+   per list with its type, service, list name, level for commands, record mode for accounting, and
+   methods in order.
 6. **Given** that switch with NTP servers, syslog hosts (one on a non-default port) and DNS name
    servers, at least one of them in a non-default VRF, **When** a crawl runs, **Then**
    `management_servers` has one row per server with service, address, port when the device states
@@ -146,6 +161,10 @@ comes back with its status, its rows and its evidence.
 
 3. **Given** a family name that is not a known fact family, **When** it is requested, **Then** the
    answer is a not-found error distinct from "unknown device".
+4. **Given** a device present in the snapshot with no observation for the family asked, for
+   example a snapshot taken before this feature, **When** it is requested, **Then** the answer is
+   404 `{"error": "not_collected", "snapshot": {…}}`, distinct from `no_such_device`, from `empty`
+   and from `unsupported`: there is no evidence to serve, so no 200 is given.
 
 ---
 
@@ -182,15 +201,22 @@ comes back with its status, its rows and its evidence.
   ACL and VRF for v2c, and user, group, authentication protocol, privacy protocol and security level
   for v3. It MUST NOT hold a community string or a passphrase.
 - **FR-003**: `aaa_servers` MUST hold one row per RADIUS or TACACS+ server, with protocol, address,
-  port, VRF and group. It MUST NOT hold a key.
+  port when the device's output shows one, VRF and group. It MUST NOT hold a key.
 - **FR-004**: `local_users` MUST hold one row per local account, with name, role, privilege and
   whether an SSH key is set. It MUST NOT hold a password, a hash or a key.
 - **FR-005**: `management_apis` MUST hold one row per management API (gNMI, eAPI, NETCONF, SSH,
   telnet), with whether it is enabled, and its transport, port and VRF when the device states them.
-- **FR-006**: `aaa_methods` MUST hold one row per method list, with service, list name and the
-  ordered list of methods.
+- **FR-006**: `aaa_methods` MUST hold one row per method list, with its type (`authentication`,
+  `authorization`, `accounting`), its service (`login`, `enable`, `exec`, `commands`, `system`, or
+  another the device names), the list name, the ordered list of methods, for the `commands` service
+  only the privilege level it applies to (`all` or `0` to `15`, `all` kept as given), and for
+  accounting only the record mode (`start-stop`, `stop-only`). Type, service, list name and level
+  together identify a row.
 - **FR-007**: `management_servers` MUST hold one row per NTP, syslog or DNS server, with service,
   address, port when stated, and VRF.
+- **FR-007a**: A `port` field in any new family MUST hold only what the device's output shows,
+  including a default port the device prints itself. A pack MUST NOT fill in a protocol's default
+  port the device did not print.
 - **FR-008**: Every row of `snmp`, `aaa_servers`, `management_apis` and `management_servers` MUST
   carry a VRF; a service with no VRF configured MUST be recorded as `default`.
 - **FR-009**: Commands in the new Arista recipes MUST NOT print a secret: community strings, RADIUS,
@@ -219,7 +245,9 @@ comes back with its status, its rows and its evidence.
 - **FR-016**: The read interface MUST offer one answer per device and fact family, giving the
   family's status, its rows, and its evidence (observation, snapshot, collection time). It reads the
   device's observation for that family in the requested snapshot, and is not limited to the six new
-  families: any family in the schema can be asked for.
+  families: any family in the schema can be asked for. It requires the existing `read` scope, like every
+  other endpoint: the raw output of the same commands is already served under `read`, so a separate
+  scope would protect nothing.
 - **FR-017**: The README and the how-to guides MUST be updated in the same change where they list
   fact families or what a pack collects.
 
@@ -233,8 +261,9 @@ comes back with its status, its rows and its evidence.
   login is set up for it.
 - **Management API**: a way into the device for management (gNMI, eAPI, NETCONF, SSH, telnet) and
   whether it is on.
-- **AAA method list**: for one service (login, enable, exec, commands, accounting) and one list name,
-  the ordered methods the device tries.
+- **AAA method list**: for one type (authentication, authorization, accounting), one service
+  (login, enable, exec, commands, system), one list name and, for commands, one privilege level, the
+  ordered methods the device tries, and for accounting when records are sent.
 - **Management server**: an NTP, syslog or DNS server the device talks to, with its VRF.
 
 ## Success Criteria *(mandatory)*
