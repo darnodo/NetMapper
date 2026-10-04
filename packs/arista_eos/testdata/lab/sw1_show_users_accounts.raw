@@ -3,4 +3,4 @@ user: admin
        privilege level: 15
 user: netmapper
        role: network-operator
-       privilege level: 1
+       privilege level: 15

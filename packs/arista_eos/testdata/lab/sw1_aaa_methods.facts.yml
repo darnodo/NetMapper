@@ -5,7 +5,7 @@ rows:
   - {"list":"default","methods":["local"],"service":"enable","type":"authentication"}
   - {"list":"default","service":"dot1x","type":"authentication"}
   - {"level":"0-15","methods":["none"],"service":"commands","type":"authorization"}
-  - {"methods":["none"],"service":"exec","type":"authorization"}
+  - {"methods":["local"],"service":"exec","type":"authorization"}
   - {"level":"0-15","service":"commands","type":"accounting"}
   - {"service":"exec","type":"accounting"}
   - {"service":"system","type":"accounting"}

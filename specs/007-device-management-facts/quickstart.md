@@ -73,6 +73,11 @@ command prints a secret on this EOS version: drop it from the recipe, do not mas
 
 ## 4. Crawl the repository lab
 
+The `netmapper` account of sw1, sw2 and sw4 is `privilege 15 role network-operator` with exec
+authorization, which the management families need (research R13). The Mac does not reach
+172.20.20.0/24 over the Tailnet: T044 ran the collector on the NetLab VM against the PostgreSQL and
+object store of the Mac, and the engine, `run` and the API on the Mac.
+
 ```sh
 export LAB_SNMP_COMMUNITY=public LAB_SSH_PASSWORD=admin
 export LAB_SNMP_V3='{"auth":"...","priv":"..."}'   # values in test/lab/sw2.cfg

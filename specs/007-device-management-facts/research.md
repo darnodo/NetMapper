@@ -258,3 +258,17 @@ dc-leaf1 and campus-access1 (eAPI, text format), cEOS 4.36.0F. No recording hold
   nobody checked what they print. An older device gets `unsupported` with `no_matching_version`
   for the six families, which is visible, instead of an unchecked output in the database. Widening
   the range means recording that release and passing `TestNoSecretInRecordedOutput` on it.
+- **The collector account needs privileged exec on EOS** (live crawl of `test/lab`, T044). `show
+  running-config sanitized`, `show users accounts` and `show aaa methods all` answer `% Invalid
+  input (privileged mode required)` to a privilege 1 account, and `snmp`, `local_users`,
+  `aaa_methods` and `management_servers` came out `parse_failed`. Decision (2026-10-04): the account
+  is `privilege 15 role network-operator`, which reaches privileged exec and still cannot configure.
+  EOS applies that privilege only with `aaa authorization exec default local` (sw2 had it through
+  its method lists, sw1 did not and stayed at privilege 1). Documented in `docs/how-to/deploy.md`.
+  The offline recordings came from `docker exec ... Cli -p 15` and could not show this.
+- **The first command of an SSH session sometimes carries its echo** on EOS: a late prompt and the
+  command (`sw2#show aaa methods all | no-more`) or the tail of the command, as a first line. It hit
+  `aaa_methods`, now the first family scraped, one crawl in two. Issue #15 fixed the same race for
+  the generic driver only; the SSH session now drops a first line that ends with the whole command,
+  or is a suffix of it of 8 characters or more (`internal/transport/ssh`, `dropEcho`). Three
+  consecutive crawls after the fix: no family outside `collected` and `empty`.

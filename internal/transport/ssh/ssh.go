@@ -3,6 +3,7 @@
 package ssh
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -180,7 +181,29 @@ func (s *session) Run(ctx context.Context, step transport.Step) (transport.RawOu
 	// ponytail: the whole output of one step is held in memory once, then hashed, uploaded and
 	// parsed from the same buffer (research R12). Upgrade path if a table proves too large: read
 	// at the scrapligo channel level, stream to the object store while hashing, parse a re-read.
-	return transport.RawOutput{Bytes: resp.RawResult}, nil
+	return transport.RawOutput{Bytes: dropEcho(resp.RawResult, step.Command)}, nil
+}
+
+// dropEcho removes the first line of out when it is the command's own echo. On EOS, the first
+// command of a session sometimes comes back preceded by a late prompt and its echo
+// ("sw2#show aaa methods all | no-more"), or by the tail of the echo ("aa methods all | no-more"):
+// the prompt the platform driver read on open was not the last one the device printed. Issue #15
+// fixed the same race for the generic driver only. Seen on cEOS 4.36 on test/lab (feature 007,
+// research R13). The rule is narrow so real output is never cut: the line must end with the whole
+// command, or be a suffix of it at least 8 characters long.
+func dropEcho(out []byte, command string) []byte {
+	line, rest, found := bytes.Cut(out, []byte("\n"))
+	first := strings.TrimSpace(string(line))
+	if first == "" || command == "" {
+		return out
+	}
+	if strings.HasSuffix(first, command) || (len(first) >= 8 && strings.HasSuffix(command, first)) {
+		if !found {
+			return []byte{}
+		}
+		return rest
+	}
+	return out
 }
 
 func (s *session) Close() error { return s.d.Close() }

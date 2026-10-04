@@ -309,3 +309,6 @@ comes back with its status, its rows and its evidence.
   needs a boolean or an ordered list type the schema does not have yet, adding it is part of this
   feature.
 - Compliance checks on these facts and other platforms are separate work.
+- On Arista EOS the collector's SSH account reaches privileged exec with a read-only role
+  (`privilege 15 role network-operator`, exec authorization on); a privilege 1 account cannot read
+  the sanitized configuration, the accounts or the method lists (research R13).

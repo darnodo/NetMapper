@@ -2,4 +2,4 @@
 status: collected
 rows:
   - {"name":"admin","privilege":15,"role":"network-admin","ssh_key":"no"}
-  - {"name":"netmapper","privilege":1,"role":"network-operator","ssh_key":"no"}
+  - {"name":"netmapper","privilege":15,"role":"network-operator","ssh_key":"no"}

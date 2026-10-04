@@ -158,7 +158,7 @@ nothing for come out `empty`.
 - [X] T039 [P] Update docs/how-to/write-a-pack.md: the six families in the list of families a pack can fill; the three recipe keys (`map` on a step, `defaults`, `split`) with one example each taken from the Arista recipes; the rule that a recipe command must print no secret, and the secret test that enforces it on lab recordings
 - [X] T040 [P] Update README.md where it lists what is collected and the API endpoints: the six families and `GET /v1/devices/{name}/facts/{family}`
 - [X] T041 Run `gofmt -l .`, `go vet ./...` and `go test -count=1 ./...` with the test stack of quickstart.md section 1: no output from gofmt, nothing skipped
-- [ ] T042 [VM] Not run (2026-10-04): test/lab is deployed on the NetLab VM (sw1, sw2) but 172.20.20.0/24
+- [X] T042 [VM] Covered by T044 (2026-10-04). Was not run at first: test/lab is deployed on the NetLab VM (sw1, sw2) but 172.20.20.0/24
   is not routed over the Tailnet, so the Mac cannot crawl it. Needs a subnet route, or the stack on the VM.
   Its recordings and the offline tests cover the parsing; T043 covered a live crawl. Original task: Run quickstart.md section 4 against `test/lab`: sw2 rows match sw2.cfg, sw1 `empty` cases, sw3/sw4 and sw2-over-SNMPv3 outcomes unchanged, crawl duration within a few seconds of `main`, endpoint 200/404 cases, no `nm-lab-secret-` in parsed facts or stored raw objects. Record any difference in research.md
 - [X] T043 [VM] Done 2026-10-04 from the Mac over the Tailnet (SSH admin, SNMPv3 snmp-ro): 28 switches, the six
@@ -202,7 +202,12 @@ session around it: record everything in one sitting, then everything up to T041 
 
 ## Phase 7: Convergence
 
-- [ ] T044 [VM] Crawl test/lab (sw1, sw2, already deployed on NetLab) with quickstart.md section 4, once 172.20.20.0/24 is routed over the Tailnet or the stack runs on the VM: sw2 rows match test/lab/sw2.cfg, the sw1 empty cases hold, sw3, sw4 and the SNMPv3 read of sw2 keep their 001/006 outcomes, crawl duration within a few seconds of `main`, no `nm-lab-secret-` in parsed facts or stored raw output, per SC-002 (partial)
+- [X] T044 [VM] Done 2026-10-04, collector on the NetLab VM, engine, run and API on the Mac. Found and fixed: the
+  netmapper account needed privileged exec (privilege 15, network-operator, exec authorization), and the first SSH
+  command sometimes carried its echo (dropEcho). Then three crawls: every family `collected` or `empty`, sw1 and sw2
+  rows equal to their facts.yml, sw1 and sw2 identified over SNMP v2c and v3, 16 to 19 s per crawl (no login waits),
+  no lab secret in facts or the 42 raw outputs. sw3 and sw4 not deployed: their 001 cases were not rerun, nor a
+  timing baseline on `main`. Original task: Crawl test/lab (sw1, sw2, already deployed on NetLab) with quickstart.md section 4, once 172.20.20.0/24 is routed over the Tailnet or the stack runs on the VM: sw2 rows match test/lab/sw2.cfg, the sw1 empty cases hold, sw3, sw4 and the SNMPv3 read of sw2 keep their 001/006 outcomes, crawl duration within a few seconds of `main`, no `nm-lab-secret-` in parsed facts or stored raw output, per SC-002 (partial)
 - [X] T045 Record in specs/007-device-management-facts/plan.md (Technical Context "Storage") and research.md R8 that migration 0010 grants `netmapper_api` SELECT on `parse_generation`, and why the facts endpoint needs it, per plan: storage decision "No migration" (contradicts)
 - [X] T046 Narrow `versions` to '>=4.36' in the six recipes packs/arista_eos/recipes/{snmp,aaa_servers,local_users,management_apis,aaa_methods,management_servers}.yaml until an older EOS release is recorded and passes TestNoSecretInRecordedOutput, and note the reason in research.md R13, per spec edge case "version without the command" and FR-009 (partial)
 - [X] T047 Fix specs/007-device-management-facts/quickstart.md: section 3 gets the `| include` commands of the recipes, the stripping of the `> <command>` echo line that `Cli -c` adds, and `show logging | include Logging to`; section 4 expects `empty` on sw1 for `aaa_servers` and `management_servers` only (EOS always prints its method lists, research R13), per FR-014a (partial)

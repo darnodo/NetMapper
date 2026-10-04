@@ -187,3 +187,21 @@ func TestRun(t *testing.T) {
 		t.Errorf("deadline: %v", err)
 	}
 }
+
+// The three first lines seen on test/lab sw1 and sw2 (feature 007): a late prompt with the echo,
+// the tail of the echo, and the clean case. Output that only resembles the command stays.
+func TestDropEcho(t *testing.T) {
+	cmd := "show aaa methods all | no-more"
+	for _, c := range []struct{ name, out, want string }{
+		{"prompt and echo", "sw2#show aaa methods all | no-more\nAuthentication method lists for LOGIN:\n", "Authentication method lists for LOGIN:\n"},
+		{"tail of the echo", "aa methods all | no-more\n% Invalid input\n", "% Invalid input\n"},
+		{"echo only", "sw2>show aaa methods all | no-more", ""},
+		{"clean", "Authentication method lists for LOGIN:\n  name=default methods=local\n", "Authentication method lists for LOGIN:\n  name=default methods=local\n"},
+		{"short tail kept", "no-more\nx\n", "no-more\nx\n"},
+		{"empty", "", ""},
+	} {
+		if got := string(dropEcho([]byte(c.out), cmd)); got != c.want {
+			t.Errorf("%s: %q, want %q", c.name, got, c.want)
+		}
+	}
+}
