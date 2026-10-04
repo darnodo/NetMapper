@@ -61,6 +61,109 @@ was sent. The dial check still refuses the address if anything else ever tries t
 | mtu         | int    | no                                  |
 | mac         | string | no, normalised lowercase colon form |
 
+## Management families (feature 007)
+
+Written for every identified device, like `interfaces`. They describe the device, not its links:
+the engine does not read them, and they do not count toward the snapshot verdict (FR-015).
+
+Rules common to the six:
+
+- **No secret, ever.** No field holds a community string, a server or NTP key in any encoding, a
+  password or a hash. The stored raw output of the commands behind them holds none either: a pack
+  uses only commands that print none (FR-009). A community is recorded by its access level and ACL.
+- **A port is what the device printed.** `port` is absent when the output shows none. A pack never
+  fills in a protocol's default.
+- **A VRF is always set where the schema has one.** A server with no VRF stated is `vrf: default`.
+  `snmp` has no VRF: where a platform binds SNMP to VRFs per agent, they are on the
+  `management_apis` row `api: snmp`.
+- **Addresses are stored as given** and never resolved, like a neighbour's system name.
+- **Nothing configured is `empty`.** An output the template does not understand is `parse_failed`.
+  A consumer may read `empty` as "the device was asked and has none"; it may not read a missing
+  observation that way.
+- `yes`/`no` fields are strings, by the same convention as `admin_state`.
+
+Status mapping: `collected`; `empty`; `parse_failed`; `unsupported` with `no_recipe` for a pack with
+no recipe; `unreachable` and `denied` as for every scraped family.
+
+### snmp
+
+One row per v2c community or v3 user.
+
+| Field         | Type   | Required | Values / notes |
+| ------------- | ------ | -------- | -------------- |
+| version       | string | yes      | `v2c`, `v3` |
+| access        | string | v2c      | `ro`, `rw` |
+| acl           | string | no       | ACL name bound to the community |
+| user          | string | v3       | v3 user name |
+| group         | string | no       | v3 group |
+| auth_protocol | string | no       | `md5`, `sha`, `sha224`, `sha256`, `sha384`, `sha512` (names of feature 006) |
+| priv_protocol | string | no       | `des`, `3des`, `aes`, `aes192`, `aes256`; absent means authNoPriv (research R4) |
+
+No community string, no passphrase, no VRF: the agent's VRFs are on the `management_apis` row
+`api: snmp` (research R2). Two communities with the same access and ACL give two identical rows.
+
+### aaa_servers
+
+One row per RADIUS or TACACS+ server.
+
+| Field    | Type   | Required | Values / notes |
+| -------- | ------ | -------- | -------------- |
+| protocol | string | yes      | `radius`, `tacacs` |
+| address  | string | yes      | as the device prints it, never resolved |
+| port     | int    | no       | only when the output shows it (FR-007a) |
+| vrf      | string | yes      | `default` when none is stated (FR-008) |
+| group    | string | no       | server group; absent for a server in no named group |
+
+### local_users
+
+One row per local account.
+
+| Field     | Type   | Required | Values / notes |
+| --------- | ------ | -------- | -------------- |
+| name      | string | yes      | |
+| role      | string | no       | |
+| privilege | int    | no       | |
+| ssh_key   | string | yes      | `yes`, `no`; the key itself is not stored |
+
+### management_apis
+
+One row per management API.
+
+| Field     | Type    | Required | Values / notes |
+| --------- | ------- | -------- | -------------- |
+| api       | string  | yes      | `gnmi`, `eapi`, `netconf`, `ssh`, `telnet`, `snmp` |
+| enabled   | string  | yes      | `yes`, `no`; configured but shut down, or never configured, is `no` |
+| transport | string  | no       | as printed: `grpc`, `https`, `http`, `ssh`, ... |
+| port      | int     | no       | only when the output shows it |
+| vrfs      | strings | no       | VRFs the API serves, in the device's order (research R3) |
+
+### aaa_methods
+
+One row per method list. Key: `type`, `service`, `list`, `level`.
+
+| Field   | Type    | Required | Values / notes |
+| ------- | ------- | -------- | -------------- |
+| type    | string  | yes      | `authentication`, `authorization`, `accounting` |
+| service | string  | yes      | `login`, `enable`, `exec`, `commands`, `system`, `dot1x`, or another the device names, lowercase |
+| list    | string  | no       | the list name, where the device prints one (EOS: authentication lists only, research R13) |
+| level   | string  | no       | `commands` only: the privilege level or range, as printed (EOS: `0-15`) |
+| record  | string  | no       | accounting only: `start-stop`, `stop-only` |
+| methods | strings | no       | in order, as printed: `local`, `group NM-TACACS`, `none`; absent when the device lists none |
+
+`level` is a string because a range such as `0-15` is a valid value. EOS prints every method list,
+configured or not, so this family is never `empty` on EOS.
+
+### management_servers
+
+One row per NTP, syslog or DNS server.
+
+| Field   | Type   | Required | Values / notes |
+| ------- | ------ | -------- | -------------- |
+| service | string | yes      | `ntp`, `syslog`, `dns` |
+| address | string | yes      | as printed, never resolved |
+| port    | int    | no       | only when the output shows it |
+| vrf     | string | yes      | `default` when none is stated |
+
 ## A family with nothing to run
 
 Every family is written for every identified device, whether or not its pack has a recipe for it.
@@ -73,4 +176,5 @@ When nothing can run, the observation is `unsupported` with one of two details:
 Neither changes the snapshot verdict, which counts `identity` observations only.
 
 Other families (`mac_table`, `arp_table`, ...) follow the same rule: added here first, then in packs.
-This feature ships `identity`, `neighbours` and `interfaces`.
+This feature ships `identity`, `neighbours` and `interfaces`; feature 007 adds the six management
+families above.

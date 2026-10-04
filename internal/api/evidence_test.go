@@ -41,6 +41,14 @@ func checkEvidence(t testing.TB, path string, body []byte) {
 			t.Errorf("%s: snapshot envelope has no verdict key", path)
 		}
 	}
+	// The facts endpoint answers with observations, each carrying its evidence; they are not
+	// elements of the graph and have no confidence (feature 007).
+	if obs, ok := root["observations"].([]any); ok {
+		for _, o := range obs {
+			checkEvidenceItems(t, path+": observation", o.(map[string]any))
+		}
+		return
+	}
 	// The device endpoint answers with the device itself at the top level.
 	if _, ok := root["device_key"]; ok {
 		if _, isIface := root["interface"]; !isIface {
@@ -73,6 +81,12 @@ func checkElement(t testing.TB, path, kind string, e map[string]any) {
 	if !slices.Contains(confidences[kind], c) {
 		t.Errorf("%s: confidence %q, want one of %v", name, c, confidences[kind])
 	}
+	checkEvidenceItems(t, name, e)
+}
+
+// checkEvidenceItems requires e to carry evidence, each item with an observation and its time.
+func checkEvidenceItems(t testing.TB, name string, e map[string]any) {
+	t.Helper()
 	ev, _ := e["evidence"].([]any)
 	if len(ev) == 0 {
 		t.Errorf("%s: no evidence", name)
@@ -119,6 +133,11 @@ func TestCheckEvidenceCatchesMissing(t *testing.T) {
 		}
 	}
 	r := &recorder{TB: t}
+	checkEvidence(r, "facts without evidence", []byte(`{`+env+`, "device_key": "k", "observations": [{"status": "empty", "rows": []}]}`))
+	if !r.failed {
+		t.Error("an observation without evidence passed the checker")
+	}
+	r = &recorder{TB: t}
 	checkEvidence(r, "good", []byte(`{`+env+`, "interfaces": [{"canonical_name": "port1", "confidence": "described", `+ev+`}]}`))
 	if r.failed {
 		t.Error("a well-formed answer failed the checker")

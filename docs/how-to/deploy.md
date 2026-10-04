@@ -180,6 +180,7 @@ H="Authorization: Bearer $TOKEN"
 curl -H "$H" api:8080/v1/snapshots              # what can be asked about
 curl -H "$H" api:8080/v1/devices                # the devices of the latest graph
 curl -H "$H" api:8080/v1/devices/sw1            # by device key, hostname or address
+curl -H "$H" api:8080/v1/devices/sw1/facts/aaa_servers  # one fact family of one device
 curl -H "$H" api:8080/v1/findings               # what the crawl reported against itself
 curl -H "$H" api:8080/v1/observations/42?snapshot=7        # the commands behind one piece of evidence
 curl -H "$H" api:8080/v1/observations/42/raw/0?snapshot=7  # the bytes the device printed

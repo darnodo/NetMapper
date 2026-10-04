@@ -22,10 +22,10 @@ ones: `interfaces` or `neighbours` work too. `?snapshot=<id>` as for the device 
       "rows": [
         {"protocol": "tacacs", "address": "192.0.2.10", "port": 49, "vrf": "default", "group": "NM-TACACS"}
       ],
-      "evidence": {
+      "evidence": [{
         "observation_id": 418, "snapshot_id": 12, "collected_at": "2026-10-04T10:44:58Z",
         "family": "aaa_servers", "target": "172.20.20.3"
-      }
+      }]
     }
   ]
 }
@@ -35,8 +35,12 @@ ones: `interfaces` or `neighbours` work too. `?snapshot=<id>` as for the device 
   answered on, in the snapshot's active parse generation, ordered by collection time then id. For a
   scraped family it has one entry; `identity` has one per address the device answered on.
 - `rows` is `[]` for any status but `collected`. `detail` is `null` when the status has none.
-- Each entry carries its evidence; `/v1/observations/{observation_id}?snapshot={snapshot_id}` and
-  its `raw/{step}` follow from it.
+- Each entry carries its evidence, a list of one item in the shape every other element uses;
+  `/v1/observations/{observation_id}?snapshot={snapshot_id}` and its `raw/{step}` follow from it.
+  An observation is not a graph element and has no `confidence`.
+- Reading the active parse generation needs SELECT on `parse_generation`, granted to
+  `netmapper_api` by migration 0010: ids, a timestamp and the `active` flag, nothing a credential
+  could come from.
 
 | Situation | Status | Body |
 | --------- | ------ | ---- |

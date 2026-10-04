@@ -113,7 +113,9 @@ rather than with `terminal length 0`.
 
 A recipe says how to collect one fact family. The families and their fields are fixed and
 platform-neutral, listed in [fact-families.md](../../specs/001-crawl-loop/contracts/fact-families.md):
-today `neighbours` and `interfaces` (`identity` comes from the fingerprint and identifiers above).
+`neighbours` and `interfaces` for the graph, and six management families that describe the device
+itself (`snmp`, `aaa_servers`, `local_users`, `management_apis`, `aaa_methods`,
+`management_servers`). `identity` comes from the fingerprint and identifiers above.
 
 Every recipe is optional: a pack only has to fingerprint its platform. What a missing recipe costs:
 
@@ -121,6 +123,7 @@ Every recipe is optional: a pack only has to fingerprint its platform. What a mi
 | ------------ | ---------------- |
 | `neighbours` | The crawl does not expand from these devices and they report no link. A device can still appear at the far end of a link a neighbour reports. |
 | `interfaces` | Only ports named by a neighbour exist, with no description, state, speed or MTU. |
+| the six management families | No management inventory for these devices: no SNMP access, AAA servers, accounts, management APIs, method lists or NTP, syslog and DNS servers. The graph is unaffected. |
 
 NetMapper logs a warning when it loads the packs, once for each family a pack has no recipe for,
 and each device gets an observation `unsupported` with detail `no_recipe` for it. A recipe whose
@@ -154,6 +157,32 @@ implementations:                     # the first one whose version and transport
   `'^Interface \S+ detected 0 LLDP neighbors:$'`. Such output is recorded as `empty`; anything else
   that yields no row is `parse_failed`, which shows up as a finding instead of passing silently.
 - A family with several commands uses several steps and `merge_on` to join rows on key fields.
+  Rows of the same step that share the key merge too: `show tacacs` lists a server, then the same
+  server again as a member of its group, and the two become one row.
+- A step can carry its own `map`, merged over the implementation's for the rows of that step. It is
+  how one family gives each command its literal:
+
+  ```yaml
+  steps:
+    - command: show tacacs | no-more
+      template: show_tacacs.textfsm
+      map: { protocol: '=tacacs' }
+    - command: show radius | no-more
+      template: show_radius.textfsm
+      map: { protocol: '=radius' }
+  ```
+
+- `defaults` sets a field when a row has no value for it, after `map` and `values`:
+  `defaults: { vrf: default }`. The value must be valid for the field.
+- `split` cuts a mapped string into a list, for a list field such as `methods`:
+  `split: { methods: ', ' }`. A TextFSM `List` value already gives a list. `values` applies to each
+  item of a list.
+- **No command may print a secret.** Every output is stored as evidence and served by the API: a
+  community string, a server key or a password hash in it is a secret in the database. Use a
+  command that does not print it, or the platform's sanitized configuration (`show running-config
+  sanitized` on EOS) filtered with `include`. `TestNoSecretInRecordedOutput` scans every recording
+  under `testdata/lab/` for the lab secrets, hashes and type 7 keys; record from a lab whose
+  secrets are distinctive strings so that scan means something.
 - SNMP steps use `walk: <oid>` instead of a command and template. The parser supports them, but no
   shipped pack uses one yet, so expect to be the first to exercise that path.
 
@@ -181,7 +210,12 @@ testdata/lab/sw1_show_lldp_neighbors_detail.raw
 ```
 
 A `.yml` file next to a `.raw`, in the ntc-templates `parsed_sample` format, is compared field by
-field with what the template extracts. Then:
+field with what the template extracts. A recording with `_empty` in its name must give no row:
+it is a device with nothing to report.
+
+A `<switch>_<family>.facts.yml` file in `testdata/lab/` (`status:` and `rows:`) is compared with
+what the whole recipe produces from that switch's recordings, one per step: maps, values, split,
+defaults, merge and the schema check together. Then:
 
 ```sh
 go test ./packs/

@@ -82,11 +82,13 @@ it carries now. `verdict` and `coverage` are `null` for a snapshot never judged,
 | 404    | `{"error": "no_such_observation"}`              | no observation has that id, or none in the snapshot named   |
 | 404    | `{"error": "no_such_step"}`                     | the observation exists and ran no such step                 |
 | 405    |                                                 | any method but `GET`                                        |
+| 404    | `{"error": "no_such_family", "snapshot": {…}}`  | the family named is not in the fact schema (feature 007)    |
+| 404    | `{"error": "not_collected", "snapshot": {…}}`   | the device has no observation of that family (feature 007)  |
 | 409    | `{"error": "not_projected", "snapshot": {…}}`   | the snapshot is open, unprojected, or its projection is stale; `snapshot` is `null` when no snapshot carries a graph at all |
 | 500    | `{"error": "internal"}`                         | nothing more: detail goes to the log, never to the caller   |
 
-`?snapshot=<id>` applies to `/v1/devices`, `/v1/devices/{name}`, `/v1/interfaces/{device}/{name}` and
-`/v1/findings`, where it defaults to the latest snapshot carrying a graph. It also applies to the two
+`?snapshot=<id>` applies to `/v1/devices`, `/v1/devices/{name}`, `/v1/devices/{name}/facts/{family}`,
+`/v1/interfaces/{device}/{name}` and `/v1/findings`, where it defaults to the latest snapshot carrying a graph. It also applies to the two
 observation endpoints, with no default: see below.
 
 ## Endpoints
@@ -131,6 +133,57 @@ Each interface carries its canonical name, whether the device described it or a 
 the spellings it is known by, its operational fields, and its evidence (FR-005). Each edge carries its
 type, its two endpoint references, its confidence, its attributes and the evidence for each side
 (FR-003).
+
+### `GET /v1/devices/{name}/facts/{family}`
+
+The observations of one fact family for one device, with their rows and evidence. `{name}` resolves
+like `GET /v1/devices/{name}`. `{family}` is any family of the fact schema, not only the management
+ones: `interfaces` or `neighbours` work too. `?snapshot=<id>` as for the device endpoint.
+
+```json
+{
+  "snapshot": {"id": 12, "closed_at": "…", "state": "closed", "verdict": "accepted", "coverage": 1},
+  "device_key": "chassis_mac:00:1c:73:aa:bb:02",
+  "family": "aaa_servers",
+  "observations": [
+    {
+      "status": "collected",
+      "detail": null,
+      "rows": [
+        {"protocol": "tacacs", "address": "192.0.2.10", "port": 49, "vrf": "default", "group": "NM-TACACS"}
+      ],
+      "evidence": [{
+        "observation_id": 418, "snapshot_id": 12, "collected_at": "2026-10-04T10:44:58Z",
+        "family": "aaa_servers", "target": "172.20.20.3"
+      }]
+    }
+  ]
+}
+```
+
+- `observations` holds every observation of the family whose target is an address the device
+  answered on, in the snapshot's active parse generation, ordered by collection time then id. For a
+  scraped family it has one entry; `identity` has one per address the device answered on.
+- `rows` is `[]` for any status but `collected`. `detail` is `null` when the status has none.
+- Each entry carries its evidence, a list of one item in the shape every other element uses;
+  `/v1/observations/{observation_id}?snapshot={snapshot_id}` and its `raw/{step}` follow from it.
+  An observation is not a graph element and has no `confidence`.
+- Reading the active parse generation needs SELECT on `parse_generation`, granted to
+  `netmapper_api` by migration 0010: ids, a timestamp and the `active` flag, nothing a credential
+  could come from.
+
+| Situation | Status | Body |
+| --------- | ------ | ---- |
+| Device resolved, family has observations | 200 | as above |
+| `{family}` is not in the fact schema | 404 | `{"error": "no_such_family", "snapshot": {…}}` |
+| Device resolved, no observation of the family | 404 | `{"error": "not_collected", "snapshot": {…}}` |
+| Nothing matches `{name}` | 404 | `{"error": "no_such_device", "snapshot": {…}}` |
+| `{name}` matches several devices | 409 | `{"error": "ambiguous", …}` as for the device endpoint |
+| Snapshot carries no graph | 409 | `{"error": "not_projected", "snapshot": {…}}` |
+
+`no_such_family` is checked before the device is resolved: a typo in the family name is not
+reported as a missing device. `not_collected` is distinct from an `empty` or `unsupported`
+observation, which is a 200 with that status (clarification Q2).
 
 ### `GET /v1/findings`
 
