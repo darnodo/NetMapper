@@ -213,3 +213,15 @@ session around it: record everything in one sitting, then everything up to T041 
 - [X] T047 Fix specs/007-device-management-facts/quickstart.md: section 3 gets the `| include` commands of the recipes, the stripping of the `> <command>` echo line that `Cli -c` adds, and `show logging | include Logging to`; section 4 expects `empty` on sw1 for `aaa_servers` and `management_servers` only (EOS always prints its method lists, research R13), per FR-014a (partial)
 - [X] T048 [VM] Done 2026-10-04. EOS prints both "SNMP agent enabled in VRFs: default" and "SNMP agent disabled", so the template now clears on the disabled line. On test/lab sw1, remove the SNMP community, record `show snmp | no-more` into packs/arista_eos/testdata/lab/sw1nosnmp_show_snmp.raw, put the community back, then check the `SNMP agent disabled` rule of packs/arista_eos/templates/show_snmp.textfsm against the recording and add a test that this output gives `{api: snmp, enabled: no}`, per FR-013a (partial)
 - [X] T049 In specs/007-device-management-facts/data-model.md and specs/001-crawl-loop/contracts/fact-families.md, change the Required column of `snmp.access` and `snmp.user` from `v2c`/`v3` to `no`, with the note "set for v2c" / "set for v3", per FR-010 (partial)
+
+---
+
+## Phase 8: Convergence
+
+- [X] T050 [VM] Done 2026-10-04, full lab (sw1 to sw4) redeployed: sw3 is still `denied` (credential_denied finding), sw1,
+  sw2 and sw4 every family `collected` or `empty`. The sw4 contradiction case of 003 quickstart section 4 does NOT hold:
+  sw1 and sw4 (same serial, different chassis MAC) resolve to one entity, key chassis_mac:00:1c:73:c4:29:56 (sw1's MAC
+  in the previous deployment), with no identity_conflict finding. `netmapper resolve 8` with the binary of `main` gives
+  the same 2 entities and 0 conflicts, and this branch changes nothing in internal/entity, graph or gate: an existing
+  identity-resolution defect, not a regression of feature 007, to track as its own issue. Original task: Deploy test/lab sw3 on NetLab, crawl with lab-seeds and check sw3 is still `denied`; then deploy sw4 alone (`--node-filter sw4`, per test/lab/two-switch.clab.yaml) and replay 001 quickstart section 4, checking sw4 and sw1 are still kept apart on the conflicting serial now that sw4.cfg has `privilege 15` and `aaa authorization exec default local`, per FR-013 (partial)
+- [X] T051 Update the header comment of test/lab/two-switch.clab.yaml: the netmapper account is `privilege 15 role network-operator` with exec authorization on sw1, sw2 and sw4 (feature 007, docs/how-to/deploy.md), and sw1 carries that authorization line but no other management configuration, per FR-014a (partial)
