@@ -1,0 +1,9 @@
+# What the management_apis recipe must produce from the sw1 recordings (test/lab/sw1.cfg).
+status: collected
+rows:
+  - {"api":"gnmi","enabled":"no","transport":"grpc"}
+  - {"api":"eapi","enabled":"no","port":443,"transport":"https"}
+  - {"api":"netconf","enabled":"no","transport":"ssh"}
+  - {"api":"ssh","enabled":"yes","vrfs":["default"]}
+  - {"api":"telnet","enabled":"no"}
+  - {"api":"snmp","enabled":"yes","vrfs":["default"]}

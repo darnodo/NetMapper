@@ -1,0 +1,5 @@
+# What the aaa_servers recipe must produce from the dc-leaf1 recordings (arista-evpn-vxlan-clab configs/dc-leaf1.cfg).
+status: collected
+rows:
+  - {"address":"172.16.0.75","group":"LAB-TACACS","port":49,"protocol":"tacacs","vrf":"default"}
+  - {"address":"172.16.0.99","group":"LAB-TACACS","port":49,"protocol":"tacacs","vrf":"default"}

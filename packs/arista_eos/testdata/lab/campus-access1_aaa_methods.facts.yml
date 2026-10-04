@@ -1,0 +1,13 @@
+# What the aaa_methods recipe must produce from the campus-access1 recordings (arista-evpn-vxlan-clab configs/campus-access1.cfg).
+status: collected
+rows:
+  - {"list":"console","methods":["local"],"service":"login","type":"authentication"}
+  - {"list":"default","methods":["group LAB-TACACS","local"],"service":"login","type":"authentication"}
+  - {"list":"default","methods":["group LAB-TACACS","local"],"service":"enable","type":"authentication"}
+  - {"list":"default","methods":["LAB-RADIUS"],"service":"dot1x","type":"authentication"}
+  - {"level":"0-15","methods":["group LAB-TACACS","local"],"service":"commands","type":"authorization"}
+  - {"methods":["group LAB-TACACS","local"],"service":"exec","type":"authorization"}
+  - {"level":"0-15","methods":["group LAB-TACACS"],"record":"start-stop","service":"commands","type":"accounting"}
+  - {"methods":["group LAB-TACACS"],"record":"start-stop","service":"exec","type":"accounting"}
+  - {"service":"system","type":"accounting"}
+  - {"methods":["LAB-RADIUS"],"record":"start-stop","service":"dot1x","type":"accounting"}

@@ -1,0 +1,14 @@
+Value USER (\S+)
+Value AUTH (\S+)
+Value PRIV (\S+)
+Value GROUP (\S+)
+
+Start
+  ^User name\s+:\s+${USER}\s*$$
+  ^Security model\s+:
+  ^Engine ID\s+:
+  ^Authentication\s+:\s+${AUTH}\s*$$
+  ^Privacy\s+:\s+${PRIV}\s*$$
+  ^Group\s+:\s+${GROUP}\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error

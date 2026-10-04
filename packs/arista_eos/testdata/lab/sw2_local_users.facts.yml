@@ -1,0 +1,7 @@
+# What the local_users recipe must produce from the sw2 recordings (test/lab/sw2.cfg).
+status: collected
+rows:
+  - {"name":"admin","privilege":15,"role":"network-admin","ssh_key":"no"}
+  - {"name":"netmapper","privilege":1,"role":"network-operator","ssh_key":"no"}
+  - {"name":"nm-auto","privilege":15,"role":"network-admin","ssh_key":"yes"}
+  - {"name":"nm-ops","privilege":1,"role":"network-operator","ssh_key":"no"}

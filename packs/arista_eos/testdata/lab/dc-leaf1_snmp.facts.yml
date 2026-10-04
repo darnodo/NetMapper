@@ -1,0 +1,7 @@
+# What the snmp recipe must produce from the dc-leaf1 recordings (arista-evpn-vxlan-clab configs/dc-leaf1.cfg).
+status: collected
+rows:
+  - {"access":"ro","acl":"SNMP-RO","version":"v2c"}
+  - {"access":"rw","acl":"SNMP-RW","version":"v2c"}
+  - {"auth_protocol":"sha256","group":"lab-auth","user":"snmp-auth","version":"v3"}
+  - {"auth_protocol":"sha256","group":"lab-ro","priv_protocol":"aes","user":"snmp-ro","version":"v3"}

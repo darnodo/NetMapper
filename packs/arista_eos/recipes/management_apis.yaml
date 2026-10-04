@@ -1,0 +1,32 @@
+family: management_apis
+implementations:
+  - id: apis-cli
+    versions: '>=4.20'
+    transport: ssh
+    steps:
+      - command: show management api gnmi | no-more
+        template: show_management_api_gnmi.textfsm
+        map: { api: '=gnmi', transport: '=grpc' }
+      - command: show management api http-commands | no-more
+        template: show_management_api_http_commands.textfsm
+        map: { api: '=eapi', transport: '=https' }
+      - command: show management api netconf | no-more
+        template: show_management_api_netconf.textfsm
+        map: { api: '=netconf', transport: '=ssh' }
+      # SSH, telnet and the SNMP agent print the VRFs they run in, and nothing else says whether
+      # they are on: enabled is yes when that list is not empty (research R13).
+      - command: show management ssh | no-more
+        template: show_management_ssh.textfsm
+        map: { api: '=ssh', enabled: VRFS }
+      - command: show management telnet | no-more
+        template: show_management_telnet.textfsm
+        map: { api: '=telnet', enabled: VRFS }
+      - command: show snmp | no-more
+        template: show_snmp.textfsm
+        map: { api: '=snmp', enabled: VRFS }
+    map: { enabled: ENABLED, port: PORT, vrfs: VRFS }
+    values:
+      enabled: { 'yes': 'yes', 'Yes': 'yes', 'no': 'no', 'No': 'no', 'no transports enabled': 'no', '*': 'yes' }
+      vrfs: { Default: default, None: '' }
+    split: { vrfs: ', ' }
+    defaults: { enabled: 'no' }

@@ -1,0 +1,21 @@
+family: management_servers
+implementations:
+  - id: servers-cli
+    versions: '>=4.20'
+    transport: ssh
+    steps:
+      # NTP from the sanitized configuration: `show ntp associations` does not print the VRF, and
+      # sanitized masks NTP keys (research R1).
+      - command: show running-config sanitized | include ^ntp server | no-more
+        template: show_running_config_sanitized_ntp_server.textfsm
+        map: { service: '=ntp' }
+      # The host lines only: the rest of `show logging` is the log buffer (research R13).
+      - command: show logging | include Logging to | no-more
+        template: show_logging.textfsm
+        map: { service: '=syslog' }
+      - command: show ip name-server | no-more
+        template: show_ip_name_server.textfsm
+        empty_lines: ['^IP Address\s+VRF\s+Priority\s*$', '^-+(\s+-+)*\s*$']
+        map: { service: '=dns' }
+    map: { address: ADDRESS, port: PORT, vrf: VRF }
+    defaults: { vrf: default }

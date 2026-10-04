@@ -3,11 +3,13 @@
 package packs_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -82,8 +84,9 @@ func parseRecorded(t *testing.T, p *pack.Pack, raw string) {
 	if err := po.ParseTextString(string(out), fsm, true); err != nil {
 		t.Fatal(err)
 	}
-	if len(po.Dict) == 0 {
-		t.Fatalf("%s yielded no row", tmpl)
+	// A recording named _empty is a device with nothing to report (feature 007): no row is right.
+	if empty := strings.Contains(filepath.Base(raw), "_empty"); empty != (len(po.Dict) == 0) {
+		t.Fatalf("%s yielded %d rows (recording named _empty: %v)", tmpl, len(po.Dict), empty)
 	}
 	b, err := os.ReadFile(strings.TrimSuffix(raw, ".raw") + ".yml")
 	if err != nil {
@@ -116,6 +119,30 @@ func parseRecorded(t *testing.T, p *pack.Pack, raw string) {
 }
 
 // The management address is stored with its LLDP subtype, so an IP and a MAC are never confused.
+// A management output the template does not understand is parse_failed, never empty: an auditor
+// reads empty as "nothing configured" (feature 007, FR-012).
+func TestDriftIsNotEmpty(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "aaa_servers", "4.36.0F")[0]
+	tacacs, _ := os.ReadFile("arista_eos/testdata/lab/sw2_show_tacacs.raw")
+	radius, _ := os.ReadFile("arista_eos/testdata/lab/sw1_show_radius_empty.raw")
+	reworded := strings.ReplaceAll(string(tacacs), "TACACS+ server ", "TACACS+ host ")
+	reworded = strings.ReplaceAll(reworded, "TACACS+ server-group", "TACACS+ host-group")
+	for _, c := range []struct{ name, out, want string }{
+		{"recorded", string(tacacs), parse.Collected},
+		{"nothing configured", "Last time counters were cleared: never\n", parse.Empty},
+		{"reworded", reworded, parse.ParseFailed},
+	} {
+		got, _, err := parse.Parse(reg, "arista_eos", "aaa_servers", im, [][]byte{[]byte(c.out), radius})
+		if got != c.want {
+			t.Errorf("%s: %s (%v), want %s", c.name, got, err, c.want)
+		}
+	}
+}
+
 func TestLLDPAddressKeepsItsType(t *testing.T) {
 	reg, err := pack.LoadRoot(".")
 	if err != nil {
@@ -171,4 +198,71 @@ func TestNoSecretInRecordedOutput(t *testing.T) {
 			}
 		}
 	}
+}
+
+// Each <switch>_<family>.facts.yml under testdata/lab is what the family's recipe must produce from
+// that switch's recordings, one per step, through the whole parse: step maps, values, split,
+// defaults, merge and schema validation (feature 007, research R11). No lab needed.
+func TestFamiliesFromLab(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, _ := filepath.Glob(filepath.Join("*", "testdata", "lab", "*.facts.yml"))
+	if len(files) == 0 {
+		t.Fatal("no .facts.yml found")
+	}
+	for _, f := range files {
+		t.Run(f, func(t *testing.T) {
+			platform := strings.Split(f, string(filepath.Separator))[0]
+			sw, family, _ := strings.Cut(strings.TrimSuffix(filepath.Base(f), ".facts.yml"), "_")
+			im := reg.Implementations(platform, family, "4.36.0F")
+			if len(im) == 0 {
+				t.Fatalf("no %s implementation for 4.36.0F", family)
+			}
+			var outputs [][]byte
+			for _, st := range im[0].Steps {
+				base := filepath.Join(filepath.Dir(f), sw+"_"+strings.TrimSuffix(st.Template, ".textfsm"))
+				b, err := os.ReadFile(base + ".raw")
+				if os.IsNotExist(err) {
+					b, err = os.ReadFile(base + "_empty.raw")
+				}
+				if err != nil {
+					t.Fatalf("step %q: %v", st.Command, err)
+				}
+				outputs = append(outputs, b)
+			}
+			status, rows, err := parse.Parse(reg, platform, family, im[0], outputs)
+			b, _ := os.ReadFile(f)
+			var want struct {
+				Status string           `yaml:"status"`
+				Rows   []map[string]any `yaml:"rows"`
+			}
+			if err := yaml.Unmarshal(b, &want); err != nil {
+				t.Fatal(err)
+			}
+			if status != want.Status {
+				t.Fatalf("status %s (%v), want %s", status, err, want.Status)
+			}
+			// Rows compare as a multiset: order is not part of the contract, a duplicate row is.
+			got, exp := canonical(t, rows), canonical(t, want.Rows)
+			if !slices.Equal(got, exp) {
+				t.Errorf("rows\n got %s\nwant %s", strings.Join(got, "\n     "), strings.Join(exp, "\n     "))
+			}
+		})
+	}
+}
+
+// canonical renders each row as JSON (sorted keys, numbers and lists as YAML reads them) and sorts.
+func canonical(t *testing.T, rows []map[string]any) []string {
+	out := []string{}
+	for _, r := range rows {
+		b, err := json.Marshal(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, string(b))
+	}
+	slices.Sort(out)
+	return out
 }

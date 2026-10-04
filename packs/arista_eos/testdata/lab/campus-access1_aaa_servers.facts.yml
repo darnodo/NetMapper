@@ -1,0 +1,7 @@
+# What the aaa_servers recipe must produce from the campus-access1 recordings (arista-evpn-vxlan-clab configs/campus-access1.cfg).
+status: collected
+rows:
+  - {"address":"172.16.0.75","group":"LAB-TACACS","port":49,"protocol":"tacacs","vrf":"default"}
+  - {"address":"172.16.0.99","group":"LAB-TACACS","port":49,"protocol":"tacacs","vrf":"default"}
+  - {"address":"172.16.0.76","group":"LAB-RADIUS","port":1812,"protocol":"radius","vrf":"default"}
+  - {"address":"172.16.0.99","group":"LAB-RADIUS","port":1812,"protocol":"radius","vrf":"default"}

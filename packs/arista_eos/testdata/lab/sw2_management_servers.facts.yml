@@ -1,0 +1,10 @@
+# What the management_servers recipe must produce from the sw2 recordings (test/lab/sw2.cfg).
+status: collected
+rows:
+  - {"address":"192.0.2.30","service":"ntp","vrf":"MGMT"}
+  - {"address":"192.0.2.31","service":"ntp","vrf":"MGMT"}
+  - {"address":"192.0.2.40","port":514,"service":"syslog","vrf":"default"}
+  - {"address":"192.0.2.41","port":1514,"service":"syslog","vrf":"default"}
+  - {"address":"192.0.2.42","port":514,"service":"syslog","vrf":"MGMT"}
+  - {"address":"192.0.2.51","service":"dns","vrf":"MGMT"}
+  - {"address":"192.0.2.50","service":"dns","vrf":"default"}

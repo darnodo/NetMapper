@@ -1,0 +1,7 @@
+# What the snmp recipe must produce from the sw2 recordings (test/lab/sw2.cfg).
+status: collected
+rows:
+  - {"access":"ro","acl":"NM-SNMP-RO","version":"v2c"}
+  - {"access":"rw","acl":"NM-SNMP-RW","version":"v2c"}
+  - {"auth_protocol":"sha256","group":"nm-ro","priv_protocol":"aes256","user":"netmapper","version":"v3"}
+  - {"auth_protocol":"sha256","group":"nm-auth","user":"nm-authonly","version":"v3"}

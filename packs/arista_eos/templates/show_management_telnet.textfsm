@@ -1,0 +1,7 @@
+# Same shape as show_management_ssh: enabled VRFs, and a line always printed.
+Value List VRFS (\S+)
+Value LIMIT (\d+)
+
+Start
+  ^Telnet status for ${VRFS} VRF is enabled\s*$$
+  ^Telnet session limit is ${LIMIT}\s*$$

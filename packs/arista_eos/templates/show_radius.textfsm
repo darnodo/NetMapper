@@ -1,0 +1,17 @@
+Value ADDRESS ([^,\s]+)
+Value PORT (\d+)
+Value VRF (\S+)
+Value Filldown GROUP (\S+)
+
+Start
+  ^RADIUS server\s+:\s+${ADDRESS}(?:\s+\(vrf\s+${VRF}\))?,\s+authentication port\s+${PORT}\b -> Record
+  ^RADIUS server-group:\s+${GROUP}\s*$$ -> Group
+
+Group
+  ^\s+\d+:\s+${ADDRESS}(?:\s+\(vrf\s+${VRF}\))?,\s+authentication port\s+${PORT}\b -> Record
+  ^RADIUS server-group:\s+${GROUP}\s*$$
+  ^\S -> Start
+
+# Every row is recorded explicitly: no implicit record at the end, which would emit a row holding
+# only the Filldown values.
+EOF

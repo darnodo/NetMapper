@@ -1,0 +1,9 @@
+# What the management_servers recipe must produce from the dc-leaf1 recordings (arista-evpn-vxlan-clab configs/dc-leaf1.cfg).
+status: collected
+rows:
+  - {"address":"172.16.0.99","service":"ntp","vrf":"default"}
+  - {"address":"172.16.0.254","service":"ntp","vrf":"default"}
+  - {"address":"172.16.0.73","port":514,"service":"syslog","vrf":"default"}
+  - {"address":"172.16.0.99","port":1514,"service":"syslog","vrf":"default"}
+  - {"address":"172.16.0.77","service":"dns","vrf":"default"}
+  - {"address":"172.16.0.99","service":"dns","vrf":"default"}

@@ -1,0 +1,7 @@
+Value VRF (\S+)
+Value ADDRESS (\S+)
+
+Start
+  ^ntp server(?:\s+vrf\s+${VRF})?\s+${ADDRESS}(?:\s+.*)?$$ -> Record
+  ^\s*$$
+  ^. -> Error

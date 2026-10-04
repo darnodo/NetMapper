@@ -1,0 +1,4 @@
+# What the snmp recipe must produce from the sw1 recordings (test/lab/sw1.cfg).
+status: collected
+rows:
+  - {"access":"ro","version":"v2c"}

@@ -1,0 +1,19 @@
+family: aaa_servers
+implementations:
+  - id: aaa-servers-cli
+    versions: '>=4.20'
+    transport: ssh
+    steps:
+      # Each output lists the servers, then each group with its members: the two rows of one server
+      # merge on merge_on (research R13). A server in two groups keeps the first.
+      - command: show tacacs | no-more
+        template: show_tacacs.textfsm
+        empty_lines: ['^Last time counters were cleared: .*$']
+        map: { protocol: '=tacacs' }
+      - command: show radius | no-more
+        template: show_radius.textfsm
+        empty_lines: ['^Last time counters were cleared: .*$']
+        map: { protocol: '=radius' }
+    map: { address: ADDRESS, port: PORT, vrf: VRF, group: GROUP }
+    defaults: { vrf: default }
+    merge_on: [protocol, address, port, vrf]
