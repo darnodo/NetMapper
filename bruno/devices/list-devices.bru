@@ -15,7 +15,7 @@ params:query {
 }
 
 script:post-response {
-  // Use the first device for "Get device" and "Get interface".
+  // Use the first device for "Get device", "Get interface" and the facts requests.
   // The device key is used rather than the hostname, which can be ambiguous (409).
   const devices = res.getBody().devices || [];
   if (res.getStatus() === 200 && devices.length > 0) {

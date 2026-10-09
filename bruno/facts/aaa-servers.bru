@@ -1,0 +1,15 @@
+meta {
+  name: aaa_servers
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/aaa_servers
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}

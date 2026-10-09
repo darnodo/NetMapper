@@ -1,0 +1,15 @@
+meta {
+  name: interfaces
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/interfaces
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}

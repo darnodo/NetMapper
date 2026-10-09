@@ -1,0 +1,15 @@
+meta {
+  name: aaa_methods
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/aaa_methods
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}

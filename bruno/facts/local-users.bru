@@ -1,0 +1,15 @@
+meta {
+  name: local_users
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/local_users
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}

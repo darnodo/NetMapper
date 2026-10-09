@@ -1,0 +1,15 @@
+meta {
+  name: neighbours
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/neighbours
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}
