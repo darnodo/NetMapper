@@ -6,9 +6,9 @@ and the parser and pack code. The `NetLab` VM was unreachable when the plan was 
 back the same day and `show vlan`, `show vlan internal usage`, `show interfaces switchport`,
 `show interfaces status` and `show interfaces trunk` were run read only on the EVPN lab (dc-leaf1,
 dc-spine1, campus-access1, and `show vlan` on all 28 switches). R1, R2, R3 and R8 were corrected
-from that output. What only `test/lab` can show (suspended and locally shut VLANs, a trunk that is
-down, `none`, a list long enough to wrap) is still marked **to confirm when recording**, with the
-rule to apply either way.
+from that output. What only `test/lab` could show (suspended and locally shut VLANs, a trunk that is
+down, `none`, a list long enough to wrap) was settled from the `test/lab` recordings on the same day
+(tasks T008); each item says what was recorded.
 
 ## R1. `vlans` comes from `show vlan`
 
@@ -45,26 +45,30 @@ rule to apply either way.
   `in Po1`, `in Po999`, `in Po10`; `Vx1` is not listed.
 - **Step 1 template**, `show_interfaces_status_vlan.textfsm` (new; the `interfaces` template is not
   touched): one Value `VLAN` for the Vlan column when it is not `in ...`, one Value `CHANNEL` for the
-  channel after `in`. Lines whose Vlan column is `routed` are matched and not recorded (FR-009). The
+  channel after `in`. Lines whose Vlan column is `routed` are matched first and not recorded
+  (FR-009). Members and switched ports then share one rule (`in ${CHANNEL}` or `${VLAN}`) with a
+  greedy Name, as in `show_interfaces_status.textfsm`, so a description holding a status word
+  ("connected in rack3") is read as the Name. Changed in code review: with separate rules and a lazy
+  Name, that description made an access port a member of a channel named `rack3`. The
   step's `empty_lines` lists the header and the `routed` lines, so a device with only routed ports
   (dc-spine1, sw4) skips the step instead of giving `parse_failed`; the rule needs every line to
   match, so any other line still reaches the template.
-- **Mode and access VLAN from one column.** `mode: VLAN` with values
-  `{ trunk: trunk, <other recorded words>: <same word>, '*': access }` and `access_vlan: VLAN` with
-  values `{ trunk: '', <same words>: '' }`. Only words a recording shows go in the tables;
-  `dot1q-tunnel` is recorded on sw1 for this (tasks T006 e), `tap` and `tool` are not. A word that is
-  in neither table is not an integer and the row fails as `parse_failed`, so a new Vlan column value
-  is never silently read as an access port.
+- **Mode and access VLAN from one column.** `mode: VLAN` with values `{ trunk: trunk, '*': access }`
+  and `access_vlan: VLAN` with values `{ trunk: '' }`. Only words a recording shows go in the
+  tables: `trunk` is the only one. A dot1q-tunnel port prints a number (R3), and `tap` and `tool`
+  were not recorded. Any other word is not an integer and the row fails as `parse_failed`, so a new
+  Vlan column value is never silently read as an access port.
 - **Step 2 template**, `show_interfaces_trunk.textfsm`: one state per table. Table 1 records `PORT`,
   `NATIVE`; table 2 `PORT`, `ALLOWED`; table 3 `PORT`, `ACTIVE`; table 4 (STP forwarding) is
-  skipped. `merge_on` joins the three records of a port. `values`: `All` maps to `1-4094`, `None` and
-  `none` to `''`. On a device with no trunk it prints `There are no active trunk ports`, listed in
+  skipped. `merge_on` joins the three records of a port. `values`: `All` maps to `1-4094`, `None` to `''`
+  (the only spelling recorded). On a device with no trunk it prints `There are no active trunk ports`, listed in
   the step's `empty_lines`.
-- **To confirm when recording**: whether a trunk that is down is listed in the trunk view. The
-  message on spines says "no active trunk ports", which suggests not. If it is not listed, a down
-  trunk's row has `mode: trunk` and no VLAN field; the contract and the spec edge case say so ("VLAN
-  lists are those of an active trunk"), and `interfaces.oper_state` tells a reader why. If it is
-  listed, nothing changes.
+- **Recorded on sw1 (2026-10-09)**: with `Port-Channel10` shut down, the trunk view lists only
+  Ethernet1 (`sw1_show_interfaces_trunk_po10_down.raw`); the status table still prints Po10 as
+  `disabled trunk` and its members as `errdisabled in Po10`. So a trunk that is not active has a row
+  with `mode: trunk` and no VLAN field. The contract, the data model and spec FR-005 say so, and
+  `interfaces.oper_state` tells a reader why. `switchport trunk allowed vlan none` prints `None` in
+  both the allowed and the active table (`sw1_show_interfaces_trunk_none.raw`).
 - **Alternatives considered**: `show interfaces switchport` (above); `show port-channel` for
   membership (another format, and not needed once the status table gives it); `show vlan` ports
   column (no native, no allowed list); computing active VLANs (rejected in the spec clarification).
@@ -76,8 +80,15 @@ rule to apply either way.
   A member row has no mode. An access row has `access_vlan` only, a trunk row the step 2 fields only.
 - **Rationale**: the status table is the one view that tells members apart (R2). Its Vlan column is
   what the switch applies; for VLAN membership that is what #37 needs.
-- **To confirm when recording**: the Vlan column of an access port that is administratively down
-  (expected: still its VLAN number, with Status `disabled`).
+- **Recorded on sw1**: an access port shut down still prints its VLAN (`disabled  10`,
+  `sw1_show_interfaces_status_vlan_access_down.raw`).
+- **dot1q-tunnel reads as access.** With `switchport mode dot1q-tunnel` on Ethernet4, the switchport
+  view says `Administrative Mode: tunnel` but the status table prints `10`, exactly like an access
+  port (`sw1_show_interfaces_status_vlan_tunnel.raw`). The pack records it as `access` in its outer
+  VLAN. For VLAN membership that is what the port is: a member of VLAN 10. Telling the mode apart
+  would need the switchport view, rejected in R2, for a mode nobody in these labs uses. `tap` and
+  `tool` were not recorded, so the `mode` table holds `trunk` only and every number reads as access;
+  any other word fails as `parse_failed` on `access_vlan`.
 
 ## R4. VLAN lists: one neutral form, normalised by the parser
 
@@ -105,19 +116,20 @@ rule to apply either way.
   a list cut after a comma comes back whole.
 - **Seen**: the trunk view prints the list after the port name in a fixed column
   (`Po999           1,40,4090-4091`). No list on the EVPN lab is long enough to wrap.
-- **To confirm when recording**: on sw1, set a temporary allowed list long enough to wrap
-  (every even VLAN from 2 to 200), record the trunk view as `sw1_show_interfaces_trunk_wrapped.raw`,
-  then restore the configuration. If EOS cuts inside a range (`11-` / `4094`), the join changes to "no
-  separator when the previous item ends with `-`", tested on that recording.
+- **Recorded on sw1**: every even VLAN from 2 to 200 (`sw1_show_interfaces_trunk_wrapped.raw`). EOS
+  wraps the list over eight lines, each continuation line indented to the list column, and cuts
+  between items with no trailing comma (`...,34,36` / `38,40,...`). Joining the items with `,` gives
+  the list back.
 
 ## R6. Status mapping
 
-- **Decision**: `values` for `status`: `active` to `active`, `suspended` to `suspended`, `act/lshut`
-  to `shutdown`, `*` to `other`.
-- **To confirm when recording**: the exact strings, and the configuration that puts a VLAN in
-  `act/lshut` on cEOS. If cEOS cannot produce it, the mapping stays, a parse test covers it on a copy
-  of the sw2 recording with that one line edited and named as such, and the divergence is written in
-  the quickstart.
+- **Decision**: `values` for `status`: `active` to `active`, `suspended` to `suspended`, `*` to
+  `other`. Nothing maps to `shutdown` on EOS.
+- **Recorded**: EOS has no local VLAN shutdown. `shutdown` under a VLAN is refused with "The
+  'shutdown' command is not supported. Please use 'state suspend' instead." (and silently dropped
+  from a startup-config). `act/lshut` is a Cisco IOS status, assumed during clarification by mistake.
+  `shutdown` stays in the platform-neutral enum for platforms that have it; no fixture is edited to
+  fake it.
 
 ## R7. `test/lab` layout
 
@@ -131,7 +143,7 @@ Three new links between sw1 and sw2, one change on sw2's existing link to sw3. V
 | sw1:eth4 - sw2:eth5 (new) | access VLAN 10 on both ends | access row |
 | sw2:eth2 (existing, to sw3) | `no switchport` | routed port: no row, internal VLAN not in `vlans` |
 
-VLAN 31 is suspended (`state suspend`), VLAN 32 shut down locally (R6). VLAN 50 is allowed on no
+VLAN 31 is suspended (`state suspend`); VLAN 32 is a plain VLAN, since EOS cannot shut one down locally (R6). VLAN 50 is allowed on no
 trunk and declared on sw2 only, so a VLAN can be declared and carried nowhere.
 
 - **Rationale**: every row type of FR-014 on one crawl of two switches. sw1 already carries the

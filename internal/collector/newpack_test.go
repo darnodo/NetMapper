@@ -17,7 +17,7 @@ func TestNewPlatformIsData(t *testing.T) {
 	l := NewLab(t, &fake.Network{Devices: map[netip.Addr]*fake.Device{Addr("10.0.0.1"): sw}})
 	job := l.Crawl(Doc)
 	got := l.Strings(`SELECT fact_family || ' ' || status || ' ' || platform FROM observation
-		WHERE fact_family <> ALL($1) ORDER BY 1`, ManagementFamilies) // fakeos has no recipe for them
+		WHERE fact_family <> ALL($1) ORDER BY 1`, NoRecipeFamilies) // fakeos has no recipe for them
 	want := []string{"identity collected fakeos", "interfaces collected fakeos", "neighbours empty fakeos"}
 	if len(got) != 3 || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
 		t.Errorf("got %v", got)

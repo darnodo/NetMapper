@@ -156,3 +156,34 @@ func TestListsAndSplit(t *testing.T) {
 		t.Errorf("split: %s %v %v", s, err, rows)
 	}
 }
+
+// A VLAN list is normalised after values (feature 008, FR-006): a list a device wraps over lines
+// and prints out of order comes back sorted and merged, "none" leaves the field absent, and a bad
+// token is parse_failed.
+func TestVLANList(t *testing.T) {
+	r := registry(t)
+	r.Pack("fakeos").Templates["vlan_list.textfsm"] = `Value PORT (\S+)
+Value List ALLOWED (\S+)
+
+Start
+  ^${PORT}\s+${ALLOWED}\s*$$
+  ^\s+${ALLOWED}\s*$$
+  ^END -> Record
+`
+	im := pack.Impl{
+		Steps:  []pack.Step{{Command: "show allowed", Template: "vlan_list.textfsm"}},
+		Map:    map[string]string{"interface": "PORT", "allowed_vlans": "ALLOWED"},
+		Values: map[string]map[string]string{"allowed_vlans": {"none": ""}},
+	}
+	_, rows, err := Parse(r, "fakeos", "interface_vlans", im, [][]byte{[]byte("p1 30-32,10,11\n   2,4\nEND\n")})
+	if err != nil || !reflect.DeepEqual(rows[0]["allowed_vlans"], []string{"2", "4", "10-11", "30-32"}) {
+		t.Errorf("wrapped list: %v %v", rows, err)
+	}
+	_, rows, err = Parse(r, "fakeos", "interface_vlans", im, [][]byte{[]byte("p1 none\nEND\n")})
+	if _, set := rows[0]["allowed_vlans"]; err != nil || set {
+		t.Errorf("none: %v %v", rows, err)
+	}
+	if s, _, err := Parse(r, "fakeos", "interface_vlans", im, [][]byte{[]byte("p1 10,x\nEND\n")}); s != ParseFailed || err == nil {
+		t.Errorf("bad token: %s %v", s, err)
+	}
+}

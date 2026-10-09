@@ -132,7 +132,8 @@ func walkRows(out []byte, m map[string]string) ([]map[string]any, error) {
 
 // mapRow builds one fact row from one template row, with m the step's effective map. A list field
 // keeps a template List as a list and cuts a string on its split separator; values translate each
-// item. Defaults fill the fields still absent at the end.
+// item, and a VLAN list is then normalised (feature 008). Defaults fill the fields still absent at
+// the end.
 func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, m map[string]string, raw map[string]any) (map[string]any, error) {
 	row := map[string]any{}
 	for field, src := range m {
@@ -165,6 +166,12 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, m map[str
 			for _, it := range items {
 				if it, ok := translate(im.Values[field], strings.TrimSpace(it)); ok {
 					list = append(list, it)
+				}
+			}
+			if f.VLANList && len(list) > 0 {
+				var err error
+				if list, err = pack.NormaliseVLANs(list); err != nil {
+					return nil, fmt.Errorf("field %s: %w", field, err)
 				}
 			}
 			if len(list) > 0 {

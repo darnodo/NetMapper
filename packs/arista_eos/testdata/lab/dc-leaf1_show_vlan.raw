@@ -1,0 +1,7 @@
+VLAN  Name                             Status    Ports
+----- -------------------------------- --------- -------------------------------
+1     default                          active    Po999
+40    test-l2-vxlan                    active    Po1, Po999, Vx1
+4090  mlag-peer                        active    Cpu, Po999
+4091  mlag-ibgp                        active    Cpu, Po999
+

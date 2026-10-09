@@ -53,7 +53,8 @@ VLAN and a pruned allowed list, so there is a fixture with no remote lab."
   the allowed list and `vlans`? → A: As the device prints them, normalized into the range-list
   form. The pack computes nothing.
 - Q: What status does a VLAN shut down locally on one switch get? → A: A fourth value, `shutdown`:
-  the enum is `active`, `suspended`, `shutdown`, `other`.
+  the enum is `active`, `suspended`, `shutdown`, `other`. (Recording showed EOS has no local VLAN
+  shutdown; the value stays for other platforms, research R6.)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -72,10 +73,10 @@ the lab stopped: they pass from the recorded fixtures alone.
 
 **Acceptance Scenarios**:
 
-1. **Given** a `test/lab` switch with a few named VLANs, one of them suspended and one shut down
-   locally, **When** a crawl runs, **Then** the `vlans` observation is `collected` with one row per
-   VLAN giving ID, name and status, the default VLAN 1 included, the suspended VLAN reads as
-   `suspended` and the shut down one as `shutdown`.
+1. **Given** a `test/lab` switch with a few named VLANs, one of them suspended, **When** a crawl
+   runs, **Then** the `vlans` observation is `collected` with one row per VLAN giving ID, name and
+   status, the default VLAN 1 included, and the suspended VLAN reads as `suspended`. (EOS cannot
+   shut a VLAN down locally, so `shutdown` is not produced by this lab; research R6.)
 2. **Given** a switch with a routed port, for which the device has allocated an internal VLAN,
    **When** a crawl runs, **Then** that internal VLAN is not a row of `vlans`.
 3. **Given** the arista-evpn-vxlan-clab lab running, **When** it is crawled, **Then** the devices
@@ -160,15 +161,17 @@ and check the `interface_vlans` observation is `empty`, and that a device of ano
 - An Ethernet port left unconfigured: on EOS it is a switched port in access VLAN 1 by default, so
   it has a row like any access port. Unused ports are not filtered out.
 - A port shut down administratively: still has its row. VLAN membership is configuration, not link
-  state, and link state is already in `interfaces`.
-- A port in a mode other than access and trunk (for example dot1q-tunnel): the row records the mode
-  as the device names it. A mode the pack has no recording of is `parse_failed`, never read as an
-  access port.
+  state, and link state is already in `interfaces`. A shut trunk keeps its row with its mode only:
+  the device reports VLAN lists for active trunks only (research R2).
+- A port in a mode other than access and trunk: on EOS a dot1q-tunnel port is printed like an
+  access port in its outer VLAN and is recorded as `access` in that VLAN, which is the VLAN it is a
+  member of (research R3). Any mode word the pack has no recording of is `parse_failed`, never read
+  as an access port.
 - VLANs the device creates dynamically (for example for VXLAN or MLAG) rather than from
   configuration: recorded as rows if the device lists them among its VLANs, with the status it
   prints. Internal VLANs for routed ports are the only ones excluded.
-- A VLAN shut down locally on one switch: status `shutdown` on that switch, whatever its state
-  elsewhere.
+- A VLAN shut down locally on one switch, on a platform that has it: status `shutdown` on that
+  switch, whatever its state elsewhere. EOS has no local VLAN shutdown (research R6).
 - A VLAN with no name configured: the row carries the name the device prints, which on EOS is a
   default such as `VLAN0010`.
 - A port-channel with no member up, or a member port that is down: rows are still recorded as for
@@ -189,8 +192,9 @@ and check the `interface_vlans` observation is `empty`, and that a device of ano
   identified by its interface name canonicalised by the pack's naming rules, so it joins the
   `interfaces` and `neighbours` families.
 - **FR-005**: An `interface_vlans` row MUST carry the port's mode (`access`, `trunk`, or the mode as
-  the device names it otherwise), the access VLAN for an access port, and for a trunk the native
-  VLAN, the allowed VLANs and the active VLANs. Active VLANs are the device's own report of which
+  the device names it otherwise), the access VLAN for an access port, and for a trunk the device reports as active the native
+  VLAN, the allowed VLANs and the active VLANs; a trunk that is not active carries its mode only,
+  and `interfaces.oper_state` says why (amended during implementation, research R2). Active VLANs are the device's own report of which
   allowed VLANs are active on the port, recorded as printed (normalized per FR-006); the pack MUST
   NOT compute them from the allowed list or from `vlans`.
 - **FR-006**: The allowed and active VLANs MUST be stored as a list of ranges in one
@@ -211,7 +215,7 @@ and check the `interface_vlans` observation is `empty`, and that a device of ano
 - **FR-012**: The schemas of the new families MUST be published in the fact families contract in
   the same change as the code.
 - **FR-013**: `test/lab` MUST carry VLAN configuration on sw1 and sw2: a few named VLANs including a
-  suspended one and one shut down locally, an access port, a trunk between them with a native VLAN other than 1 and a pruned
+  suspended one, an access port, a trunk between them with a native VLAN other than 1 and a pruned
   allowed list including a range, and a port-channel in trunk mode with at least one member. What
   the lab already proves (identification over SSH and SNMP v2c and v3, the denied switch, the serial
   conflict of sw4, the management facts of feature 007 and their `empty` cases on sw1) MUST keep

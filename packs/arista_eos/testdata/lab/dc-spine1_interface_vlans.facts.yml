@@ -1,0 +1,3 @@
+# What the interface_vlans recipe must produce from the dc-spine1 recordings (arista-evpn-vxlan-clab configs/dc-spine1.cfg: routed ports only).
+status: empty
+rows: []

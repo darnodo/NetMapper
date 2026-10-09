@@ -18,6 +18,8 @@ Early. What works today:
 - interfaces and links (LLDP), with the evidence behind each;
 - on Arista EOS, how each device is managed: SNMP communities (never their strings) and v3 users,
   AAA servers and method lists, local accounts, management APIs, NTP, syslog and DNS servers;
+- on Arista EOS, VLANs and which ports carry them: access ports, trunks with their native, allowed
+  and active VLANs, port-channels and their members (the L2 domains built from them come later);
 - a read-only REST API behind bearer tokens, including any fact family of one device
   (`/v1/devices/{name}/facts/{family}`).
 

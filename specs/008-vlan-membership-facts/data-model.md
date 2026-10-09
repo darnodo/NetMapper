@@ -51,7 +51,7 @@ Identity within an observation: `interface`.
 
 Rules:
 
-- A trunk that is not active may be missing from the device's trunk view (research R2): its row
+- A trunk that is not active is missing from the device's trunk view (research R2): its row
   then has `mode: trunk` and no VLAN field.
 - A member row has `interface` and `channel` and nothing else. The channel's VLAN settings are on
   the channel's own row (FR-008).

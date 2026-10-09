@@ -34,7 +34,7 @@ new dependency.
 
 **Testing**: `go test ./...`; template fixtures in `packs/arista_eos/testdata/lab/` (`TestPacks`),
 `TestFamiliesFromLab` over sw1, sw2, sw4, dc-leaf1, campus-access1 and dc-spine1 recordings, an internal VLAN test, unit tests for the
-normaliser, the `VLANList` check and the step 3 `empty_lines`.
+normaliser, the `VLANList` check and the status step's `empty_lines`.
 
 **Target Platform**: Linux container (one binary, three roles); collector against Arista EOS 4.36+,
 fixtures from cEOS 4.36.0F.
@@ -59,7 +59,7 @@ a few items per trunk thanks to ranges. 28-switch EVPN lab as the widest check.
 | II. Observations immutable, rest rebuildable | yes | Rows live in `observation.parsed`; VLAN list normalisation is in the parser, so a rule fix is a replay over stored outputs. |
 | III. Credentials stay in the collector | no | No new credential, grant or secret path. VLAN data holds no secret. |
 | IV. Read only, outward | yes | Only `show` commands. |
-| V. Vendor specifics are data | yes | Commands, templates, `ALL`/`NONE`, `act/lshut`, `static access`, `in Po` are in `packs/arista_eos`. `VLANList` and its normaliser carry no vendor term. |
+| V. Vendor specifics are data | yes | Commands, templates, `All`/`None`, `in Po`, the status table's column layout are in `packs/arista_eos`. `VLANList` and its normaliser carry no vendor term. |
 
 Workflow rules: the README, `docs/how-to/write-a-pack.md` and Bruno requests are updated for the new
 families and the `VLANList` attribute (FR-018); the fact families contract of 001 is updated in the

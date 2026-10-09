@@ -133,9 +133,14 @@ var missingCost = map[string]string{
 	"management_apis":    noManagement,
 	"aaa_methods":        noManagement,
 	"management_servers": noManagement,
+	"vlans":              noVLANs,
+	"interface_vlans":    noVLANs,
 }
 
-const noManagement = "no management inventory for these devices"
+const (
+	noManagement = "no management inventory for these devices"
+	noVLANs      = "no VLAN data for these devices; they will join no L2 domain"
+)
 
 // Load loads the given pack directories and refuses the whole set if any check fails. A platform
 // pack missing a family's recipe still loads, with one warning per missing family.
@@ -494,6 +499,35 @@ func NormaliseMAC(s string) string {
 		b.WriteString(h[i : i+2])
 	}
 	return b.String()
+}
+
+// NormaliseVLANs turns a device's VLAN list into its one normal form (feature 008, FR-006): the
+// items are joined with commas, so a list a device wraps over several lines comes back whole, then
+// read as IDs or lo-hi ranges, sorted and merged. A token that is neither, or an ID outside 1 to
+// 4094, is an error.
+func NormaliseVLANs(items []string) ([]string, error) {
+	type span struct{ lo, hi int }
+	var spans []span
+	for _, tok := range strings.Split(strings.Join(items, ","), ",") {
+		if tok = strings.TrimSpace(tok); tok == "" {
+			continue
+		}
+		lo, hi, err := fact.ParseVLANRange(tok)
+		if err != nil {
+			return nil, err
+		}
+		spans = append(spans, span{lo, hi})
+	}
+	slices.SortFunc(spans, func(a, b span) int { return a.lo - b.lo })
+	var out []string
+	for i := 0; i < len(spans); {
+		cur := spans[i]
+		for i++; i < len(spans) && spans[i].lo <= cur.hi+1; i++ {
+			cur.hi = max(cur.hi, spans[i].hi)
+		}
+		out = append(out, fact.FormatVLANRange(cur.lo, cur.hi))
+	}
+	return out, nil
 }
 
 type clause struct {

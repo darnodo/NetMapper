@@ -8,6 +8,10 @@
 # except `aaa authorization exec default local`: on sw1, sw2 and sw4 the netmapper account is
 # privilege 15 with the read-only network-operator role, which the management facts need, and EOS
 # applies that privilege only with exec authorization (docs/how-to/deploy.md, "The device account").
+# sw1 and sw2 also carry the VLAN configuration of feature 008: a trunk on eth1 with native VLAN 99
+# and a pruned allowed list, Port-Channel10 on the two links after it allowing every VLAN, access
+# VLAN 10 on the last link, VLAN 31 suspended; sw2's eth2 towards sw3
+# is routed. sw4 has no Ethernet port and is the `empty` case of the interface_vlans family.
 # Record outputs with: docker exec clab-netmapper-sw2 Cli -p 15 -c '<command> | no-more'
 # sw3 answers SSH but has no netmapper user and no SNMP community: it
 # rejects every lab credential set (denied). 172.20.20.9 is inside the perimeter and unused
@@ -37,3 +41,6 @@ topology:
   links:
     - endpoints: ["sw1:eth1", "sw2:eth1"]
     - endpoints: ["sw2:eth2", "sw3:eth1"]
+    - endpoints: ["sw1:eth2", "sw2:eth3"]   # Port-Channel10 (feature 008)
+    - endpoints: ["sw1:eth3", "sw2:eth4"]   # Port-Channel10
+    - endpoints: ["sw1:eth4", "sw2:eth5"]   # access VLAN 10

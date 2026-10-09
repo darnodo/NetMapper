@@ -1,0 +1,10 @@
+Value VLAN_ID (\d+)
+Value INTERFACE (\S+)
+
+Start
+  ^${VLAN_ID}\s+${INTERFACE}\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error
+
+# No recipe uses this template. It reads the evidence recorded beside show vlan, so a test can check
+# that no internal VLAN is a vlans row (feature 008, FR-003).

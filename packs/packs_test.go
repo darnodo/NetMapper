@@ -142,6 +142,37 @@ func TestDriftIsNotEmpty(t *testing.T) {
 	}
 }
 
+// The same for interface_vlans (feature 008, US3): a status table with a Vlan word the pack has
+// never recorded, a reworded trunk message and a spine table with one switched port are not empty.
+func TestVLANDriftIsNotEmpty(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "interface_vlans", "4.36.0F")[0]
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join("arista_eos", "testdata", "lab", name+".raw"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	status, trunk := read("sw1_show_interfaces_status_vlan"), read("sw1_show_interfaces_trunk")
+	spine, noTrunk := read("dc-spine1_show_interfaces_status_vlan_empty"), read("dc-spine1_show_interfaces_trunk_empty")
+	for _, c := range []struct{ name, status, trunk, want string }{
+		{"recorded", status, trunk, parse.Collected},
+		{"spine", spine, noTrunk, parse.Empty},
+		{"unknown Vlan word", status + "Et9               connected    foo      full   1G     EbraTestPhyPort\n", trunk, parse.ParseFailed},
+		{"reworded trunk message", spine, "There are no trunk ports\n", parse.ParseFailed},
+		{"spine with one access port", spine + "Et11              connected    10       full   1G     EbraTestPhyPort\n", noTrunk, parse.Collected},
+	} {
+		got, _, err := parse.Parse(reg, "arista_eos", "interface_vlans", im, [][]byte{[]byte(c.status), []byte(c.trunk)})
+		if got != c.want {
+			t.Errorf("%s: %s (%v), want %s", c.name, got, err, c.want)
+		}
+	}
+}
+
 // An EOS switch with no SNMP community and no user still prints "SNMP agent enabled in VRFs:
 // default", then "SNMP agent disabled" (recorded on test/lab sw1, cEOS 4.36). The agent row must say
 // enabled: no and list no VRF.
@@ -341,4 +372,130 @@ func canonical(t *testing.T, rows []map[string]any) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// Internal VLANs a switch allocates for its routed ports are not declared VLANs (feature 008,
+// FR-003). show vlan internal usage is recorded beside show vlan as evidence: none of the IDs it
+// lists may be a vlans row.
+func TestInternalVLANsAreNotDeclared(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "vlans", "4.36.0F")[0]
+	for _, sw := range []string{"sw2", "dc-leaf1"} {
+		base := filepath.Join("arista_eos", "testdata", "lab", sw)
+		usage, _ := os.ReadFile(base + "_show_vlan_internal_usage.raw")
+		fsm := gotextfsm.TextFSM{}
+		if err := fsm.ParseString(reg.Pack("arista_eos").Templates["show_vlan_internal_usage.textfsm"]); err != nil {
+			t.Fatal(err)
+		}
+		po := gotextfsm.ParserOutput{}
+		if err := po.ParseTextString(string(usage), fsm, true); err != nil {
+			t.Fatal(err)
+		}
+		if len(po.Dict) == 0 {
+			t.Fatalf("%s: the recording lists no internal VLAN, so this test proves nothing", sw)
+		}
+		out, _ := os.ReadFile(base + "_show_vlan.raw")
+		_, rows, err := parse.Parse(reg, "arista_eos", "vlans", im, [][]byte{out})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, internal := range po.Dict {
+			for _, r := range rows {
+				if fmt.Sprint(r["vlan_id"]) == internal["VLAN_ID"] {
+					t.Errorf("%s: internal VLAN %v (%v) is a vlans row", sw, internal["VLAN_ID"], internal["INTERFACE"])
+				}
+			}
+		}
+	}
+}
+
+// The trunk and port variants recorded on sw1 by changing one setting at a time (feature 008,
+// tasks T006): each is parsed with the interface_vlans recipe and checked for the port it changed.
+func TestTrunkVariants(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "interface_vlans", "4.36.0F")[0]
+	dir := filepath.Join("arista_eos", "testdata", "lab")
+	evens := []string{}
+	for v := 2; v <= 200; v += 2 {
+		evens = append(evens, fmt.Sprint(v))
+	}
+	for _, c := range []struct {
+		status, trunk, port string
+		want                map[string]any
+	}{
+		// allowed vlan none: the trunk is still listed, with None in both lists.
+		{"sw1_show_interfaces_status_vlan", "sw1_show_interfaces_trunk_none", "Ethernet1",
+			map[string]any{"interface": "Ethernet1", "mode": "trunk", "native_vlan": int64(99)}},
+		// Every even VLAN from 2 to 200, wrapped by EOS over eight lines (research R5).
+		{"sw1_show_interfaces_status_vlan", "sw1_show_interfaces_trunk_wrapped", "Ethernet1",
+			map[string]any{"interface": "Ethernet1", "mode": "trunk", "native_vlan": int64(99), "allowed_vlans": evens,
+				"active_vlans": []string{"10", "20", "30", "32", "40", "42", "44", "46", "48"}}},
+		// A shut trunk is absent from the trunk view: mode only (research R2).
+		{"sw1_show_interfaces_status_vlan_po10_down", "sw1_show_interfaces_trunk_po10_down", "Port-Channel10",
+			map[string]any{"interface": "Port-Channel10", "mode": "trunk"}},
+		{"sw1_show_interfaces_status_vlan_po10_down", "sw1_show_interfaces_trunk_po10_down", "Ethernet2",
+			map[string]any{"interface": "Ethernet2", "channel": "Port-Channel10"}},
+		// A shut access port keeps its VLAN.
+		{"sw1_show_interfaces_status_vlan_access_down", "sw1_show_interfaces_trunk", "Ethernet4",
+			map[string]any{"interface": "Ethernet4", "mode": "access", "access_vlan": int64(10)}},
+		// dot1q-tunnel is printed like an access port in its outer VLAN, and read so (research R3).
+		{"sw1_show_interfaces_status_vlan_tunnel", "sw1_show_interfaces_trunk", "Ethernet4",
+			map[string]any{"interface": "Ethernet4", "mode": "access", "access_vlan": int64(10)}},
+	} {
+		var outputs [][]byte
+		for _, f := range []string{c.status, c.trunk} {
+			b, err := os.ReadFile(filepath.Join(dir, f+".raw"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			outputs = append(outputs, b)
+		}
+		_, rows, err := parse.Parse(reg, "arista_eos", "interface_vlans", im, outputs)
+		if err != nil {
+			t.Fatalf("%s + %s: %v", c.status, c.trunk, err)
+		}
+		var got map[string]any
+		for _, r := range rows {
+			if r["interface"] == c.port {
+				got = r
+			}
+		}
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s + %s, %s:\n got %v\nwant %v", c.status, c.trunk, c.port, got, c.want)
+		}
+	}
+}
+
+// A description can hold a status word and a token that looks like a Vlan column ("connected in
+// rack3", "connected 10"): the Vlan column is the one after the last status word, as in the
+// interfaces template (feature 008, found in review). Inputs that tie on purpose.
+func TestDescriptionIsNotTheVlanColumn(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", "interface_vlans", "4.36.0F")[0]
+	status := `Port       Name                Status       Vlan     Duplex Speed  Type            Flags Encapsulation
+Et2        to sw2 connected 10 connected    in Po10  full   1G     EbraTestPhyPort
+Et4        connected in rack3  connected    10       full   1G     EbraTestPhyPort
+Et5        connected 20        connected    routed   full   1G     EbraTestPhyPort
+Ma0                            connected    routed   a-full a-1G   10/100/1000
+`
+	_, rows, err := parse.Parse(reg, "arista_eos", "interface_vlans", im, [][]byte{[]byte(status), []byte("There are no active trunk ports\n")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []map[string]any{
+		{"interface": "Ethernet2", "channel": "Port-Channel10"},
+		{"interface": "Ethernet4", "mode": "access", "access_vlan": int64(10)},
+	}
+	if !reflect.DeepEqual(rows, want) {
+		t.Errorf("got %v\nwant %v", rows, want)
+	}
 }

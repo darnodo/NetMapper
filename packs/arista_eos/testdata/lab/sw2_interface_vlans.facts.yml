@@ -1,0 +1,10 @@
+# What the interface_vlans recipe must produce from the sw2 recordings (test/lab/sw2.cfg). Ethernet2
+# (towards sw3) and Management0 are routed: no row. VLAN 50 is declared on sw2 only, so only sw2's
+# Port-Channel10 has it active.
+status: collected
+rows:
+  - {interface: Ethernet1, mode: trunk, native_vlan: 99, allowed_vlans: ["10", "20", "30-32", "40-49", "99"], active_vlans: ["10", "20", "30", "32", "40-49", "99"]}
+  - {interface: Ethernet3, channel: Port-Channel10}
+  - {interface: Ethernet4, channel: Port-Channel10}
+  - {interface: Ethernet5, mode: access, access_vlan: 10}
+  - {interface: Port-Channel10, mode: trunk, native_vlan: 1, allowed_vlans: ["1-4094"], active_vlans: ["1", "10", "20", "30", "32", "40-50", "99"]}

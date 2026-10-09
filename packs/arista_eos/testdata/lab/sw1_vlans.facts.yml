@@ -1,0 +1,20 @@
+# What the vlans recipe must produce from the sw1 recordings (test/lab/sw1.cfg).
+status: collected
+rows:
+  - {vlan_id: 1, name: default, status: active}
+  - {vlan_id: 10, name: USERS, status: active}
+  - {vlan_id: 20, name: SERVERS, status: active}
+  - {vlan_id: 30, name: LAB-30, status: active}
+  - {vlan_id: 31, name: SUSPENDED, status: suspended}
+  - {vlan_id: 32, name: LAB-32, status: active}
+  - {vlan_id: 40, name: VLAN0040, status: active}
+  - {vlan_id: 41, name: VLAN0041, status: active}
+  - {vlan_id: 42, name: VLAN0042, status: active}
+  - {vlan_id: 43, name: VLAN0043, status: active}
+  - {vlan_id: 44, name: VLAN0044, status: active}
+  - {vlan_id: 45, name: VLAN0045, status: active}
+  - {vlan_id: 46, name: VLAN0046, status: active}
+  - {vlan_id: 47, name: VLAN0047, status: active}
+  - {vlan_id: 48, name: VLAN0048, status: active}
+  - {vlan_id: 49, name: VLAN0049, status: active}
+  - {vlan_id: 99, name: NATIVE, status: active}

@@ -1,0 +1,15 @@
+meta {
+  name: interface_vlans
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/interface_vlans
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}

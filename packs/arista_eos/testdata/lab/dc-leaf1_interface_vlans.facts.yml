@@ -1,0 +1,9 @@
+# What the interface_vlans recipe must produce from the dc-leaf1 recordings (arista-evpn-vxlan-clab
+# configs/dc-leaf1.cfg). Port-Channel999 is the MLAG peer-link: it allows every VLAN, and the device
+# reports which are active. Vxlan1 is not a port of the status table: no row.
+status: collected
+rows:
+  - {interface: Ethernet1, channel: Port-Channel1}
+  - {interface: Ethernet10, channel: Port-Channel999}
+  - {interface: Port-Channel1, mode: trunk, native_vlan: 1, allowed_vlans: ["40"], active_vlans: ["40"]}
+  - {interface: Port-Channel999, mode: trunk, native_vlan: 1, allowed_vlans: ["1-4094"], active_vlans: ["1", "40", "4090-4091"]}

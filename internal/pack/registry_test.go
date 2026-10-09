@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -137,14 +138,38 @@ func TestLoadWarnsMissingFamily(t *testing.T) {
 	if _, err := Load(base, dir); err != nil {
 		t.Fatal(err)
 	}
-	// fakeos also has no recipe for the six management families (feature 007): one line each.
+	// fakeos also has no recipe for the six management families (feature 007) and the two layer 2
+	// families (feature 008): one line each.
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	if len(lines) != 7 || !strings.Contains(buf.String(), "pack=fakeos family=neighbours") {
+	if len(lines) != 9 || !strings.Contains(buf.String(), "family=vlans effect=\"no VLAN data") || !strings.Contains(buf.String(), "pack=fakeos family=neighbours") {
 		t.Errorf("warnings = %q", buf.String())
 	}
 	for _, l := range lines {
 		if !strings.Contains(l, "pack=fakeos") {
 			t.Errorf("warning about another pack: %q", l)
+		}
+	}
+}
+
+func TestNormaliseVLANs(t *testing.T) {
+	for _, c := range []struct {
+		in, want []string
+	}{
+		{[]string{"1,40,4090-4091"}, []string{"1", "40", "4090-4091"}},
+		{[]string{"10-12", "11-20", "21"}, []string{"10-21"}},
+		{[]string{"2,4,", "6"}, []string{"2", "4", "6"}},                // a list cut after a comma
+		{[]string{"2,4,6", "8,10"}, []string{"2", "4", "6", "8", "10"}}, // cut between items (EOS)
+		{[]string{"1-4094"}, []string{"1-4094"}},
+		{[]string{"30-32", "10"}, []string{"10", "30-32"}},
+	} {
+		got, err := NormaliseVLANs(c.in)
+		if err != nil || !slices.Equal(got, c.want) {
+			t.Errorf("NormaliseVLANs(%q) = %q, %v; want %q", c.in, got, err, c.want)
+		}
+	}
+	for _, bad := range [][]string{{"0"}, {"4095"}, {"a-b"}, {"20-10"}} {
+		if got, err := NormaliseVLANs(bad); err == nil {
+			t.Errorf("NormaliseVLANs(%q) = %q, want an error", bad, got)
 		}
 	}
 }

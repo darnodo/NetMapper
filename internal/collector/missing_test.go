@@ -58,9 +58,9 @@ func TestMissingFamilies(t *testing.T) {
 			t.Errorf("missing %q in %v", want, got)
 		}
 	}
-	// Feature 007: fakeos has no recipe for the management families, so each is recorded
-	// unsupported/no_recipe on every identified device (SC-004).
-	for _, family := range ManagementFamilies {
+	// Features 007 and 008: fakeos has no recipe for the management and layer 2 families, so each is
+	// recorded unsupported/no_recipe on every identified device (007 SC-004, 008 SC-004).
+	for _, family := range NoRecipeFamilies {
 		for _, target := range []string{"10.0.0.1", "10.0.0.2"} {
 			if want := target + " " + family + " unsupported no_recipe"; !slices.Contains(got, want) {
 				t.Errorf("missing %q in %v", want, got)
