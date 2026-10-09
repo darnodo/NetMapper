@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-09
 
-**Status**: Draft
+**Status**: Planned
 
 **Input**: User description: "Implement GitHub issue darnodo/NetMapper#35 (first sub-issue of #34):
 collect declared VLANs and which ports carry them on Arista EOS, as two new platform-neutral fact
@@ -141,8 +141,8 @@ and check the `interface_vlans` observation is `empty`, and that a device of ano
 
 ### Edge Cases
 
-- A trunk whose allowed list is empty (`none`): allowed VLANs and active VLANs are both empty. That
-  is different from the default, which allows every VLAN.
+- A trunk whose allowed list is empty (`none`): allowed VLANs and active VLANs are both absent from
+  its row. That is different from the default, which allows every VLAN (`["1-4094"]`).
 - A trunk allowing a VLAN that is not declared on the switch: the VLAN is in the allowed list, and
   the active list is whatever the device reports (expected: not in it).
 - A trunk allowing every VLAN while the device restricts some of them on that port (for example a
@@ -196,7 +196,8 @@ and check the `interface_vlans` observation is `empty`, and that a device of ano
   merged, so one set of VLANs has exactly one form (`["1-9", "11-4094"]`). VLAN IDs are not
   expanded one by one: a default trunk is one item, not 4094.
 - **FR-007**: "Every VLAN allowed" and "no VLAN allowed" MUST read differently: the first as the
-  full range 1 to 4094, the second as an empty set.
+  full range `["1-4094"]`, the second as an absent allowed list on a trunk row (amended during
+  planning, research R4: an empty list is never stored, as for every list field).
 - **FR-008**: A member port of a port-channel MUST have a row that names its port-channel
   (canonical name) and carries no VLAN fields. The VLAN settings are on the port-channel's row.
 - **FR-009**: Routed ports and management interfaces MUST NOT have an `interface_vlans` row.
