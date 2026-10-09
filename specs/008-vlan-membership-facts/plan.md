@@ -33,7 +33,7 @@ new dependency.
 **Storage**: none new. Rows go to `observation.parsed`, outputs to the object store. No migration.
 
 **Testing**: `go test ./...`; template fixtures in `packs/arista_eos/testdata/lab/` (`TestPacks`),
-`TestFamiliesFromLab` over sw1, sw2 and sw4 recordings, an internal VLAN test, unit tests for the
+`TestFamiliesFromLab` over sw1, sw2, sw4, dc-leaf1, campus-access1 and dc-spine1 recordings, an internal VLAN test, unit tests for the
 normaliser, the `VLANList` check and the step 3 `empty_lines`.
 
 **Target Platform**: Linux container (one binary, three roles); collector against Arista EOS 4.36+,
@@ -86,12 +86,13 @@ specs/008-vlan-membership-facts/
 ### Source Code (repository root)
 
 ```text
-internal/fact/fact.go              # two families, Field.VLANList, its check in Validate
+internal/fact/fact.go              # two families, Field.VLANList and Field.VLANID, their checks
 internal/pack/registry.go          # NormaliseVLANs (beside NormaliseMAC), missingCost entries
 internal/parse/parse.go            # apply NormaliseVLANs to VLANList fields in mapRow
 packs/arista_eos/recipes/          # vlans.yaml, interface_vlans.yaml
 packs/arista_eos/templates/        # show_vlan, show_interfaces_status_vlan,
-                                   # show_interfaces_trunk (.textfsm)
+                                   # show_interfaces_trunk (.textfsm), and
+                                   # show_vlan_internal_usage (evidence only)
 packs/arista_eos/testdata/lab/     # sw1_*, sw2_*, sw4_*_empty recordings, .yml,
                                    # <switch>_vlans.facts.yml, <switch>_interface_vlans.facts.yml,
                                    # sw2_show_vlan_internal_usage.raw (evidence only)

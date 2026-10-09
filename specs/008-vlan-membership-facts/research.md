@@ -50,8 +50,9 @@ rule to apply either way.
   (dc-spine1, sw4) skips the step instead of giving `parse_failed`; the rule needs every line to
   match, so any other line still reaches the template.
 - **Mode and access VLAN from one column.** `mode: VLAN` with values
-  `{ trunk: trunk, dot1q-tunnel: dot1q-tunnel, tap: tap, tool: tool, '*': access }` and
-  `access_vlan: VLAN` with values `{ trunk: '', dot1q-tunnel: '', tap: '', tool: '' }`. A word that is
+  `{ trunk: trunk, <other recorded words>: <same word>, '*': access }` and `access_vlan: VLAN` with
+  values `{ trunk: '', <same words>: '' }`. Only words a recording shows go in the tables;
+  `dot1q-tunnel` is recorded on sw1 for this (tasks T006 e), `tap` and `tool` are not. A word that is
   in neither table is not an integer and the row fails as `parse_failed`, so a new Vlan column value
   is never silently read as an access port.
 - **Step 2 template**, `show_interfaces_trunk.textfsm`: one state per table. Table 1 records `PORT`,
@@ -71,7 +72,7 @@ rule to apply either way.
 ## R3. Mode comes from the status table
 
 - **Decision**: `mode` is `access` when the Vlan column of `show interfaces status` is a number,
-  `trunk` when it says `trunk`, the word as printed for `dot1q-tunnel`, `tap` or `tool` (R2 values).
+  `trunk` when it says `trunk`, the word as printed for another mode a recording shows (R2 values).
   A member row has no mode. An access row has `access_vlan` only, a trunk row the step 2 fields only.
 - **Rationale**: the status table is the one view that tells members apart (R2). Its Vlan column is
   what the switch applies; for VLAN membership that is what #37 needs.

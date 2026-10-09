@@ -16,13 +16,18 @@ The parser builds that form from whatever the template gives (research R4, R5). 
 rejects a row whose `VLANList` field is not in it, so a pack that bypasses the parser still cannot
 store another form. No item means the field is absent (the parser's existing rule for lists).
 
+## New field attribute: `VLANID`
+
+An `int` field marked `VLANID` holds one VLAN ID: `fact.Validate` rejects a value outside 1 to
+4094 (FR-002).
+
 ## `vlans`
 
 One row per VLAN the device lists as declared. Internal VLANs of routed ports are not rows (R1).
 
 | Field | Type | Required | Notes |
 | ----- | ---- | -------- | ----- |
-| `vlan_id` | int | yes | 1 to 4094 |
+| `vlan_id` | int, `VLANID` | yes | 1 to 4094, checked |
 | `name` | string | no | as printed; EOS prints a default such as `VLAN0010` when none is set |
 | `status` | string | yes | `active`, `suspended`, `shutdown`, `other` |
 
@@ -35,9 +40,9 @@ One row per switched port, port-channels included, and one per port-channel memb
 | Field | Type | Required | Notes |
 | ----- | ---- | -------- | ----- |
 | `interface` | string | yes, canonical | joins `interfaces.name` and `neighbours.local_interface` |
-| `mode` | string | no | `access`, `trunk`, or as printed (`dot1q-tunnel`, `tap`, `tool`); absent on a member row |
-| `access_vlan` | int | no | access mode only |
-| `native_vlan` | int | no | trunk mode only |
+| `mode` | string | no | `access`, `trunk`, or another mode as printed, only if a recording shows it (research R3); absent on a member row |
+| `access_vlan` | int, `VLANID` | no | access mode only; 1 to 4094, checked |
+| `native_vlan` | int, `VLANID` | no | trunk mode only; 1 to 4094, checked |
 | `allowed_vlans` | strings, `VLANList` | no | trunk mode only; absent on an active trunk means no VLAN allowed |
 | `active_vlans` | strings, `VLANList` | no | trunk mode only, as the device reports it; absent means none active |
 | `channel` | string | no, canonical | member rows only: the port-channel this port belongs to |

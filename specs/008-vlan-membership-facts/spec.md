@@ -19,10 +19,12 @@ VLAN and a pruned allowed list, so there is a fixture with no remote lab."
 - **Two families, as the issue proposes.** A VLAN and a switched port share no field. `vlans` has
   one row per declared VLAN, `interface_vlans` one row per switched port. The MAC table (#36) and the
   `l2domain` projection (#37) are separate work and are not started here.
-- **Port membership comes from the switchport view, not from the per-VLAN port list.** The per-VLAN
+- **Port membership comes from the per-port views, not from the per-VLAN port list.** The per-VLAN
   list says which ports are in a VLAN but not which one is native or what a trunk allows. The
-  switchport view gives all of it, so `vlans` carries no port list and there is one source of
-  truth for membership.
+  device's port status table (mode, access VLAN, port-channel membership) and its trunk view
+  (native, allowed and active VLANs) give all of it, so `vlans` carries no port list and there is
+  one source of truth for membership. The switchport view was set aside during planning: it prints
+  port-channel members as plain access ports (research R2).
 - **Internal VLANs are left out.** A VLAN the device allocates on its own for a routed port is not
   declared, and recording it as a VLAN would create broadcast domains that do not exist. They are
   not rows of `vlans`.
@@ -159,8 +161,9 @@ and check the `interface_vlans` observation is `empty`, and that a device of ano
   it has a row like any access port. Unused ports are not filtered out.
 - A port shut down administratively: still has its row. VLAN membership is configuration, not link
   state, and link state is already in `interfaces`.
-- A port in a mode other than access and trunk (dot1q-tunnel, tap, tool): the row records the mode
-  as the device names it, with the VLAN fields the device prints for it.
+- A port in a mode other than access and trunk (for example dot1q-tunnel): the row records the mode
+  as the device names it. A mode the pack has no recording of is `parse_failed`, never read as an
+  access port.
 - VLANs the device creates dynamically (for example for VXLAN or MLAG) rather than from
   configuration: recorded as rows if the device lists them among its VLANs, with the status it
   prints. Internal VLANs for routed ports are the only ones excluded.

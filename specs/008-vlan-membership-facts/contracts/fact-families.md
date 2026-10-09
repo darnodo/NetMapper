@@ -22,7 +22,7 @@ this family is never `empty`, since VLAN 1 always exists.
 
 | Field   | Type   | Required                                    |
 | ------- | ------ | ------------------------------------------- |
-| vlan_id | int    | yes                                         |
+| vlan_id | int    | yes, 1 to 4094                              |
 | name    | string | no                                          |
 | status  | string | yes: `active`, `suspended`, `shutdown`, `other` |
 
@@ -36,8 +36,8 @@ One row per switched port (port-channels included), and one per port-channel mem
 | ------------- | ------------------- | ---------------------------------------- |
 | interface     | string              | yes, canonical                           |
 | mode          | string              | no: `access`, `trunk`, or as the device names it |
-| access_vlan   | int                 | no, access mode only                     |
-| native_vlan   | int                 | no, trunk mode only                      |
+| access_vlan   | int                 | no, access mode only, 1 to 4094          |
+| native_vlan   | int                 | no, trunk mode only, 1 to 4094           |
 | allowed_vlans | strings, VLAN list  | no, trunk mode only                      |
 | active_vlans  | strings, VLAN list  | no, trunk mode only                      |
 | channel       | string              | no, canonical, member rows only          |
