@@ -8,9 +8,10 @@
 
 Two new platform-neutral fact families, `vlans` and `interface_vlans`, in `internal/fact`, filled on
 Arista EOS by one recipe each. `vlans` reads `show vlan`, which leaves out internal VLANs on its own
-(research R1). `interface_vlans` merges three steps on the interface: `show interfaces switchport`
-for mode, access, native and allowed VLANs; `show interfaces trunk` for the active VLANs the device
-reports; `show interfaces status` for port-channel membership (R2). One vendor-neutral schema
+(research R1). `interface_vlans` merges two steps on the interface: `show interfaces status` for mode,
+access VLAN and port-channel membership, and `show interfaces trunk` for native, allowed and active
+VLANs as the device reports them (R2). `show interfaces switchport` was dropped after the EVPN lab
+showed it prints channel members as plain access ports. One vendor-neutral schema
 addition: a `VLANList` field attribute, which the parser normalises into sorted, merged ranges and
 `fact.Validate` enforces (R4). `test/lab` gets three more sw1-sw2 links, VLANs, a trunk, a
 port-channel, an access port and a routed port (R7). No API change: the per-family endpoint of 007
@@ -19,9 +20,8 @@ already serves any family.
 Spec amendment from research, made in this change: "no VLAN allowed" on a trunk is an absent
 `allowed_vlans` field, not a stored empty list (R4, FR-007).
 
-The `NetLab` VM was unreachable when this plan was written. Research items that depend on what EOS
-prints are marked "to confirm when recording" and are settled in implementation step 1, before any
-template is written.
+Research R1 to R3 and R8 were checked on the EVPN lab (cEOS 4.36.0F) on 2026-10-09. What only
+`test/lab` can show is marked "to confirm when recording" and is settled in implementation step 1.
 
 ## Technical Context
 
@@ -41,7 +41,7 @@ fixtures from cEOS 4.36.0F.
 
 **Project Type**: single Go service with data packs.
 
-**Performance Goals**: no target. Four more short `show` commands per EOS device.
+**Performance Goals**: no target. Three more short `show` commands per EOS device.
 
 **Constraints**: tests pass with no lab up; `NetLab` VM needed once to record fixtures and once for
 the live crawl.
@@ -90,8 +90,8 @@ internal/fact/fact.go              # two families, Field.VLANList, its check in 
 internal/pack/registry.go          # NormaliseVLANs (beside NormaliseMAC), missingCost entries
 internal/parse/parse.go            # apply NormaliseVLANs to VLANList fields in mapRow
 packs/arista_eos/recipes/          # vlans.yaml, interface_vlans.yaml
-packs/arista_eos/templates/        # show_vlan, show_interfaces_switchport, show_interfaces_trunk,
-                                   # show_interfaces_status_channel (.textfsm)
+packs/arista_eos/templates/        # show_vlan, show_interfaces_status_vlan,
+                                   # show_interfaces_trunk (.textfsm)
 packs/arista_eos/testdata/lab/     # sw1_*, sw2_*, sw4_*_empty recordings, .yml,
                                    # <switch>_vlans.facts.yml, <switch>_interface_vlans.facts.yml,
                                    # sw2_show_vlan_internal_usage.raw (evidence only)
@@ -117,8 +117,7 @@ README.md, docs/how-to/write-a-pack.md
 5. `missingCost`, contract, README, write-a-pack guide, Bruno requests.
 6. Quickstart sections 4 and 5 on the VM.
 
-Steps 2 to 5 need no lab. Step 1 must come first: three of the four templates depend on output not
-yet seen.
+Steps 2 to 5 need no lab. Step 1 must come first: the test/lab fixtures are what the templates are tested against.
 
 ## Complexity Tracking
 

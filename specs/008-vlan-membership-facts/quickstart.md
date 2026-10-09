@@ -22,9 +22,9 @@ Expected: everything passes, nothing skipped, and in particular:
 | `packs` `TestPacks` | every recorded output of the new templates parses to its `.yml`; `_empty` outputs give no row |
 | `packs` `TestFamiliesFromLab` | sw1's and sw2's recorded steps give the rows of `<switch>_vlans.facts.yml` and `<switch>_interface_vlans.facts.yml`; sw4 gives `empty` `interface_vlans` |
 | `packs` internal VLAN test (research R1) | no ID listed by sw2's recorded `show vlan internal usage` is a `vlans` row |
-| `internal/pack` | `NormaliseVLANs`: sorting, merging, `ALL`, wrapped lists, bad tokens |
+| `internal/pack` | `NormaliseVLANs`: sorting, merging, wrapped lists, bad tokens, IDs out of range |
 | `internal/fact` | a `VLANList` field out of normal form, or with an ID outside 1 to 4094, is refused |
-| `internal/parse` | the step 3 `empty_lines` rule skips a status table with no member, and still fails on drift |
+| `internal/parse` | the status step's `empty_lines` skips a table of only `routed` lines, and still fails on drift |
 
 ## 2. Load warnings
 
@@ -44,7 +44,7 @@ sudo containerlab deploy -t test/lab/two-switch.clab.yaml --reconfigure
 Check the lab before recording: on sw1 and sw2, `show port-channel` lists `Port-Channel10` with two
 active members, `show vlan` lists VLAN 31 as `suspended` and VLAN 32 as `act/lshut` (research R6).
 
-Record each step command of both recipes, sent exactly as the recipe writes it, on sw1 and sw2,
+Record each step command of both recipes (`show vlan`, `show interfaces status`, `show interfaces trunk`), sent exactly as the recipe writes it, on sw1 and sw2,
 named `<switch>_<template name>.raw`:
 
 ```sh

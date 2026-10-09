@@ -44,6 +44,7 @@ One row per switched port (port-channels included), and one per port-channel mem
 
 - A member row has `interface` and `channel` only; VLAN settings are on the channel's row.
 - On a trunk row, absent `allowed_vlans` means the trunk allows no VLAN; a trunk allowing every
-  VLAN has `["1-4094"]`.
+  VLAN has `["1-4094"]`. The VLAN lists and the native VLAN are those of an active trunk: a trunk the
+  device does not report as active may have `mode` only (to settle when recording, research R2).
 - `active_vlans` is what the device reports as allowed and active on the port, not computed.
 - Routed ports and management interfaces have no row. A device with none of the above is `empty`.

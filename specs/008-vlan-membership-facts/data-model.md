@@ -35,10 +35,10 @@ One row per switched port, port-channels included, and one per port-channel memb
 | Field | Type | Required | Notes |
 | ----- | ---- | -------- | ----- |
 | `interface` | string | yes, canonical | joins `interfaces.name` and `neighbours.local_interface` |
-| `mode` | string | no | `access`, `trunk`, or as printed (`dot1q-tunnel`, ...); absent on a member row |
+| `mode` | string | no | `access`, `trunk`, or as printed (`dot1q-tunnel`, `tap`, `tool`); absent on a member row |
 | `access_vlan` | int | no | access mode only |
 | `native_vlan` | int | no | trunk mode only |
-| `allowed_vlans` | strings, `VLANList` | no | trunk mode only; absent on a trunk means no VLAN allowed |
+| `allowed_vlans` | strings, `VLANList` | no | trunk mode only; absent on an active trunk means no VLAN allowed |
 | `active_vlans` | strings, `VLANList` | no | trunk mode only, as the device reports it; absent means none active |
 | `channel` | string | no, canonical | member rows only: the port-channel this port belongs to |
 
@@ -46,6 +46,8 @@ Identity within an observation: `interface`.
 
 Rules:
 
+- A trunk that is not active may be missing from the device's trunk view (research R2): its row
+  then has `mode: trunk` and no VLAN field.
 - A member row has `interface` and `channel` and nothing else. The channel's VLAN settings are on
   the channel's own row (FR-008).
 - A member of a routed port-channel still gets its member row; the channel has no row, which is what
