@@ -1,0 +1,18 @@
+Authentication method lists for LOGIN:
+  name=default methods=local
+Authentication method list for ENABLE:
+  name=default methods=local
+Authentication method list for DOT1X:
+  name=default methods=
+Authorization method lists for COMMANDS:
+  name=privilege0-15 methods=none
+Authorization method list for EXEC:
+  name=exec methods=local
+Accounting method lists for COMMANDS:
+  name=privilege0-15 default-action=none
+Accounting method list for EXEC:
+  name=exec default-action=none
+Accounting method list for SYSTEM:
+  name=system default-action=none
+Accounting method list for DOT1X:
+  name=dot1x default-action=none

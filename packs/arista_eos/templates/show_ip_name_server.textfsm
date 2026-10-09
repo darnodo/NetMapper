@@ -1,0 +1,9 @@
+Value ADDRESS (\S+)
+Value VRF (\S+)
+
+Start
+  ^IP Address\s+VRF\s+Priority\s*$$
+  ^-+(\s+-+)*\s*$$
+  ^${ADDRESS}\s+${VRF}\s+\d+\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error

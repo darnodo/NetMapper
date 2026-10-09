@@ -86,6 +86,23 @@ configuration is refused when it is loaded. A secret that lacks a field the set 
 
 Give the collector a Vault token that can read those paths and nothing else.
 
+### The device account
+
+The SSH account needs read access only, but on Arista EOS some of what NetMapper reads needs
+privileged exec: the sanitized configuration (SNMP communities, NTP servers), `show users
+accounts` and `show aaa methods all`. With a privilege 1 account those families are recorded
+`parse_failed`. Give the account privilege 15 and a role that cannot configure, and make sure exec
+authorization applies the local privilege:
+
+```text
+username netmapper privilege 15 role network-operator secret <password>
+aaa authorization exec default local          ! or your server group, then local
+```
+
+`network-operator` lets the account run `show` commands in privileged exec and refuses
+`configure`. Without `aaa authorization exec`, EOS ignores the account's privilege and the session
+lands in plain exec.
+
 ## 4. The configuration document
 
 One YAML document, posted whole on every run and kept with the snapshot it produced:
@@ -180,6 +197,7 @@ H="Authorization: Bearer $TOKEN"
 curl -H "$H" api:8080/v1/snapshots              # what can be asked about
 curl -H "$H" api:8080/v1/devices                # the devices of the latest graph
 curl -H "$H" api:8080/v1/devices/sw1            # by device key, hostname or address
+curl -H "$H" api:8080/v1/devices/sw1/facts/aaa_servers  # one fact family of one device
 curl -H "$H" api:8080/v1/findings               # what the crawl reported against itself
 curl -H "$H" api:8080/v1/observations/42?snapshot=7        # the commands behind one piece of evidence
 curl -H "$H" api:8080/v1/observations/42/raw/0?snapshot=7  # the bytes the device printed

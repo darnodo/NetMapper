@@ -1,0 +1,2 @@
+ntp server vrf MGMT 192.0.2.30
+ntp server vrf MGMT 192.0.2.31

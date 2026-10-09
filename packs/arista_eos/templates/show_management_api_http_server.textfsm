@@ -1,0 +1,12 @@
+# The plain HTTP server of eAPI, read with `| include ^HTTP server`: one row when it serves
+# (running, or starting right after `protocol http`), none when it is shut down or the API is off
+# ("enabled"), which the recipe declares empty. Cleartext eAPI is what an audit looks for.
+Value STATE (running|starting)
+Value PORT (\d+)
+
+Start
+  ^HTTP server:\s+${STATE}, set to use port ${PORT}\s*$$ -> Record
+  ^HTTP server:\s+(shutdown|enabled),
+  ^\s*$$
+  ^. -> Error
+

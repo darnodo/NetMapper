@@ -51,6 +51,52 @@ var Families = map[string][]Field{
 		{Name: "mtu", Type: Int},
 		{Name: "mac", Type: String, MAC: true},
 	},
+	// The management families describe the device, not its links: the engine reads none of them.
+	// No field holds a secret (feature 007). yes/no stands for a boolean, like admin_state.
+	"snmp": {
+		{Name: "version", Type: String, Required: true, Enum: []string{"v2c", "v3"}},
+		{Name: "access", Type: String, Enum: []string{"ro", "rw"}}, // v2c
+		{Name: "acl", Type: String},                                // v2c
+		{Name: "user", Type: String},                               // v3
+		{Name: "group", Type: String},                              // v3
+		{Name: "auth_protocol", Type: String, Enum: []string{"md5", "sha", "sha224", "sha256", "sha384", "sha512"}},
+		// Absent means authNoPriv.
+		{Name: "priv_protocol", Type: String, Enum: []string{"des", "3des", "aes", "aes192", "aes256"}},
+	},
+	"aaa_servers": {
+		{Name: "protocol", Type: String, Required: true, Enum: []string{"radius", "tacacs"}},
+		{Name: "address", Type: String, Required: true},
+		{Name: "port", Type: Int},
+		{Name: "vrf", Type: String, Required: true},
+		{Name: "group", Type: String},
+	},
+	"local_users": {
+		{Name: "name", Type: String, Required: true},
+		{Name: "role", Type: String},
+		{Name: "privilege", Type: Int},
+		{Name: "ssh_key", Type: String, Required: true, Enum: []string{"yes", "no"}},
+	},
+	"management_apis": {
+		{Name: "api", Type: String, Required: true, Enum: []string{"gnmi", "eapi", "netconf", "ssh", "telnet", "snmp"}},
+		{Name: "enabled", Type: String, Required: true, Enum: []string{"yes", "no"}},
+		{Name: "transport", Type: String},
+		{Name: "port", Type: Int},
+		{Name: "vrfs", Type: Strings},
+	},
+	"aaa_methods": {
+		{Name: "type", Type: String, Required: true, Enum: []string{"authentication", "authorization", "accounting"}},
+		{Name: "service", Type: String, Required: true},
+		{Name: "list", Type: String},                                              // where the device prints a list name
+		{Name: "level", Type: String},                                             // commands only, as printed: "0-15"
+		{Name: "record", Type: String, Enum: []string{"start-stop", "stop-only"}}, // accounting only
+		{Name: "methods", Type: Strings},
+	},
+	"management_servers": {
+		{Name: "service", Type: String, Required: true, Enum: []string{"ntp", "syslog", "dns"}},
+		{Name: "address", Type: String, Required: true},
+		{Name: "port", Type: Int},
+		{Name: "vrf", Type: String, Required: true},
+	},
 }
 
 // Lookup returns the schema of one field.

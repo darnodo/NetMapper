@@ -1,0 +1,8 @@
+Value ADDRESS (\S+)
+Value PORT (\d+)
+Value VRF (\S+)
+
+Start
+  ^\s+Logging to '${ADDRESS}' port ${PORT} in VRF ${VRF} via \S+\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error

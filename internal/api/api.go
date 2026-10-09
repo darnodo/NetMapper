@@ -19,7 +19,7 @@ import (
 	"github.com/darnodo/NetMapper/internal/store"
 )
 
-// Server answers the eight read endpoints. db must be connected as netmapper_api: the role, not this
+// Server answers the nine read endpoints. db must be connected as netmapper_api: the role, not this
 // code, is what bounds a compromise of the one process anyone can reach (research R3).
 type Server struct {
 	db  *pgxpool.Pool
@@ -40,6 +40,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /v1/snapshots/{id}", s.read(s.snapshot))
 	mux.Handle("GET /v1/devices", s.read(s.devices))
 	mux.Handle("GET /v1/devices/{name}", s.read(s.device))
+	mux.Handle("GET /v1/devices/{name}/facts/{family}", s.read(s.deviceFacts))
 	// {name...} so a port spelled Ethernet1/1 can be written as it is, not only as Ethernet1%2F1.
 	mux.Handle("GET /v1/interfaces/{device}/{name...}", s.read(s.iface))
 	mux.Handle("GET /v1/findings", s.read(s.findings))

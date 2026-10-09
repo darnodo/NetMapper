@@ -1,0 +1,19 @@
+meta {
+  name: Get device facts
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/{{family}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}
+
+vars:pre-request {
+  family: management_apis
+}

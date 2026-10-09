@@ -16,7 +16,10 @@ Early. What works today:
 - a coverage verdict on every crawl (published, degraded, quarantined);
 - identity resolution across addresses and crawls;
 - interfaces and links (LLDP), with the evidence behind each;
-- a read-only REST API behind bearer tokens.
+- on Arista EOS, how each device is managed: SNMP communities (never their strings) and v3 users,
+  AAA servers and method lists, local accounts, management APIs, NTP, syslog and DNS servers;
+- a read-only REST API behind bearer tokens, including any fact family of one device
+  (`/v1/devices/{name}/facts/{family}`).
 
 Supported platforms: Arista EOS. Others are added as data, see [writing a pack](docs/how-to/write-a-pack.md).
 

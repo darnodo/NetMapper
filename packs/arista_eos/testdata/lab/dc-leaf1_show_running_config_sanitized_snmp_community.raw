@@ -1,0 +1,2 @@
+snmp-server community <removed> ro SNMP-RO
+snmp-server community <removed> rw SNMP-RW

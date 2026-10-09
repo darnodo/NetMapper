@@ -1,0 +1,3 @@
+# What the aaa_servers recipe must produce from the sw1 recordings (test/lab/sw1.cfg).
+status: empty
+rows: []

@@ -97,3 +97,62 @@ func TestWalkAndMerge(t *testing.T) {
 		t.Errorf("empty walk: %s", s)
 	}
 }
+
+// Feature 007: a literal per step, rows of one step merged on a key, defaults for absent fields.
+func TestStepMapMergeAndDefaults(t *testing.T) {
+	r := registry(t)
+	im := pack.Impl{
+		Steps: []pack.Step{
+			{Template: "display_servers.textfsm", Map: map[string]string{"protocol": "=tacacs"}},
+			{Template: "display_servers.textfsm", Map: map[string]string{"protocol": "=radius"}},
+		},
+		Map:      map[string]string{"address": "ADDR", "vrf": "VRF", "group": "GROUP"},
+		Defaults: map[string]string{"vrf": "default"},
+		MergeOn:  []string{"protocol", "address", "vrf"},
+	}
+	tacacs := "server 192.0.2.10\nserver 192.0.2.12 vrf MGMT\nmember T 192.0.2.10\nmember T 192.0.2.12 vrf MGMT\n"
+	radius := "server 192.0.2.10\n" // same address, other protocol: not merged with the tacacs row
+	s, rows, err := Parse(r, "fakeos", "aaa_servers", im, [][]byte{[]byte(tacacs), []byte(radius)})
+	want := []map[string]any{
+		{"protocol": "tacacs", "address": "192.0.2.10", "vrf": "default", "group": "T"},
+		{"protocol": "tacacs", "address": "192.0.2.12", "vrf": "MGMT", "group": "T"},
+		{"protocol": "radius", "address": "192.0.2.10", "vrf": "default"},
+	}
+	if s != Collected || err != nil || !reflect.DeepEqual(rows, want) {
+		t.Errorf("%s %v\n got %v\nwant %v", s, err, rows, want)
+	}
+}
+
+// Feature 007: a TextFSM List stays a list for a list field, with values applied to each item; a
+// string is cut on the split separator, in order; the same List is still joined for a string field.
+func TestListsAndSplit(t *testing.T) {
+	r := registry(t)
+	out := []byte("vrf Default\nvrf MGMT\nmethods local, group NM-TACACS\nlimit 50\n")
+	im := pack.Impl{
+		Steps:    []pack.Step{{Template: "display_access.textfsm", Map: map[string]string{"api": "=ssh"}}},
+		Map:      map[string]string{"enabled": "VRFS", "vrfs": "VRFS"},
+		Values:   map[string]map[string]string{"enabled": {"*": "yes"}, "vrfs": {"Default": "default"}},
+		Defaults: map[string]string{"enabled": "no"},
+	}
+	s, rows, err := Parse(r, "fakeos", "management_apis", im, [][]byte{out})
+	want := []map[string]any{{"api": "ssh", "enabled": "yes", "vrfs": []string{"default", "MGMT"}}}
+	if s != Collected || err != nil || !reflect.DeepEqual(rows, want) {
+		t.Errorf("%s %v\n got %v\nwant %v", s, err, rows, want)
+	}
+	// No VRF line: the row still exists (LIMIT), and enabled falls back to its default.
+	s, rows, err = Parse(r, "fakeos", "management_apis", im, [][]byte{[]byte("limit 50\n")})
+	want = []map[string]any{{"api": "ssh", "enabled": "no"}}
+	if s != Collected || err != nil || !reflect.DeepEqual(rows, want) {
+		t.Errorf("no vrf: %s %v %v", s, err, rows)
+	}
+	im = pack.Impl{
+		Steps: []pack.Step{{Template: "display_access.textfsm"}},
+		Map:   map[string]string{"type": "=authentication", "service": "=login", "methods": "METHODS"},
+		Split: map[string]string{"methods": ", "},
+	}
+	s, rows, err = Parse(r, "fakeos", "aaa_methods", im, [][]byte{out})
+	want = []map[string]any{{"type": "authentication", "service": "login", "methods": []string{"local", "group NM-TACACS"}}}
+	if s != Collected || err != nil || !reflect.DeepEqual(rows, want) {
+		t.Errorf("split: %s %v %v", s, err, rows)
+	}
+}

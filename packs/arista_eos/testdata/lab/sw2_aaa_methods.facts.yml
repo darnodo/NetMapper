@@ -1,0 +1,13 @@
+# What the aaa_methods recipe must produce from the sw2 recordings (test/lab/sw2.cfg).
+status: collected
+rows:
+  - {"list":"console","methods":["local"],"service":"login","type":"authentication"}
+  - {"list":"default","methods":["local","group NM-TACACS"],"service":"login","type":"authentication"}
+  - {"list":"default","methods":["local","group NM-TACACS"],"service":"enable","type":"authentication"}
+  - {"list":"default","service":"dot1x","type":"authentication"}
+  - {"level":"0-15","methods":["local","group NM-TACACS"],"service":"commands","type":"authorization"}
+  - {"methods":["local","group NM-TACACS"],"service":"exec","type":"authorization"}
+  - {"level":"0-15","methods":["group NM-TACACS"],"record":"start-stop","service":"commands","type":"accounting"}
+  - {"methods":["group NM-TACACS"],"record":"start-stop","service":"exec","type":"accounting"}
+  - {"service":"system","type":"accounting"}
+  - {"service":"dot1x","type":"accounting"}

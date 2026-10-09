@@ -1,0 +1,7 @@
+Value ACCESS (ro|rw)
+Value ACL (\S+)
+
+Start
+  ^snmp-server community <removed>(?:\s+view\s+\S+)?\s+${ACCESS}(?:\s+ipv6\s+\S+)?(?:\s+${ACL})?\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error

@@ -1,0 +1,14 @@
+# The SNMP agent as a management API: the VRFs it runs in. MAXSIZE is always printed and keeps one
+# row when the agent runs nowhere. With no community and no user, cEOS 4.36 still prints "SNMP
+# agent enabled in VRFs: default", then "SNMP agent disabled: ..." at the end
+# (testdata/lab/sw1nosnmp_show_snmp.raw): that line clears what was captured, so the recipe says
+# enabled: no and lists no VRF.
+Value VRFS (.+?)
+Value MAXSIZE (\d+)
+Value DISABLED (\S.*?)
+
+Start
+  ^SNMP agent disabled: -> Continue.Clear
+  ^SNMP agent disabled:\s+${DISABLED}\s*$$
+  ^SNMP agent enabled in VRFs:\s+${VRFS}\s*$$
+  ^Transmit message maximum size:\s+${MAXSIZE}\s*$$

@@ -1,0 +1,9 @@
+# What the management_apis recipe must produce from the dc-leaf1 recordings (arista-evpn-vxlan-clab configs/dc-leaf1.cfg).
+status: collected
+rows:
+  - {"api":"gnmi","enabled":"yes","port":6030,"transport":"grpc","vrfs":["default"]}
+  - {"api":"eapi","enabled":"yes","port":443,"transport":"https","vrfs":["default"]}
+  - {"api":"netconf","enabled":"yes","port":830,"transport":"ssh","vrfs":["default"]}
+  - {"api":"ssh","enabled":"yes","vrfs":["default"]}
+  - {"api":"telnet","enabled":"no"}
+  - {"api":"snmp","enabled":"yes","vrfs":["default"]}

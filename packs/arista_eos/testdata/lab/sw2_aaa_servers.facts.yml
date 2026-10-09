@@ -1,0 +1,7 @@
+# What the aaa_servers recipe must produce from the sw2 recordings (test/lab/sw2.cfg).
+status: collected
+rows:
+  - {"address":"192.0.2.10","group":"NM-TACACS","port":49,"protocol":"tacacs","vrf":"default"}
+  - {"address":"192.0.2.11","group":"NM-TACACS","port":49,"protocol":"tacacs","vrf":"default"}
+  - {"address":"192.0.2.12","group":"NM-TACACS","port":49,"protocol":"tacacs","vrf":"MGMT"}
+  - {"address":"192.0.2.20","group":"NM-RADIUS","port":1812,"protocol":"radius","vrf":"default"}

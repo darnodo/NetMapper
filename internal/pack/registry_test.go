@@ -98,6 +98,11 @@ func TestRefusals(t *testing.T) {
 		{"map target not in schema", "recipes/interfaces.yaml", "description: DESC", "colour: DESC", `map target "colour"`},
 		{"unknown family", "recipes/interfaces.yaml", "family: interfaces", "family: weather", `unknown fact family "weather"`},
 		{"probe outside _base", "pack.yaml", "fingerprint:", "probe: {snmp: []}\nfingerprint:", "only _base may declare probe"},
+		{"step map target not in schema", "recipes/interfaces.yaml", "template: display_interfaces.textfsm", "template: display_interfaces.textfsm\n        map: {colour: '=red'}", `step map target "colour"`},
+		{"default outside the enum", "recipes/interfaces.yaml", "values:", "defaults: {admin_state: maybe}\n    values:", `default "maybe" is not a valid value of admin_state`},
+		{"default not in schema", "recipes/interfaces.yaml", "values:", "defaults: {colour: red}\n    values:", `default for "colour"`},
+		{"split on a string field", "recipes/interfaces.yaml", "values:", "split: {description: ', '}\n    values:", `split field "description" is not a list field`},
+		{"split with no separator", "recipes/interfaces.yaml", "values:", "split: {description: ''}\n    values:", `split separator for "description" is empty`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			_, err := Load(base, copyPack(t, c.rel, c.old, c.new))
@@ -132,8 +137,14 @@ func TestLoadWarnsMissingFamily(t *testing.T) {
 	if _, err := Load(base, dir); err != nil {
 		t.Fatal(err)
 	}
+	// fakeos also has no recipe for the six management families (feature 007): one line each.
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	if len(lines) != 1 || !strings.Contains(lines[0], "pack=fakeos family=neighbours") {
+	if len(lines) != 7 || !strings.Contains(buf.String(), "pack=fakeos family=neighbours") {
 		t.Errorf("warnings = %q", buf.String())
+	}
+	for _, l := range lines {
+		if !strings.Contains(l, "pack=fakeos") {
+			t.Errorf("warning about another pack: %q", l)
+		}
 	}
 }

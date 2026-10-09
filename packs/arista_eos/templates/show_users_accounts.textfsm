@@ -1,0 +1,13 @@
+Value NAME (\S+)
+Value ROLE (\S+)
+Value PRIVILEGE (\d+)
+Value SSHKEY (\S.*)
+
+Start
+  ^user: -> Continue.Record
+  ^user:\s+${NAME}\s*$$
+  ^\s+role:\s+${ROLE}\s*$$
+  ^\s+privilege level:\s+${PRIVILEGE}\s*$$
+  ^\s+ssh public key:\s+${SSHKEY}$$
+  ^\s*$$
+  ^. -> Error

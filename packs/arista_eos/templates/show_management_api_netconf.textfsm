@@ -1,0 +1,10 @@
+Value ENABLED (\S+)
+Value PORT (\d+)
+Value VRFS (\S+)
+
+Start
+  ^Enabled:\s+${ENABLED}\s*$$
+  ^Server: running on port ${PORT}, in ${VRFS} VRF\s*$$
+  ^Server:
+  ^\s*$$
+  ^. -> Error

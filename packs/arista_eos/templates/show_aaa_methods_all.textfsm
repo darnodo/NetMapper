@@ -1,0 +1,37 @@
+# EOS names authentication lists (default, console) but prints authorization and accounting lists
+# by service or privilege range (name=exec, name=privilege0-15): only the first is a list name,
+# the range is the level (research R13).
+Value Filldown TYPE (Authentication|Authorization|Accounting)
+Value Filldown SERVICE (\S+)
+Value LIST (\S+)
+Value LEVEL (\S+)
+Value RECORD (\S+)
+Value METHODS (.*?)
+
+Start
+  ^${TYPE} method lists? for ${SERVICE}:\s*$$ -> Continue
+  ^Authentication method -> Authentication
+  ^(Authorization|Accounting) method -> Other
+  ^\s*$$
+  ^. -> Error
+
+Authentication
+  ^${TYPE} method lists? for ${SERVICE}:\s*$$ -> Continue
+  ^Authentication method
+  ^(Authorization|Accounting) method -> Other
+  ^\s+name=${LIST}\s+methods=${METHODS}\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error
+
+Other
+  ^${TYPE} method lists? for ${SERVICE}:\s*$$ -> Continue
+  ^Authentication method -> Authentication
+  ^(Authorization|Accounting) method
+  ^\s+name=(?:privilege${LEVEL}|\S+)\s+methods=${METHODS}\s*$$ -> Record
+  ^\s+name=(?:privilege${LEVEL}|\S+)\s+default-action=${RECORD}(?:\s+default-methods=${METHODS})?(?:\s+console-\S+=.*)?\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error
+
+# Every row is recorded explicitly: no implicit record at the end, which would emit a row holding
+# only the Filldown values.
+EOF

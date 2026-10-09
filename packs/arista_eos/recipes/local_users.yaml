@@ -1,0 +1,12 @@
+family: local_users
+implementations:
+  - id: users-cli
+    versions: '>=4.36'   # only 4.36 recorded and scanned for secrets (research R13)
+    transport: ssh
+    steps:
+      - command: show users accounts | no-more
+        template: show_users_accounts.textfsm
+    map: { name: NAME, role: ROLE, privilege: PRIVILEGE, ssh_key: SSHKEY }
+    values:
+      ssh_key: { '*': 'yes' }   # the public key itself is not kept
+    defaults: { ssh_key: 'no' }

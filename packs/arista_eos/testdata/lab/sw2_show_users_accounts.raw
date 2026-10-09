@@ -1,0 +1,13 @@
+user: admin
+       role: network-admin
+       privilege level: 15
+user: netmapper
+       role: network-operator
+       privilege level: 15
+user: nm-auto
+       role: network-admin
+       privilege level: 15
+       ssh public key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOgKydqV0kg/kEthK+UIkY66EIS+xPUgvdYVvoRCxXyO nm-auto@test-lab
+user: nm-ops
+       role: network-operator
+       privilege level: 1

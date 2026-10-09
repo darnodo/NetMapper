@@ -1,0 +1,8 @@
+# VRFS lists the VRFs whose SSH server is enabled. LIMIT is always printed: it keeps one row even
+# when SSH is off everywhere, so the recipe can say enabled: no.
+Value List VRFS (\S+)
+Value LIMIT (\d+)
+
+Start
+  ^SSHD status for ${VRFS} VRF: enabled\s*$$
+  ^SSH connection limit:\s+${LIMIT}\s*$$

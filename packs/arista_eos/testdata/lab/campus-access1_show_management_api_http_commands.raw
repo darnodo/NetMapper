@@ -1,0 +1,28 @@
+Enabled: Yes
+HTTPS server: running, set to use port 443
+HTTP server: shutdown, set to use port 80
+Local HTTP server: shutdown, no authentication, set to use port 8080
+Unix Socket server: shutdown, no authentication
+VRFs: default
+Hits: 21
+Last hit: 0:00:00 ago
+Bytes in: 2718
+Bytes out: 27830
+Requests: 21
+Commands: 21
+Duration: 1.962 seconds
+SSL Profile: ARISTA_DEFAULT_SELF_SIGNED_PROFILE, valid
+FIPS Mode: No
+QoS DSCP: 0
+Session Timeout: 1440 minutes
+Log Level: none
+CSP Frame Ancestor: None
+TLS Protocols: 1.0 1.1 1.2 1.3
+User  Requests Bytes in Bytes out     Last hit
+----- -------- -------- --------- ------------
+admin       21     2718     27830  0:00:00 ago
+
+URLs                                 
+-------------------------------------
+Management0 : https://172.16.0.61:443
+

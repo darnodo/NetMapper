@@ -1,0 +1,8 @@
+Value ENABLED (.+?)
+Value PORT (\d+)
+Value VRFS (\S+)
+
+Start
+  ^Transport: -> Continue.Record
+  ^Enabled:\s+${ENABLED}\s*$$
+  ^Server: running on port ${PORT}, in ${VRFS} VRF

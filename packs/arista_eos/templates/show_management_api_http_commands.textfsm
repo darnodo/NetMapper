@@ -1,0 +1,8 @@
+Value ENABLED (\S+)
+Value PORT (\d+)
+Value VRFS (.+?)
+
+Start
+  ^Enabled:\s+${ENABLED}\s*$$
+  ^HTTPS server:\s+\S+, set to use port ${PORT}\s*$$
+  ^VRFs:\s+${VRFS}\s*$$
