@@ -1,0 +1,5 @@
+VLAN  Name                             Status    Ports
+----- -------------------------------- --------- -------------------------------
+1     default                          active    
+60    vrf-gold-campus-subnet1          active    Et3, Po10
+

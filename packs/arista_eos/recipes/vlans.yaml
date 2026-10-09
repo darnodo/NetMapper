@@ -1,0 +1,14 @@
+family: vlans
+implementations:
+  - id: vlans-cli
+    versions: '>=4.36'   # only 4.36 recorded (feature 008, research R9)
+    transport: ssh
+    steps:
+      # EOS always lists VLAN 1, so this family is never empty on EOS (research R8). Internal VLANs
+      # of routed ports are not in this table (R1).
+      - command: show vlan | no-more
+        template: show_vlan.textfsm
+    map: { vlan_id: VLAN_ID, name: NAME, status: STATUS }
+    # EOS has no local VLAN shutdown, so nothing maps to shutdown here (R6).
+    values:
+      status: { active: active, suspended: suspended, '*': other }

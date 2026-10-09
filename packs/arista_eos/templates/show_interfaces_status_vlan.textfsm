@@ -1,0 +1,18 @@
+Value PORT (\S+)
+Value VLAN (\S+)
+Value CHANNEL (\S+)
+
+Start
+  ^Port\s+Name\s+Status\s+Vlan\s+Duplex\s+Speed\s+Type(?:\s+Flags)?(?:\s+Encapsulation)?\s*$$
+  # A routed port carries no VLAN and has no row (FR-009).
+  ^\S+(?:\s+\S.*)?\s+(?:connected|notconnect|inactive|errdisabled|disabled)\s+routed\s+\S+\s+\S+\s+(?:Not\s+Present|\S+)(?:\s+\S+)?(?:\s+\S+)?\s*$$
+  # A port-channel member (in Po10): its VLAN settings are on the channel's row (feature 008, FR-008).
+  # Otherwise a switched port: its access VLAN, or trunk. EOS prints a dot1q-tunnel port like an
+  # access port in its outer VLAN (research R3). One rule for both, with a greedy Name, so a
+  # description holding a status word ("connected in rack3") is read as the Name, as in
+  # show_interfaces_status.textfsm.
+  ^${PORT}(?:\s+\S.*)?\s+(?:connected|notconnect|inactive|errdisabled|disabled)\s+(?:in\s+${CHANNEL}|${VLAN})\s+\S+\s+\S+\s+(?:Not\s+Present|\S+)(?:\s+\S+)?(?:\s+\S+)?\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error
+
+# Same table as show_interfaces_status.textfsm (the interfaces family), read for its Vlan column only.

@@ -1,0 +1,9 @@
+# What the interface_vlans recipe must produce from the sw1 recordings (test/lab/sw1.cfg). VLAN 31
+# is allowed on the trunks but suspended, so it is not active. Management0 is routed: no row.
+status: collected
+rows:
+  - {interface: Ethernet1, mode: trunk, native_vlan: 99, allowed_vlans: ["10", "20", "30-32", "40-49", "99"], active_vlans: ["10", "20", "30", "32", "40-49", "99"]}
+  - {interface: Ethernet2, channel: Port-Channel10}
+  - {interface: Ethernet3, channel: Port-Channel10}
+  - {interface: Ethernet4, mode: access, access_vlan: 10}
+  - {interface: Port-Channel10, mode: trunk, native_vlan: 1, allowed_vlans: ["1-4094"], active_vlans: ["1", "10", "20", "30", "32", "40-49", "99"]}

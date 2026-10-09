@@ -1,0 +1,8 @@
+# What the interface_vlans recipe must produce from the campus-access1 recordings
+# (arista-evpn-vxlan-clab configs/campus-access1.cfg).
+status: collected
+rows:
+  - {interface: Ethernet1, channel: Port-Channel10}
+  - {interface: Ethernet2, channel: Port-Channel10}
+  - {interface: Ethernet3, mode: access, access_vlan: 60}
+  - {interface: Port-Channel10, mode: trunk, native_vlan: 1, allowed_vlans: ["60"], active_vlans: ["60"]}

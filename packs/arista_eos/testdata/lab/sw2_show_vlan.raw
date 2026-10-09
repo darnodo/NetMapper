@@ -1,0 +1,21 @@
+VLAN  Name                             Status    Ports
+----- -------------------------------- --------- -------------------------------
+1     default                          active    Po10
+10    USERS                            active    Et1, Et5, Po10
+20    SERVERS                          active    Et1, Po10
+30    LAB-30                           active    Et1, Po10
+31    SUSPENDED                        suspended 
+32    LAB-32                           active    Et1, Po10
+40    VLAN0040                         active    Et1, Po10
+41    VLAN0041                         active    Et1, Po10
+42    VLAN0042                         active    Et1, Po10
+43    VLAN0043                         active    Et1, Po10
+44    VLAN0044                         active    Et1, Po10
+45    VLAN0045                         active    Et1, Po10
+46    VLAN0046                         active    Et1, Po10
+47    VLAN0047                         active    Et1, Po10
+48    VLAN0048                         active    Et1, Po10
+49    VLAN0049                         active    Et1, Po10
+50    SW2-ONLY                         active    Po10
+99    NATIVE                           active    Et1, Po10
+

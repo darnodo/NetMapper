@@ -113,9 +113,10 @@ rather than with `terminal length 0`.
 
 A recipe says how to collect one fact family. The families and their fields are fixed and
 platform-neutral, listed in [fact-families.md](../../specs/001-crawl-loop/contracts/fact-families.md):
-`neighbours` and `interfaces` for the graph, and six management families that describe the device
+`neighbours` and `interfaces` for the graph, six management families that describe the device
 itself (`snmp`, `aaa_servers`, `local_users`, `management_apis`, `aaa_methods`,
-`management_servers`). `identity` comes from the fingerprint and identifiers above.
+`management_servers`), and two layer 2 families (`vlans`, `interface_vlans`). `identity` comes from
+the fingerprint and identifiers above.
 
 Every recipe is optional: a pack only has to fingerprint its platform. What a missing recipe costs:
 
@@ -124,6 +125,7 @@ Every recipe is optional: a pack only has to fingerprint its platform. What a mi
 | `neighbours` | The crawl does not expand from these devices and they report no link. A device can still appear at the far end of a link a neighbour reports. |
 | `interfaces` | Only ports named by a neighbour exist, with no description, state, speed or MTU. |
 | the six management families | No management inventory for these devices: no SNMP access, AAA servers, accounts, management APIs, method lists or NTP, syslog and DNS servers. The graph is unaffected. |
+| `vlans`, `interface_vlans` | No VLAN data for these devices: no declared VLANs, access ports, trunks or port-channel members. Once L2 domains are built (#37), these devices will join none. |
 
 NetMapper logs a warning when it loads the packs, once for each family a pack has no recipe for,
 and each device gets an observation `unsupported` with detail `no_recipe` for it. A recipe whose
@@ -177,6 +179,12 @@ implementations:                     # the first one whose version and transport
 - `split` cuts a mapped string into a list, for a list field such as `methods`:
   `split: { methods: ', ' }`. A TextFSM `List` value already gives a list. `values` applies to each
   item of a list.
+- VLAN lists (`allowed_vlans`, `active_vlans`) are normalised by the parser, not by the pack: map
+  the device's tokens and let the parser join, sort and merge them into one form, such as
+  `["1-9", "11-4094"]`. A list a device wraps over several lines can be a TextFSM `List`, one line
+  per item. Use `values` for the device's words: `{ All: 1-4094, None: '' }` on EOS. A token that is
+  not a VLAN ID or range makes the observation `parse_failed`. VLAN IDs (`vlan_id`, `access_vlan`,
+  `native_vlan`) must be 1 to 4094.
 - **No command may print a secret.** Every output is stored as evidence and served by the API: a
   community string, a server key or a password hash in it is a secret in the database. Use a
   command that does not print it, or the platform's sanitized configuration (`show running-config

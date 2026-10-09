@@ -1,0 +1,3 @@
+# What the interface_vlans recipe must produce from the sw4 recordings (test/lab/sw4.cfg: no Ethernet port).
+status: empty
+rows: []

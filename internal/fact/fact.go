@@ -4,6 +4,8 @@ package fact
 import (
 	"fmt"
 	"slices"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -22,6 +24,11 @@ type Field struct {
 	// TypedBy names the field that says what kind of value this one holds. It is required
 	// whenever this field is present, and a value typed mac is normalised like a MAC field.
 	TypedBy string
+	// VLANList: a strings field holding a set of VLAN IDs as sorted, merged ranges, each item N or
+	// lo-hi, 1 to 4094 (feature 008). The parser normalises it; Validate rejects any other form.
+	VLANList bool
+	// VLANID: an int field holding one VLAN ID, 1 to 4094 (feature 008).
+	VLANID bool
 }
 
 var Families = map[string][]Field{
@@ -97,6 +104,22 @@ var Families = map[string][]Field{
 		{Name: "port", Type: Int},
 		{Name: "vrf", Type: String, Required: true},
 	},
+	// The layer 2 families (feature 008). The engine reads neither yet; the l2domain projection
+	// (#37) will.
+	"vlans": {
+		{Name: "vlan_id", Type: Int, Required: true, VLANID: true},
+		{Name: "name", Type: String},
+		{Name: "status", Type: String, Required: true, Enum: []string{"active", "suspended", "shutdown", "other"}},
+	},
+	"interface_vlans": {
+		{Name: "interface", Type: String, Required: true, Canonical: true},
+		{Name: "mode", Type: String}, // access, trunk, or as the device names it; absent on a member row
+		{Name: "access_vlan", Type: Int, VLANID: true},
+		{Name: "native_vlan", Type: Int, VLANID: true},
+		{Name: "allowed_vlans", Type: Strings, VLANList: true},
+		{Name: "active_vlans", Type: Strings, VLANList: true},
+		{Name: "channel", Type: String, Canonical: true}, // member rows only: the port-channel
+	},
 }
 
 // Lookup returns the schema of one field.
@@ -144,15 +167,65 @@ func check(f Field, v any) error {
 		s, isStr := v.(string)
 		ok = isStr && (f.Enum == nil || slices.Contains(f.Enum, s))
 	case Int:
-		switch v.(type) {
-		case int, int64:
-			ok = true
+		var n int64
+		switch x := v.(type) {
+		case int:
+			n, ok = int64(x), true
+		case int64:
+			n, ok = x, true
+		}
+		if ok && f.VLANID && (n < 1 || n > 4094) {
+			return fmt.Errorf("field %q: %d is not a VLAN ID (1 to 4094)", f.Name, n)
 		}
 	case Strings:
-		_, ok = v.([]string)
+		var l []string
+		l, ok = v.([]string)
+		if ok && f.VLANList && !isVLANList(l) {
+			return fmt.Errorf("field %q: %v is not sorted, merged VLAN ranges (1 to 4094)", f.Name, l)
+		}
 	}
 	if !ok {
 		return fmt.Errorf("field %q: %v (%T) is not a valid %s", f.Name, v, v, f.Type)
 	}
 	return nil
+}
+
+// isVLANList reports whether items are VLAN ranges in their one normal form: each N or lo-hi with
+// 1 <= N, lo < hi <= 4094, ascending, no two overlapping or touching.
+func isVLANList(items []string) bool {
+	prev := 0
+	for _, it := range items {
+		lo, hi, err := ParseVLANRange(it)
+		if err != nil || lo <= prev+1 && prev > 0 || it != FormatVLANRange(lo, hi) {
+			return false
+		}
+		prev = hi
+	}
+	return true
+}
+
+// ParseVLANRange reads one item, N or lo-hi, with 1 <= lo <= hi <= 4094.
+func ParseVLANRange(s string) (lo, hi int, err error) {
+	a, b, isRange := strings.Cut(s, "-")
+	if lo, err = strconv.Atoi(a); err != nil {
+		return 0, 0, fmt.Errorf("%q is not a VLAN ID or range", s)
+	}
+	hi = lo
+	if isRange {
+		if hi, err = strconv.Atoi(b); err != nil {
+			return 0, 0, fmt.Errorf("%q is not a VLAN ID or range", s)
+		}
+	}
+	if lo < 1 || hi > 4094 || lo > hi {
+		return 0, 0, fmt.Errorf("%q is not a VLAN ID or range (1 to 4094)", s)
+	}
+	return lo, hi, nil
+}
+
+// FormatVLANRange prints a range in normal form: N when lo == hi, lo-hi otherwise.
+func FormatVLANRange(lo, hi int) string {
+	if lo == hi {
+		return strconv.Itoa(lo)
+	}
+	return fmt.Sprintf("%d-%d", lo, hi)
 }

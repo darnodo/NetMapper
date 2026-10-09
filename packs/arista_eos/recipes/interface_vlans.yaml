@@ -1,0 +1,36 @@
+family: interface_vlans
+implementations:
+  - id: interface-vlans-cli
+    versions: '>=4.36'   # only 4.36 recorded (feature 008, research R9)
+    transport: ssh
+    # Not show interfaces switchport: it prints port-channel members as plain access ports in VLAN
+    # 1, and a member row must carry no VLAN field (research R2). The status table tells members,
+    # routed ports, access ports and trunks apart; the trunk view gives what each active trunk
+    # carries. A trunk that is down is absent from the trunk view and keeps its mode only.
+    steps:
+      - command: show interfaces status | no-more
+        template: show_interfaces_status_vlan.textfsm
+        # A device with only routed ports (a spine, sw4) has nothing to report.
+        empty_lines:
+          - '^Port\s+Name\s+Status\s+Vlan\s+Duplex\s+Speed\s+Type(\s+Flags)?(\s+Encapsulation)?$'
+          - '^\S+\s.*\s(connected|notconnect|inactive|errdisabled|disabled)\s+routed\s'
+      - command: show interfaces trunk | no-more
+        template: show_interfaces_trunk.textfsm
+        empty_lines: ['^There are no active trunk ports$']
+    merge_on: [interface]
+    map:
+      interface: PORT
+      mode: VLAN
+      access_vlan: VLAN
+      channel: CHANNEL
+      native_vlan: NATIVE
+      allowed_vlans: ALLOWED
+      active_vlans: ACTIVE
+    # The Vlan column is an access VLAN or trunk; a dot1q-tunnel port prints its outer VLAN like an
+    # access port (R3). Any other word is not an integer and fails on access_vlan as parse_failed,
+    # so a new mode is never read as an access port.
+    values:
+      mode: { trunk: trunk, '*': access }
+      access_vlan: { trunk: '' }
+      allowed_vlans: { All: 1-4094, None: '' }
+      active_vlans: { All: 1-4094, None: '' }

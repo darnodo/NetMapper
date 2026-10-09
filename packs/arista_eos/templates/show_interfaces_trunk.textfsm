@@ -1,0 +1,40 @@
+Value PORT (\S+)
+Value NATIVE (\d+)
+Value List ALLOWED (\S+)
+Value List ACTIVE (\S+)
+
+Start
+  ^Port\s+Mode\s+Status\s+Native vlan\s*$$ -> Native
+  ^There are no active trunk ports\s*$$
+  ^\s*$$
+  ^. -> Error
+
+Native
+  ^${PORT}\s+\S+\s+\S+\s+${NATIVE}\s*$$ -> Record
+  ^Port\s+Vlans allowed\s*$$ -> Allowed
+  ^\s*$$
+  ^. -> Error
+
+# A long list wraps onto indented lines, cut between items (research R5): each line is one more
+# List item, and the parser joins them. A port line first records the port before it.
+Allowed
+  ^\S -> Continue.Record
+  ^Port\s+Vlans allowed and active in management domain\s*$$ -> Active
+  ^${PORT}\s+${ALLOWED}\s*$$
+  ^\s+${ALLOWED}\s*$$
+  ^\s*$$
+  ^. -> Error
+
+Active
+  ^\S -> Continue.Record
+  ^Port\s+Vlans in spanning tree forwarding state\s*$$ -> Forwarding
+  ^${PORT}\s+${ACTIVE}\s*$$
+  ^\s+${ACTIVE}\s*$$
+  ^\s*$$
+  ^. -> Error
+
+# Spanning tree state is out of scope (feature 008): the last table is read and ignored.
+Forwarding
+  ^.*
+
+# Only active trunks are listed: a trunk that is down is absent from every table (research R2).

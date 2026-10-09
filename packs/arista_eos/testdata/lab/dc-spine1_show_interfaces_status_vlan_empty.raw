@@ -1,0 +1,13 @@
+Port       Name            Status       Vlan     Duplex Speed  Type            Flags Encapsulation
+Et1        dc-leaf1        connected    routed   full   1G     EbraTestPhyPort                   
+Et2        dc-leaf2        connected    routed   full   1G     EbraTestPhyPort                   
+Et3        dc-leaf3        connected    routed   full   1G     EbraTestPhyPort                   
+Et4        dc-leaf4        connected    routed   full   1G     EbraTestPhyPort                   
+Et5        dc-leaf5        connected    routed   full   1G     EbraTestPhyPort                   
+Et6        dc-leaf6        connected    routed   full   1G     EbraTestPhyPort                   
+Et7        dc-leaf7        connected    routed   full   1G     EbraTestPhyPort                   
+Et8        dc-leaf8        connected    routed   full   1G     EbraTestPhyPort                   
+Et9        dc-border-leaf1 connected    routed   full   1G     EbraTestPhyPort                   
+Et10       dc-border-leaf2 connected    routed   full   1G     EbraTestPhyPort                   
+Ma0                        connected    routed   a-full a-1G   10/100/1000                       
+

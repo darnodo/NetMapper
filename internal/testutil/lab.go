@@ -211,13 +211,14 @@ func (l *Lab) Outcomes(job int64) []string {
 		SELECT host(o.target) || ' ' || o.fact_family || ' ' || o.status || coalesce(' ' || o.detail, '')
 		FROM observation o JOIN job j ON j.snapshot_id = o.snapshot_id
 		WHERE j.id = $1 AND NOT (o.fact_family = ANY($2) AND o.status = 'unsupported' AND o.detail = 'no_recipe')
-		ORDER BY 1`, job, ManagementFamilies)
+		ORDER BY 1`, job, NoRecipeFamilies)
 }
 
-// ManagementFamilies are the families of feature 007. fakeos has no recipe for them, on purpose:
-// every fakeos device records each one unsupported/no_recipe, which Outcomes leaves out so the
-// crawl tests keep reading what they test. AllOutcomes keeps them.
-var ManagementFamilies = []string{"snmp", "aaa_servers", "local_users", "management_apis", "aaa_methods", "management_servers"}
+// NoRecipeFamilies are the families fakeos has no recipe for, on purpose: the management families
+// of feature 007 and the layer 2 families of feature 008. Every fakeos device records each one
+// unsupported/no_recipe, which Outcomes leaves out so the crawl tests keep reading what they test.
+// AllOutcomes keeps them.
+var NoRecipeFamilies = []string{"snmp", "aaa_servers", "local_users", "management_apis", "aaa_methods", "management_servers", "vlans", "interface_vlans"}
 
 // AllOutcomes is Outcomes with nothing left out.
 func (l *Lab) AllOutcomes(job int64) []string {

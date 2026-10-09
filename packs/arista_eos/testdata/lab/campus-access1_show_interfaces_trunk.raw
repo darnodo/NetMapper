@@ -1,0 +1,11 @@
+Port            Mode            Status          Native vlan
+Po10            trunk           trunking        1
+
+Port            Vlans allowed
+Po10            60
+
+Port            Vlans allowed and active in management domain
+Po10            60
+
+Port            Vlans in spanning tree forwarding state
+Po10            60
