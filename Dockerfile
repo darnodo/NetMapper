@@ -1,7 +1,7 @@
 # One image for the three roles (collector, engine, api) and the operator subcommands; the role is
 # the first argument, as with the binary. Migrations are embedded in the binary; platform packs are
 # shipped next to it at /packs, which is where --packs looks by default (the working directory is /).
-FROM --platform=$BUILDPLATFORM golang:1.27.1 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.2 AS build
 ARG TARGETOS TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
