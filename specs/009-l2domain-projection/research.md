@@ -216,7 +216,20 @@ the sw1 Ethernet4 / sw2 Ethernet5 access link (untagged); VLAN 99 over Ethernet1
 Port-Channel10 members (tagged); VLAN 1 over the Port-Channel10 members only. VLAN 31 is one domain
 per switch, VLAN 50 is sw2 alone. sw3 is `denied` and no entity, so it adds nothing. EOS's spanning
 tree blocks Ethernet1 (the loop with Port-Channel10); the domain still lists it, since spanning tree
-state is out of scope (spec edge case). The optional native-VLAN mismatch check was not run.
+state is out of scope (spec edge case).
+
+**test/lab native-VLAN mismatch, checked on 2026-10-12 after the merge.** Quickstart section 4
+step 4, on a local OrbStack deployment (containerlab devcontainer image, cEOS arm64), sw4 taken off
+the network, collector in a container on the lab network, engine on the Mac, scratch database and
+bucket. Three crawls:
+
+- Native 99 on both ends: 19 domains, all `complete`, no `vlan_mismatch`, as above.
+- sw2 `Ethernet1` set to native 20: 18 domains. One domain keyed 20 holds sw1:20, sw1:99, sw2:20
+  and sw2:99, each switch a member twice. One `vlan_mismatch` (compliance, warning) on the
+  Ethernet1 pair, `subject_ref` sw1's Ethernet1, `vlans` `[99, 20]` in port order, the one
+  Ethernet1 edge, 4 evidence rows. `GET /v1/findings` serves it as `derived`. `netmapper project`
+  run twice on that snapshot keeps exactly one.
+- sw2 put back to native 99: 19 domains, no `vlan_mismatch`; the previous snapshot keeps its own.
 
 **arista-evpn-vxlan-clab, checked on 2026-10-12.** Crawled with this branch the same way (SSH as
 `netops`, SNMPv3 `snmp-ro`).
