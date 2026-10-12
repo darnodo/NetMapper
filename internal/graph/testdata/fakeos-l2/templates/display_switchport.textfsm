@@ -1,0 +1,14 @@
+Value PORT (\S+)
+Value MODE (access|trunk)
+Value VLAN (\d+)
+Value NATIVE (\d+)
+Value ACTIVE (\S+)
+Value CHANNEL (\S+)
+
+# The trunk shape first, so a four-field line is never read as an access line.
+Start
+  ^${PORT}\s+${MODE}\s+${NATIVE}\s+${ACTIVE}\s*$$ -> Record
+  ^${PORT}\s+${MODE}\s+${VLAN}\s*$$ -> Record
+  ^${PORT}\s+member\s+${CHANNEL}\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error

@@ -17,6 +17,7 @@ var findingConfidence = map[string]string{
 	"credential_denied": "direct",
 	"identity_conflict": "derived",
 	"link_disagreement": "derived",
+	"vlan_mismatch":     "derived",
 }
 
 type finding struct {

@@ -1,0 +1,13 @@
+# fakeos test data for feature 009 (research R9). Not part of the shared fakeos pack: the graph tests
+# copy it into a temporary copy of that pack, so NoRecipeFamilies stays true everywhere else.
+family: vlans
+implementations:
+  - id: vlans-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display vlans
+        template: display_vlans.textfsm
+    map: { vlan_id: VLAN_ID, name: NAME, status: STATUS }
+    values:
+      status: { active: active, suspended: suspended, shutdown: shutdown, '*': other }

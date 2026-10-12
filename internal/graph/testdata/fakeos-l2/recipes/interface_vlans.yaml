@@ -1,0 +1,20 @@
+# fakeos test data for feature 009 (research R9). Not part of the shared fakeos pack: the graph tests
+# copy it into a temporary copy of that pack, so NoRecipeFamilies stays true everywhere else.
+family: interface_vlans
+implementations:
+  - id: interface-vlans-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display switchport
+        template: display_switchport.textfsm
+    map:
+      interface: PORT
+      mode: MODE
+      access_vlan: VLAN
+      native_vlan: NATIVE
+      active_vlans: ACTIVE
+      channel: CHANNEL
+    split: { active_vlans: ',' }
+    values:
+      active_vlans: { none: '' }   # a trunk with no active VLAN

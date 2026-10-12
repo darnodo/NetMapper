@@ -32,11 +32,13 @@ that carries a `resolution` row and no current `projection` row, oldest first by
 
 ## netmapper project <snapshot-id> [--packs packs] (new)
 
-Projects one snapshot again, replacing its interfaces and edges (FR-022). This is the only way a
-snapshot whose inputs have not changed is ever projected twice.
+Projects one snapshot again, replacing its interfaces, edges and, since feature 009, its layer 2
+domains (FR-022). This is the only way a snapshot whose inputs have not changed is ever projected
+twice.
 
 - Prints one line on stdout:
-  `<interfaces> interfaces, <edges> edges, <disagreements> disagreements`.
+  `<interfaces> interfaces, <edges> edges, <disagreements> disagreements, <domains> L2 domains, <mismatches> VLAN mismatches`
+  (the last two added by feature 009).
 - Exit 2, one line on stderr, when:
   - `snapshot <id> not found`
   - `snapshot <id> is not closed`

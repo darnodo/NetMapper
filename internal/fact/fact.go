@@ -104,8 +104,8 @@ var Families = map[string][]Field{
 		{Name: "port", Type: Int},
 		{Name: "vrf", Type: String, Required: true},
 	},
-	// The layer 2 families (feature 008). The engine reads neither yet; the l2domain projection
-	// (#37) will.
+	// The layer 2 families (feature 008). The graph projector reads both to build L2 domains
+	// (feature 009).
 	"vlans": {
 		{Name: "vlan_id", Type: Int, Required: true, VLANID: true},
 		{Name: "name", Type: String},

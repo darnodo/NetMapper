@@ -243,7 +243,8 @@ other.
 - **FR-006**: Each domain MUST carry its key type (`vlan` in this feature), its key (the lowest
   local VLAN ID among its members), its members with the VLAN ID used on each member device, and the
   edges it was built from.
-- **FR-007**: A cable with an end lacking port VLAN data MUST NOT join anything. When the other end
+- **FR-007**: A cable with an end lacking port VLAN data, or whose declared VLANs were not read,
+  MUST NOT join anything (the second case added during implementation, research R5). When the other end
   carries a VLAN on that cable, the domain holding that VLAN on that end's device MUST carry a
   confidence that says one of its cables was not checked at both ends. A device that is a member but
   lacks port VLAN data MUST mark every domain it is in the same way, when it has at least one cable to

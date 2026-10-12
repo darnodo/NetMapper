@@ -208,6 +208,31 @@ All `complete`. sw3 is denied, but sw2's port towards it is routed and carries n
 nothing unchecked. No `vlan_mismatch`. Expected values to confirm on the VM; the fixture tests are
 the gate, the live crawl is a check.
 
+**test/lab, checked on 2026-10-12 (T042).** Deployed on the NetLab VM, sw4 taken off the network
+(`ip link set eth0 down`, it shares sw1's serial), crawled with this branch: collector on the VM,
+engine and database on the Mac. The table above holds row for row: 19 domains, all `complete`, no
+`vlan_mismatch`. VLAN 10 is joined over Ethernet1 (tagged), both Port-Channel10 members (tagged) and
+the sw1 Ethernet4 / sw2 Ethernet5 access link (untagged); VLAN 99 over Ethernet1 (native) and the
+Port-Channel10 members (tagged); VLAN 1 over the Port-Channel10 members only. VLAN 31 is one domain
+per switch, VLAN 50 is sw2 alone. sw3 is `denied` and no entity, so it adds nothing. EOS's spanning
+tree blocks Ethernet1 (the loop with Port-Channel10); the domain still lists it, since spanning tree
+state is out of scope (spec edge case). The optional native-VLAN mismatch check was not run.
+
+**arista-evpn-vxlan-clab, checked on 2026-10-12.** Crawled with this branch the same way (SSH as
+`netops`, SNMPv3 `snmp-ro`).
+
+- 28 entities. `vlans` collected on all 28; `interface_vlans` collected on 22 and `empty` on 6 (the
+  spines and cores, routed only).
+- 44 domains, all `complete`, no `unchecked` link, no `vlan_mismatch`.
+- Each MLAG pair shares VLAN 1 and its peer VLANs 4090 (`mlag-peer`) and 4091 (`mlag-ibgp`) over its
+  peer-link, one domain per pair. Each access switch joins its leaf pair on its service VLAN (34, 40,
+  60, 70, 78), three members and three links. VLAN 40 is two domains, one per leaf pair: the fabric
+  stitches them over VXLAN, which is VNI work (#33), not a VLAN join. Spines and cores are alone in
+  VLAN 1.
+- The snapshot was `quarantined` and 110 `parse_failed` findings were raised, all on the management
+  families of feature 007 (`snmp`, `aaa_methods`, `local_users`, `management_servers`): `netops` is
+  privilege 1, and 007 research R13 says those need privilege 15. Not this feature.
+
 ## R11. Documents updated in the same change
 
 - `docs/c4-model/04-data-model.md`: the three rows (notes column), `vlan_mismatch` in the finding

@@ -54,3 +54,29 @@ func TestFindings(t *testing.T) {
 		}
 	}
 }
+
+// Feature 009, FR-018: a vlan_mismatch the projector raised is served like any finding, with its
+// evidence, and is derived: it compares two observations.
+func TestFindingVLANMismatch(t *testing.T) {
+	l := standard(t)
+	snap := l.Int(`SELECT max(id) FROM snapshot`)
+	obs := l.Int(`SELECT min(id) FROM observation WHERE snapshot_id = $1`, snap)
+	if _, err := l.DB.Exec(t.Context(), `
+		WITH f AS (INSERT INTO finding (snapshot_id, domain, category, severity, subject_ref, detail)
+		           VALUES ($1, 'compliance', 'vlan_mismatch', 'warning', 'if:x/port1', '{"vlans": [1, 99]}')
+		           RETURNING id)
+		INSERT INTO finding_evidence (finding_id, snapshot_id, observation_id) SELECT id, $1, $2 FROM f`,
+		snap, obs); err != nil {
+		t.Fatal(err)
+	}
+	c := newClient(t, l)
+	var hit map[string]any
+	for _, f := range list(c.json(fmt.Sprintf("/v1/findings?snapshot=%d", snap), 200)["findings"]) {
+		if f["category"] == "vlan_mismatch" {
+			hit = f
+		}
+	}
+	if hit == nil || hit["confidence"] != "derived" || len(list(hit["evidence"])) != 1 {
+		t.Errorf("finding %v, want a derived vlan_mismatch with one piece of evidence", hit)
+	}
+}

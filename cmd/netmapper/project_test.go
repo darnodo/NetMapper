@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/darnodo/NetMapper/internal/pack"
 	. "github.com/darnodo/NetMapper/internal/testutil"
 	"github.com/darnodo/NetMapper/internal/transport/fake"
 )
@@ -20,10 +21,23 @@ import (
 func projectLab(t *testing.T) *Lab {
 	t.Setenv("NM_SNMP", "public")
 	t.Setenv("NM_SSH", "lab-ssh-secret")
+	// Both switches print VLAN data, and the packs include the VLAN recipes of the graph tests, so the
+	// projection writes L2 domains and those inserts run under the operator's role too (feature 009).
+	sw1 := FakeOS("sw1", "S001", "p1 sw2 10.0.0.2 p1 "+MAC("S002"))
+	sw2 := FakeOS("sw2", "S002", "p1 sw1 10.0.0.1 p1 "+MAC("S001"))
+	for _, d := range []*fake.Device{sw1, sw2} {
+		d.CLI["display vlans"] = "10 active\n"
+		d.CLI["display switchport"] = "p1 trunk 1 10\n"
+	}
 	l := NewLab(t, &fake.Network{Devices: map[netip.Addr]*fake.Device{
-		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p1 sw2 10.0.0.2 p1 "+MAC("S002")),
-		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1 p1 "+MAC("S001")),
+		Addr("10.0.0.1"): sw1,
+		Addr("10.0.0.2"): sw2,
 	}})
+	reg, err := pack.LoadRoot(packDir(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	l.Registry = reg
 	l.Crawl(Doc)
 
 	schema := l.DB.Config().ConnConfig.RuntimeParams["search_path"]
@@ -47,16 +61,28 @@ func projectLab(t *testing.T) *Lab {
 // os.ReadDir, and a symlink's DirEntry does not report itself as a directory.
 func packRoot(t *testing.T) string {
 	t.Helper()
+	return "--packs=" + packDir(t)
+}
+
+// packDir builds the directory packRoot points at. The fakeos copy also gets the VLAN recipes of the
+// graph tests (internal/graph/testdata/fakeos-l2), which the shared fakeos pack leaves out on purpose.
+func packDir(t *testing.T) string {
+	t.Helper()
 	dir := t.TempDir()
 	for _, src := range []string{
 		filepath.Join(Root(), "packs", "_base"),
 		filepath.Join(Root(), "internal", "pack", "testdata", "fakeos"),
+		filepath.Join(Root(), "internal", "graph", "testdata", "fakeos-l2"),
 	} {
-		if err := os.CopyFS(filepath.Join(dir, filepath.Base(src)), os.DirFS(src)); err != nil {
+		dst := filepath.Join(dir, filepath.Base(src))
+		if filepath.Base(src) == "fakeos-l2" {
+			dst = filepath.Join(dir, "fakeos")
+		}
+		if err := os.CopyFS(dst, os.DirFS(src)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	return "--packs=" + dir
+	return dir
 }
 
 // stdout captures what a subcommand printed.
@@ -91,7 +117,7 @@ func TestProjectAsOperator(t *testing.T) {
 	if code != exitOK {
 		t.Fatalf("exit %d, want %d", code, exitOK)
 	}
-	if got := strings.TrimSpace(out); got != "4 interfaces, 3 edges, 0 disagreements" {
+	if got := strings.TrimSpace(out); got != "4 interfaces, 3 edges, 0 disagreements, 1 L2 domains, 0 VLAN mismatches" {
 		t.Errorf("printed %q, want the contract's line", got)
 	}
 	after := l.Strings(`SELECT computed_at::text FROM projection`)
@@ -100,6 +126,9 @@ func TestProjectAsOperator(t *testing.T) {
 	}
 	if n := l.Int(`SELECT count(*) FROM edge WHERE type = 'l1_link' AND confidence = 'both_ends'`); n != 1 {
 		t.Error("the operator's own projection did not produce the agreed link")
+	}
+	if n := l.Int(`SELECT count(*) FROM l2domain_member`); n != 2 {
+		t.Errorf("%d domain members written as netmapper_operator, want sw1 and sw2 in VLAN 10", n)
 	}
 }
 
