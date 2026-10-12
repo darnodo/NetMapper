@@ -141,8 +141,9 @@ on.
    confidence says both ends confirmed it.
 2. **Given** a trunk where one switch reported VLAN 10 active and the other switch was unreachable,
    **When** the snapshot is projected, **Then** the reachable switch is in a VLAN 10 domain without
-   the unreachable one, the trunk is not a link of that domain, and the domain's confidence says one
-   of its cables was not checked at both ends.
+   the unreachable one, the trunk is listed against that domain as an unchecked cable rather than a
+   link that joins it, and the domain's confidence says one of its cables was not checked at both
+   ends (amended during planning, research R5).
 3. **Given** a domain of one member built from a VLAN that none of the device's cables carry,
    **When** it is read, **Then** its confidence is the same as a fully confirmed domain: there is no
    unchecked cable in it.
