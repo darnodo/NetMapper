@@ -40,14 +40,20 @@ sharing VLAN 10, a VLAN pruned on the trunk, an access port in a VLAN that exist
 - **An untagged mismatch joins the two VLANs and is reported.** Added by clarification. When the two
   ends of a cable carry different VLANs untagged, frames cross from one to the other, so the two are
   one domain. Each member keeps its own VLAN ID, the domain's key is the lowest of them, and the
-  cable is reported as a finding so the misconfiguration is not hidden inside a domain.
+  mismatch is reported as a finding so the misconfiguration is not hidden inside a domain. The
+  finding is raised once per pair of mismatched ports: a port-channel pair is one finding that lists
+  its member cables, since the setting to fix is on the channel.
 - **`local_vlan_id` is the VLAN ID on that device.** Feature 008 records no VLAN translation, so in
   this feature it differs from the domain's key only after an untagged mismatch. VNI domains
   (`key_type` `vni`) need VXLAN data (#33) and are not built here; the rules of this feature leave
   room for them.
-- **A cable is used only when both ends have VLAN data.** Added by clarification. A device that could
-  not be read has no VLAN data and is a member of no domain, so nothing is joined on the other end's
-  word alone. The domain on the readable side records that one of its cables went unchecked.
+- **A cable is used only when both ends have port VLAN data.** Added by clarification. Membership
+  needs the device's declared VLANs (`vlans` collected); joining over a cable needs the port data of
+  both ends (`interface_vlans` collected or `empty`). A device that could not be read is a member of
+  no domain, so nothing is joined on the other end's word alone, and the domain on the readable side
+  records that one of its cables went unchecked. A device whose declared VLANs were read but whose
+  port data was not is still a member of each VLAN it declares; its cables join nothing, and every
+  domain it is in is marked not fully checked when it has at least one cable to another device.
 - **Domains are not served through the read API yet.** Added by clarification. The projection builds
   them; serving them waits for #7, the same boundary feature 004 kept for edges.
 - **A domain is labelled by the VLAN name its members agree on.** When every member that reports a
@@ -71,6 +77,11 @@ sharing VLAN 10, a VLAN pruned on the trunk, an access port in a VLAN that exist
   its confidence records that one of its cables was not checked at both ends.
 - Q: Is serving domains through the read API part of this feature? → A: No, projection only. Serving
   waits for #7.
+- Q: When a device's VLAN list was read but its port VLAN data failed, does it still count as having
+  VLAN data? → A: Its declared VLANs make it a member; its cables join nothing, and every domain it is
+  in is marked not fully checked when it has at least one cable to another device.
+- Q: Is a native mismatch on a port-channel of four cables one finding or four? → A: One finding per
+  pair of mismatched ports; a port-channel pair is one, listing its member cables.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -158,6 +169,9 @@ other.
 1. **Given** a trunk with native VLAN 1 at one end and 99 at the other, **When** the snapshot is
    projected, **Then** one domain holds both switches, with `local_vlan_id` 1 on the first and 99 on
    the second, keyed by VLAN 1, and a finding names the cable, both ends and both VLANs.
+5. **Given** a port-channel of two or more member cables with native VLAN 1 at one end and 99 at
+   the other, **When** the snapshot is projected, **Then** exactly one finding names both
+   port-channels and both VLANs and lists every member cable.
 2. **Given** an access port in VLAN 10 facing an access port in VLAN 20, **When** the snapshot is
    projected, **Then** the result is the same as scenario 1: one domain keyed by VLAN 10, and a
    finding.
@@ -175,9 +189,13 @@ other.
 - A cable known from one side only (one `l1_link` end reported it): it joins a VLAN like any other
   cable when both ports' VLAN data is known. Whether the cable is confirmed is the edge's own
   confidence, already readable on the edge.
-- A device whose VLAN data is `unsupported`, `parse_failed` or missing: it has no VLAN data and is a
-  member of no domain. Cables toward it join nothing and lower the confidence of the domains on the
+- A device whose `vlans` observation is `unsupported`, `parse_failed`, `unreachable` or missing: it
+  is a member of no domain. Cables toward it join nothing and lower the confidence of the domains on the
   readable side that would otherwise use them (a cable carrying the VLAN at the readable end).
+- A device whose `vlans` was collected but whose `interface_vlans` is `parse_failed`, `unreachable`
+  or missing: it is a member, alone or with others it cannot be joined to, of each VLAN it declares.
+  Its cables join nothing. Each of its domains is marked not fully checked if the device has at least
+  one cable to another device entity, since any of those cables might carry the VLAN.
 - A device in a domain twice through an untagged mismatch (VLAN 1 on sw1 reaches VLAN 99 on sw2,
   which reaches VLAN 99 back on sw1 through another cable): sw1 is a member once per local VLAN, so
   it appears with both 1 and 99 in the same domain.
@@ -212,19 +230,23 @@ other.
   active list and is not its native VLAN, and untagged when it is its access VLAN, or its native
   VLAN while in its active list. A member of a port-channel MUST carry what its port-channel
   carries.
-- **FR-003**: A cable MUST join a VLAN between its two devices only when both devices have VLAN data,
-  both ends carry that VLAN with the same tagging, and both devices declare it. The untagged mismatch
+- **FR-003**: A cable MUST join a VLAN between its two devices only when both devices have port VLAN
+  data (`interface_vlans` collected or `empty`), both ends carry that VLAN with the same tagging, and
+  both devices declare it. The untagged mismatch
   case is settled by FR-012.
-- **FR-004**: Every VLAN declared on a device with VLAN data MUST make that device a member of exactly
-  one domain for that local VLAN. A VLAN no cable carries MUST give a domain of one member.
+- **FR-004**: Every VLAN declared on a device whose `vlans` observation was collected MUST make that
+  device a member of exactly one domain for that local VLAN. A VLAN no cable carries MUST give a
+  domain of one member.
 - **FR-005**: A device MUST NOT become a member of a domain through a VLAN it does not declare, nor
   through a cable to a non-entity endpoint.
 - **FR-006**: Each domain MUST carry its key type (`vlan` in this feature), its key (the lowest
   local VLAN ID among its members), its members with the VLAN ID used on each member device, and the
   edges it was built from.
-- **FR-007**: A cable whose far device has no VLAN data MUST NOT join anything. When the readable end
-  carries a VLAN on that cable, the domain holding that VLAN on the readable device MUST carry a
-  confidence that says one of its cables was not checked at both ends. A domain with no such cable
+- **FR-007**: A cable with an end lacking port VLAN data MUST NOT join anything. When the other end
+  carries a VLAN on that cable, the domain holding that VLAN on that end's device MUST carry a
+  confidence that says one of its cables was not checked at both ends. A device that is a member but
+  lacks port VLAN data MUST mark every domain it is in the same way, when it has at least one cable to
+  another device entity. A domain with no such cable
   MUST carry a confidence that says it is fully checked, whatever the number of its members.
 - **FR-008**: A domain MUST be labelled with the VLAN name when every member that reports a name
   reports the same one, and MUST carry no label otherwise.
@@ -238,7 +260,9 @@ other.
   tested with inputs that tie.
 - **FR-012**: When the two ends of a cable carry different VLANs untagged, both declared on their
   devices, the cable MUST join those two VLANs into one domain, each member keeping its own local
-  VLAN ID, and MUST raise a finding naming the cable, both ends and both VLANs. The finding MUST be
+  VLAN ID, and MUST raise one finding per pair of mismatched ports, naming both ports, both VLANs and
+  the cables between them. When both ends are port-channels, that pair is the two channels and the
+  finding lists all their member cables; it is not repeated per member. The finding MUST be
   part of the projection's output and replaced with it, as link disagreements are (feature 004).
   A matching untagged VLAN at both ends MUST raise no finding.
 - **FR-013**: Domains MUST be derivable from the collected zone and the entity set alone. Losing every
@@ -250,7 +274,8 @@ other.
 - **FR-016**: The graph engine tests MUST cover, from fixture snapshots runnable with no lab: a trunk
   sharing VLAN 10, a VLAN pruned on the trunk, an access port in a VLAN declared on one side only, a
   VLAN no cable carries, a port-channel, a chain of three devices, a tagged-against-untagged end, an
-  untagged mismatch, a far end with no VLAN data, and members that disagree on a VLAN name.
+  untagged mismatch on a plain cable and on a port-channel, a far end with no VLAN data, a device
+  with declared VLANs but no port data, and members that disagree on a VLAN name.
 - **FR-017**: The data model document, the finding categories it lists, and any guide describing
   what the projection builds MUST be updated in the same change.
 - **FR-018**: Domains MUST NOT be served through the read API in this feature. Its existing answers
@@ -263,24 +288,24 @@ other.
   an optional label. Computed, never collected.
 - **Domain member**: a device entity in a domain, with the VLAN ID that domain uses on that device.
 - **Domain link**: a cable (`l1_link` edge) that joins two members of a domain.
-- **VLAN mismatch finding**: a report that a cable carries different VLANs untagged at its two ends,
-  naming the cable, both ends and both VLANs.
+- **VLAN mismatch finding**: a report that two facing ports carry different VLANs untagged, naming
+  both ports (port-channels when bundled), both VLANs and the cables between them.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
 - **SC-001**: With no lab running, the graph engine tests cover every case of FR-016 and pass.
-- **SC-002**: On a projected snapshot, every VLAN declared on a device with VLAN data appears in
-  exactly one domain membership of that device.
+- **SC-002**: On a projected snapshot, every VLAN declared on a device whose `vlans` was collected
+  appears in exactly one domain membership of that device.
 - **SC-003**: Two devices are in the same domain if and only if a path of cables carrying the VLAN at
   both ends joins them; checked on every fixture.
 - **SC-004**: Projecting a snapshot twice yields identical domains, members, links, keys and labels.
 - **SC-005**: For any domain, a reader can name the observations and collection times behind each
   membership and link, and tell a fully confirmed domain from a partly assumed one, without reading
   a log.
-- **SC-006**: Every untagged mismatch in a fixture produces exactly one finding and one joined
-  domain; a fixture with none produces no mismatch finding.
+- **SC-006**: Every pair of mismatched ports in a fixture, a port-channel pair included, produces
+  exactly one finding and one joined domain; a fixture with none produces no mismatch finding.
 - **SC-007**: Deleting every domain row and recomputing restores the same domains with no device
   contacted.
 
