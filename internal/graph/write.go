@@ -26,34 +26,41 @@ func (p *projection) write(ctx context.Context, tx pgx.Tx) error {
 	if err := p.writeEdges(ctx, tx); err != nil {
 		return err
 	}
+	if err := p.writeDomains(ctx, tx); err != nil {
+		return err
+	}
 	if err := p.writeFindings(ctx, tx); err != nil {
 		return err
 	}
 	_, err := tx.Exec(ctx, `
-		INSERT INTO projection (snapshot_id, projector_version, resolution_at, interfaces, edges)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO projection (snapshot_id, projector_version, resolution_at, interfaces, edges, l2domains)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (snapshot_id) DO UPDATE SET
 			projector_version = EXCLUDED.projector_version,
 			resolution_at     = EXCLUDED.resolution_at,
 			interfaces        = EXCLUDED.interfaces,
 			edges             = EXCLUDED.edges,
+			l2domains         = EXCLUDED.l2domains,
 			computed_at       = now()`,
-		p.snap.id, projectorVersion, p.snap.resolutionAt, p.countPorts(), len(p.edges))
+		p.snap.id, projectorVersion, p.snap.resolutionAt, p.countPorts(), len(p.edges), len(p.domains))
 	return err
 }
 
-// clear removes what a previous projection of this snapshot wrote. Aliases, evidence and edges
-// cascade from the interfaces they hang off, so deleting the edges first and the interfaces second
-// takes everything with it and leaves no orphan. The delete on `finding` is restricted to this
-// category and this snapshot: a finding the collector or the resolver raised is not this
-// projection's to remove (FR-018, FR-020, research R9).
+// clear removes what a previous projection of this snapshot wrote. Domain members and links cascade
+// from their domain, aliases, evidence and edges from the interfaces they hang off, so deleting the
+// domains, then the edges, then the interfaces takes everything with it and leaves no orphan. The
+// delete on `finding` is restricted to this projection's two categories and this snapshot: a finding
+// the collector or the resolver raised is not this projection's to remove (FR-018, FR-020, research
+// R9; feature 009 research R7).
 func (p *projection) clear(ctx context.Context, tx pgx.Tx) error {
 	for _, q := range []string{
+		`DELETE FROM l2domain WHERE snapshot_id = $1`,
 		`DELETE FROM edge WHERE snapshot_id = $1`,
 		`DELETE FROM interface WHERE snapshot_id = $1`,
 		`DELETE FROM finding_evidence WHERE finding_id IN (
-			SELECT id FROM finding WHERE snapshot_id = $1 AND category = 'link_disagreement')`,
-		`DELETE FROM finding WHERE snapshot_id = $1 AND category = 'link_disagreement'`,
+			SELECT id FROM finding WHERE snapshot_id = $1
+			AND category IN ('link_disagreement', 'vlan_mismatch'))`,
+		`DELETE FROM finding WHERE snapshot_id = $1 AND category IN ('link_disagreement', 'vlan_mismatch')`,
 	} {
 		if _, err := tx.Exec(ctx, q, p.snap.id); err != nil {
 			return err
@@ -106,13 +113,12 @@ func (p *projection) writeEdges(ctx context.Context, tx pgx.Tx) error {
 		if err != nil {
 			return err
 		}
-		var id int64
 		if err := tx.QueryRow(ctx, `
 			INSERT INTO edge (snapshot_id, type, from_ref, to_ref, from_entity_id, to_entity_id,
 				from_interface_id, to_interface_id, confidence, attributes, first_seen, last_seen)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
 			p.snap.id, e.typ, e.fromRef, e.toRef, entityID(e.fromEntity), entityID(e.toEntity),
-			ifaceID(e.fromPort), ifaceID(e.toPort), e.confidence, attrs, e.first, e.last).Scan(&id); err != nil {
+			ifaceID(e.fromPort), ifaceID(e.toPort), e.confidence, attrs, e.first, e.last).Scan(&e.id); err != nil {
 			return err
 		}
 		b := &pgx.Batch{}
@@ -124,7 +130,7 @@ func (p *projection) writeEdges(ctx context.Context, tx pgx.Tx) error {
 		})
 		for _, ev := range e.evidence {
 			b.Queue(`INSERT INTO edge_evidence (edge_id, snapshot_id, observation_id, side)
-				VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, id, p.snap.id, ev.obs, ev.side)
+				VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, e.id, p.snap.id, ev.obs, ev.side)
 		}
 		if err := tx.SendBatch(ctx, b).Close(); err != nil {
 			return err
@@ -133,13 +139,54 @@ func (p *projection) writeEdges(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
-// writeFindings raises the disagreements this projection found, on the surface 001 established and
-// 003 already writes to (research R9).
+// writeFindings raises the disagreements and the VLAN mismatches this projection found, on the
+// surface 001 established and 003 already writes to (research R9; feature 009 research R7).
 func (p *projection) writeFindings(ctx context.Context, tx pgx.Tx) error {
 	slices.SortFunc(p.findings, func(a, b disagreement) int { return strings.Compare(a.subject, b.subject) })
 	for _, d := range p.findings {
 		if err := store.RaiseFinding(ctx, tx, p.snap.id, "data_quality", "link_disagreement",
 			"warning", d.subject, d.detail, d.evidence...); err != nil {
+			return err
+		}
+	}
+	// In the order buildDomains left them: by their "lower|higher" pair of port references. That is not
+	// strictly subject order (pc10| sorts before pc1|), but it is the same on every run.
+	for _, m := range p.mismatches {
+		if err := store.RaiseFinding(ctx, tx, p.snap.id, "compliance", "vlan_mismatch",
+			"warning", m.subject, m.detail, m.evidence...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeDomains writes the domains in the order buildDomains left them, each with its members and its
+// links in one batch. The edge ids come from writeEdges, which is why it runs after it.
+func (p *projection) writeDomains(ctx context.Context, tx pgx.Tx) error {
+	for _, d := range p.domains {
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO l2domain (snapshot_id, key_type, key_id, label, confidence)
+			VALUES ($1, 'vlan', $2, $3, $4) RETURNING id`,
+			p.snap.id, d.key, null(d.label), d.confidence).Scan(&d.id); err != nil {
+			return err
+		}
+		b := &pgx.Batch{}
+		for _, m := range d.members {
+			var ports any
+			if m.e.l2.portsKnown {
+				ports = m.e.l2.portsObs
+			}
+			b.Queue(`INSERT INTO l2domain_member (l2domain_id, snapshot_id, entity_id, local_vlan_id,
+				vlans_observation_id, ports_observation_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+				d.id, p.snap.id, m.e.id, m.vlan, m.e.l2.vlans[m.vlan].obs, ports)
+		}
+		for _, e := range slices.SortedFunc(maps.Keys(d.links), func(a, b *edge) int {
+			return strings.Compare(a.name(), b.name())
+		}) {
+			b.Queue(`INSERT INTO l2domain_link (l2domain_id, edge_id, state) VALUES ($1, $2, $3)`,
+				d.id, e.id, d.links[e])
+		}
+		if err := tx.SendBatch(ctx, b).Close(); err != nil {
 			return err
 		}
 	}

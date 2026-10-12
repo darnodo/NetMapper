@@ -29,15 +29,17 @@ var (
 
 // projectorVersion identifies the projection that produced a set. Bump it by hand when a change
 // alters results, so the sets the old version wrote can be found and recomputed instead of being
-// re-crawled (research R12).
-const projectorVersion = 1
+// re-crawled (research R12). Version 2 adds layer 2 domains (feature 009, research R1).
+const projectorVersion = 2
 
 // Result is what a projection produced, for an operator command to print.
 type Result struct {
-	SnapshotID    int64
-	Interfaces    int
-	Edges         int
-	Disagreements int
+	SnapshotID     int64
+	Interfaces     int
+	Edges          int
+	Disagreements  int
+	L2Domains      int
+	VLANMismatches int
 }
 
 // entity is one resolved device, with what the projector needs from it: the key its references are
@@ -54,6 +56,7 @@ type entity struct {
 	// of these and must carry that one's range, not the entity's (FR-008).
 	answeredOn map[string]answer
 	ports      map[string]*iface
+	l2         *l2State
 }
 
 // answer is one identity observation an address produced.
@@ -162,6 +165,7 @@ type edge struct {
 	attributes  map[string]any
 	first, last time.Time
 	evidence    []edgeEvidence
+	id          int64 // set by writeEdges, for the domain links that point at it
 }
 
 func (e *edge) name() string { return e.typ + ":" + e.fromRef + "|" + e.toRef }
@@ -185,6 +189,9 @@ type projection struct {
 	byTask   map[int64]*entity
 	edges    []*edge
 	findings []disagreement
+	domains  []*domain
+	// mismatches are vlan_mismatch findings, raised like the disagreements above (research R7).
+	mismatches []disagreement
 }
 
 // Project replaces a closed snapshot's interfaces and edges with the ones its observations and its
@@ -236,17 +243,22 @@ func projectIn(ctx context.Context, tx pgx.Tx, reg *pack.Registry, s snapshot) (
 		return Result{}, err
 	}
 
+	if err := p.readVLANs(ctx, tx); err != nil {
+		return Result{}, err
+	}
+
 	p.addDevicePorts(ifRows)
 	reports := p.readReports(reg, nbRows)
 	p.addReportedPorts(reports)
 	p.buildLinks(reports)
 	p.addAddressEdges()
+	p.buildDomains()
 
 	if err := p.write(ctx, tx); err != nil {
 		return Result{}, err
 	}
 	return Result{SnapshotID: s.id, Interfaces: p.countPorts(), Edges: len(p.edges),
-		Disagreements: len(p.findings)}, nil
+		Disagreements: len(p.findings), L2Domains: len(p.domains), VLANMismatches: len(p.mismatches)}, nil
 }
 
 // projectionLockClass keeps this feature's advisory locks from colliding with the ones 003 takes on a

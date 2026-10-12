@@ -1,0 +1,8 @@
+Value VLAN_ID (\d+)
+Value STATUS (\S+)
+Value NAME (\S+)
+
+Start
+  ^${VLAN_ID}\s+${STATUS}(?:\s+${NAME})?\s*$$ -> Record
+  ^\s*$$
+  ^. -> Error

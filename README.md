@@ -19,7 +19,10 @@ Early. What works today:
 - on Arista EOS, how each device is managed: SNMP communities (never their strings) and v3 users,
   AAA servers and method lists, local accounts, management APIs, NTP, syslog and DNS servers;
 - on Arista EOS, VLANs and which ports carry them: access ports, trunks with their native, allowed
-  and active VLANs, port-channels and their members (the L2 domains built from them come later);
+  and active VLANs, port-channels and their members;
+- L2 domains built from those VLANs: which devices share a broadcast domain, over which cables, how
+  well it is known, and a finding when two ends of a cable carry different VLANs untagged (stored
+  in the database, not served by the API yet);
 - a read-only REST API behind bearer tokens, including any fact family of one device
   (`/v1/devices/{name}/facts/{family}`).
 

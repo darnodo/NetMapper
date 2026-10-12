@@ -224,3 +224,12 @@ its port instead.
 
 Stop the processes, run `netmapper migrate` with the new binary, start them again. A migration never
 rewrites collected data.
+
+A release that changes what the projection builds bumps its version, and the engine does not redo
+snapshots it already projected. The release that adds L2 domains (feature 009) does this: snapshots
+projected before it have no domains until you project them again.
+
+```sh
+psql -c "SELECT snapshot_id FROM projection WHERE projector_version < 2"
+netmapper project <snapshot-id>
+```

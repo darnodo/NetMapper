@@ -50,6 +50,7 @@ func cmdProject(ctx context.Context, args []string) int {
 	case err != nil:
 		return fail("project", err)
 	}
-	fmt.Printf("%d interfaces, %d edges, %d disagreements\n", r.Interfaces, r.Edges, r.Disagreements)
+	fmt.Printf("%d interfaces, %d edges, %d disagreements, %d L2 domains, %d VLAN mismatches\n",
+		r.Interfaces, r.Edges, r.Disagreements, r.L2Domains, r.VLANMismatches)
 	return exitOK
 }
