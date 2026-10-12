@@ -161,7 +161,7 @@ one end and 99 at the other gives one domain keyed 1 and one finding.
 - [X] T038 [P] In docs/how-to/deploy.md, upgrade section: after this version's `netmapper migrate`, snapshots projected earlier have no L2 domains until `netmapper project <snapshot-id>` is run on them; list them with `SELECT snapshot_id FROM projection WHERE projector_version < 2`. The engine does not redo them on its own
 - [X] T039 Check constitution V: `grep -rniE 'arista|eos|cisco|junos|ethernet|port-channel' internal/graph/*.go` finds no vendor term outside comments citing feature numbers; then run `go vet ./...` and `go test -count=1 ./...`, all passing
 - [X] T040 Check the migration's down step by hand (quickstart section 2): on a scratch schema with every migration applied, insert one `vlan_mismatch` finding, run goose down one step, confirm it succeeds and the finding is gone, run up again
-- [X] T041 [VM] (Done on arista-evpn-vxlan-clab, test/lab was not deployed; see research R10.) Quickstart section 4 on `test/lab`: crawl, list the domains, compare with research R10, check `GET /v1/findings` has no `vlan_mismatch`; optionally the native 20 mismatch check. Write any difference into specs/009-l2domain-projection/research.md R10 before treating it as a bug, and put the lab configuration back
+- [X] T041 [VM] (Done on test/lab and arista-evpn-vxlan-clab; the native 20 mismatch check run locally after the merge, see research R10.) Quickstart section 4 on `test/lab`: crawl, list the domains, compare with research R10, check `GET /v1/findings` has no `vlan_mismatch`; optionally the native 20 mismatch check. Write any difference into specs/009-l2domain-projection/research.md R10 before treating it as a bug, and put the lab configuration back
 
 ---
 
