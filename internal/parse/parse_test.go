@@ -2,6 +2,7 @@ package parse
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/darnodo/NetMapper/internal/pack"
@@ -185,5 +186,106 @@ Start
 	}
 	if s, _, err := Parse(r, "fakeos", "interface_vlans", im, [][]byte{[]byte("p1 10,x\nEND\n")}); s != ParseFailed || err == nil {
 		t.Errorf("bad token: %s %v", s, err)
+	}
+}
+
+// Feature 010: lists from several steps add up, sorted and without duplicates, whatever the step
+// order; [] and an absent list mean different things; a row still breaking a rule is never
+// dropped on its own: the whole observation is parse_failed.
+func TestBGPPeerRules(t *testing.T) {
+	r := registry(t)
+	peers := []byte("vrf default\n" +
+		"peer 10.0.0.1 as 65001 state Established id 1.1.1.1\n  negotiated l2vpn\n  negotiated ipv4\n" +
+		"peer 10.0.0.2 as 65002 state Established id 2.2.2.2\n" + // up, nothing negotiated
+		"peer 10.0.0.3 as 65003 state Idle id 3.3.3.3\n  negotiated ipv4\n" + // down, last session's values
+		"peer 10.0.0.4 as 65004 state Established id 4.4.4.4\n") // activated in no family
+	ipv4 := []byte("vrf default\nmember 10.0.0.1\nmember 10.0.0.2\nmember 10.0.0.3\n")
+	evpn := []byte("vrf default\nmember 10.0.0.1\nmember 10.0.0.1\n") // printed twice
+	fam := func(name string) pack.Step {
+		return pack.Step{Template: "display_family.textfsm", Map: map[string]string{
+			"vrf": "VRF", "peer_address": "PEER", "configured_address_families": "=" + name}}
+	}
+	im := pack.Impl{
+		Steps: []pack.Step{{Template: "display_peers.textfsm", Map: map[string]string{
+			"vrf": "VRF", "peer_address": "PEER", "peer_as": "AS", "state": "STATE",
+			"peer_router_id": "PEER_ID", "negotiated_address_families": "NEGOTIATED",
+			"type": "=ebgp", "local_as": "=65000", "router_id": "=9.9.9.9"}},
+			fam("l2vpn evpn"), fam("ipv4 unicast")},
+		Values: map[string]map[string]string{
+			"state":                       {"Established": "established", "Idle": "idle"},
+			"negotiated_address_families": {"ipv4": "ipv4 unicast", "l2vpn": "l2vpn evpn"},
+		},
+		Defaults: map[string]string{"shutdown": "no", "dynamic": "no"},
+		MergeOn:  []string{"vrf", "peer_address"},
+	}
+	row := func(peer string, as int64, state string, extra map[string]any) map[string]any {
+		r := map[string]any{"vrf": "default", "peer_address": peer, "peer_as": as, "state": state,
+			"type": "ebgp", "local_as": int64(65000), "router_id": "9.9.9.9", "shutdown": "no", "dynamic": "no"}
+		for k, v := range extra {
+			r[k] = v
+		}
+		return r
+	}
+	want := []map[string]any{
+		row("10.0.0.1", 65001, "established", map[string]any{"peer_router_id": "1.1.1.1",
+			"configured_address_families": []string{"ipv4 unicast", "l2vpn evpn"},
+			"negotiated_address_families": []string{"ipv4 unicast", "l2vpn evpn"}}),
+		row("10.0.0.2", 65002, "established", map[string]any{"peer_router_id": "2.2.2.2",
+			"configured_address_families": []string{"ipv4 unicast"}, "negotiated_address_families": []string{}}),
+		row("10.0.0.3", 65003, "idle", map[string]any{"configured_address_families": []string{"ipv4 unicast"}}),
+		row("10.0.0.4", 65004, "established", map[string]any{"peer_router_id": "4.4.4.4",
+			"configured_address_families": []string{}, "negotiated_address_families": []string{}}),
+	}
+	s, rows, err := Parse(r, "fakeos", "bgp_peers", im, [][]byte{peers, evpn, ipv4})
+	if s != Collected || err != nil || !reflect.DeepEqual(rows, want) {
+		t.Errorf("%s %v\n got %v\nwant %v", s, err, rows, want)
+	}
+	// The same steps in the other order give the same rows.
+	im.Steps[1], im.Steps[2] = im.Steps[2], im.Steps[1]
+	s, rows2, err := Parse(r, "fakeos", "bgp_peers", im, [][]byte{peers, ipv4, evpn})
+	if s != Collected || err != nil || !reflect.DeepEqual(rows2, want) {
+		t.Errorf("other order: %s %v\n got %v\nwant %v", s, err, rows2, want)
+	}
+	// A summary peer with no neighbour record merges into a row with no peer_as: the observation is
+	// parse_failed with the field named, and no row is kept.
+	s, rows, err = Parse(r, "fakeos", "bgp_peers", im, [][]byte{peers, append(ipv4, "member 10.0.0.9\n"...), evpn})
+	if s != ParseFailed || rows != nil || err == nil || !strings.Contains(err.Error(), "peer_as") {
+		t.Errorf("orphan summary peer: %s %v %v", s, err, rows)
+	}
+	// Edge cases (convergence T040): a state word the recipe does not map is other; a negotiated
+	// family the recipe does not name is kept as printed, the configured list staying [] since no
+	// step covers it; one peer address in two VRFs is two rows.
+	odd := []byte("vrf default\npeer 10.0.0.1 as 65001 state Weird id 1.1.1.1\n" +
+		"vrf gold\npeer 10.0.0.1 as 65001 state Established id 1.1.1.1\n  negotiated VPN-IPv4\n")
+	im.Values["state"]["*"] = "other"
+	s, rows, err = Parse(r, "fakeos", "bgp_peers", im, [][]byte{odd, nil, nil})
+	want = []map[string]any{
+		row("10.0.0.1", 65001, "other", map[string]any{"configured_address_families": []string{}}),
+		row("10.0.0.1", 65001, "established", map[string]any{"vrf": "gold", "peer_router_id": "1.1.1.1",
+			"configured_address_families": []string{}, "negotiated_address_families": []string{"VPN-IPv4"}}),
+	}
+	if s != Collected || err != nil || !reflect.DeepEqual(rows, want) {
+		t.Errorf("edge cases: %s %v\n got %v\nwant %v", s, err, rows, want)
+	}
+}
+
+// Feature 010: a default on a field that is not a merge key fills the merged row, so a later step's
+// value is not shadowed by the default an earlier step's row would otherwise carry.
+func TestDefaultAfterMerge(t *testing.T) {
+	r := registry(t)
+	peers := []byte("vrf default\npeer 10.0.0.1 as 65001 state Idle\npeer 10.0.0.2 as 65002 state Idle\n")
+	dyn := []byte("vrf default\nmember 10.0.0.2\n")
+	im := pack.Impl{
+		Steps: []pack.Step{
+			{Template: "display_peers.textfsm", Map: map[string]string{"vrf": "VRF", "peer_address": "PEER", "peer_as": "AS",
+				"state": "=idle", "type": "=ebgp", "local_as": "=1", "router_id": "=9.9.9.9", "shutdown": "=no"}},
+			{Template: "display_family.textfsm", Map: map[string]string{"vrf": "VRF", "peer_address": "PEER", "dynamic": "=yes"}},
+		},
+		Defaults: map[string]string{"dynamic": "no"},
+		MergeOn:  []string{"vrf", "peer_address"},
+	}
+	s, rows, err := Parse(r, "fakeos", "bgp_peers", im, [][]byte{peers, dyn})
+	if s != Collected || err != nil || len(rows) != 2 || rows[0]["dynamic"] != "no" || rows[1]["dynamic"] != "yes" {
+		t.Errorf("%s %v %v", s, err, rows)
 	}
 }

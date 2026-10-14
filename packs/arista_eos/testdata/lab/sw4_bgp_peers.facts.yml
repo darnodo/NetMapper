@@ -1,0 +1,3 @@
+# What the bgp_peers recipe must produce from the sw4 recordings: no BGP (`% BGP inactive` on every step).
+status: empty
+rows: []

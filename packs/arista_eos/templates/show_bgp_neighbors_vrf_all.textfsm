@@ -1,0 +1,27 @@
+Value Required PEER_ADDRESS ([^,\s]+)
+Value PEER_AS (\d+)
+Value LINK (external|internal)
+Value DESCRIPTION (.+)
+Value PEER_ROUTER_ID (\S+)
+Value VRF (\S+)
+Value PEER_GROUP (\S+)
+Value STATE (\w+)
+Value SHUTDOWN (Administratively shut down)
+Value List NEGOTIATED (.+?)
+Value LOCAL_AS (\d+)
+Value ROUTER_ID (\S+)
+
+# One record per peer, every VRF (feature 010, research R1). The Local AS line comes after the
+# statistics blocks, so a record ends at the next "BGP neighbor is" or at the end of the output.
+# Timers, counters, prefix statistics and TCP socket lines are never captured (FR-007).
+Start
+  ^BGP neighbor is -> Continue.Record
+  ^BGP neighbor is ${PEER_ADDRESS}, remote AS ${PEER_AS}, ${LINK} link
+  ^\s+Description: ${DESCRIPTION}$$
+  ^\s+BGP version \d+, remote router ID ${PEER_ROUTER_ID}, VRF ${VRF}$$
+  ^\s+Inherits configuration from and member of peer-group ${PEER_GROUP}$$
+  ^\s+BGP state is ${STATE}, ${SHUTDOWN}$$
+  ^\s+BGP state is ${STATE}
+  # Only a family the session negotiated: once it is down EOS prints "advertised and received".
+  ^\s+Multiprotocol ${NEGOTIATED}: .*\bnegotiated$$
+  ^Local AS is ${LOCAL_AS}, local router ID ${ROUTER_ID}

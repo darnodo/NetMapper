@@ -1,0 +1,5 @@
+# What the bgp_peers recipe must produce from the sw2 recordings (test/lab/sw2.cfg): the password session and the dynamic peer.
+status: collected
+rows:
+  - {"configured_address_families":["ipv4 unicast"],"description":"TO-SW1","dynamic":"no","local_as":65102,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.0.10.1","peer_as":65101,"peer_router_id":"10.255.0.1","router_id":"10.255.0.2","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["ipv4 unicast"],"dynamic":"yes","local_as":65102,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.255.1.1","peer_as":65101,"peer_group":"DYN","peer_router_id":"10.255.0.1","router_id":"10.255.0.2","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}

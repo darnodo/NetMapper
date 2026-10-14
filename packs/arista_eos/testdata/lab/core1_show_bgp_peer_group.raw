@@ -1,0 +1,122 @@
+BGP peer-group is campus_bl, remote AS 66005, peer-group external
+  BGP version 4
+  Static peer-group members:
+    VRF default:
+      10.0.5.1, state: Established
+        Negotiated MP Capabilities:
+            IPv4 Unicast: Yes
+            IPv4 Multicast: No
+            IPv4 with MPLS Labels: No
+            MVPN-IPv4: No
+            IPv4 SR-TE: No
+            Dps: No
+            VPN-IPv4: No
+            RT Membership: No
+            IPv4 Flowspec: No
+            IPv4 Flowspec VPN: No
+            IPv6 Unicast: No
+            IPv6 Multicast: No
+            IPv6 with MPLS Labels: No
+            IPv6 SR-TE: No
+            VPN-IPv6: No
+            IPv6 Flowspec: No
+            IPv6 Flowspec VPN: No
+            L2VPN VPLS: No
+            L2VPN EVPN: No
+            Link State: No
+      10.0.5.3, state: Established
+        Negotiated MP Capabilities:
+            IPv4 Unicast: Yes
+            IPv4 Multicast: No
+            IPv4 with MPLS Labels: No
+            MVPN-IPv4: No
+            IPv4 SR-TE: No
+            Dps: No
+            VPN-IPv4: No
+            RT Membership: No
+            IPv4 Flowspec: No
+            IPv4 Flowspec VPN: No
+            IPv6 Unicast: No
+            IPv6 Multicast: No
+            IPv6 with MPLS Labels: No
+            IPv6 SR-TE: No
+            VPN-IPv6: No
+            IPv6 Flowspec: No
+            IPv6 Flowspec VPN: No
+            L2VPN VPLS: No
+            L2VPN EVPN: No
+            Link State: No
+BGP peer-group is core_ibgp, remote AS 65500, peer-group internal
+  BGP version 4
+  Static peer-group members:
+    VRF default:
+      10.0.200.2, state: Established
+        Negotiated MP Capabilities:
+            IPv4 Unicast: Yes
+            IPv4 Multicast: No
+            IPv4 with MPLS Labels: No
+            MVPN-IPv4: No
+            IPv4 SR-TE: No
+            Dps: No
+            VPN-IPv4: No
+            RT Membership: No
+            IPv4 Flowspec: No
+            IPv4 Flowspec VPN: No
+            IPv6 Unicast: No
+            IPv6 Multicast: No
+            IPv6 with MPLS Labels: No
+            IPv6 SR-TE: No
+            VPN-IPv6: No
+            IPv6 Flowspec: No
+            IPv6 Flowspec VPN: No
+            L2VPN VPLS: No
+            L2VPN EVPN: No
+            Link State: No
+BGP peer-group is dc_bl, remote AS 65005, peer-group external
+  BGP version 4
+  Static peer-group members:
+    VRF default:
+      10.0.4.1, state: Established
+        Negotiated MP Capabilities:
+            IPv4 Unicast: Yes
+            IPv4 Multicast: No
+            IPv4 with MPLS Labels: No
+            MVPN-IPv4: No
+            IPv4 SR-TE: No
+            Dps: No
+            VPN-IPv4: No
+            RT Membership: No
+            IPv4 Flowspec: No
+            IPv4 Flowspec VPN: No
+            IPv6 Unicast: No
+            IPv6 Multicast: No
+            IPv6 with MPLS Labels: No
+            IPv6 SR-TE: No
+            VPN-IPv6: No
+            IPv6 Flowspec: No
+            IPv6 Flowspec VPN: No
+            L2VPN VPLS: No
+            L2VPN EVPN: No
+            Link State: No
+      10.0.4.3, state: Established
+        Negotiated MP Capabilities:
+            IPv4 Unicast: Yes
+            IPv4 Multicast: No
+            IPv4 with MPLS Labels: No
+            MVPN-IPv4: No
+            IPv4 SR-TE: No
+            Dps: No
+            VPN-IPv4: No
+            RT Membership: No
+            IPv4 Flowspec: No
+            IPv4 Flowspec VPN: No
+            IPv6 Unicast: No
+            IPv6 Multicast: No
+            IPv6 with MPLS Labels: No
+            IPv6 SR-TE: No
+            VPN-IPv6: No
+            IPv6 Flowspec: No
+            IPv6 Flowspec VPN: No
+            L2VPN VPLS: No
+            L2VPN EVPN: No
+            Link State: No

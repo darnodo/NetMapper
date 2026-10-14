@@ -1,0 +1,19 @@
+BGP summary information for VRF default
+Router identifier 10.0.200.1, local AS number 65500
+Neighbor Status Codes: m - Under maintenance
+  Neighbor   V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc PfxAdv
+  10.0.4.1   4 65005            160       155    0    0 02:05:28 Estab   17     2      2
+  10.0.4.3   4 65005            160       153    0    0 02:05:29 Estab   17     2      2
+  10.0.5.1   4 66005            158       154    0    0 02:05:29 Estab   11     2      2
+  10.0.5.3   4 66005            160       152    0    0 02:05:29 Estab   11     2      2
+  10.0.200.2 4 65500            154       153    0    0 02:05:07 Estab   5      5      5
+
+BGP summary information for VRF gold
+Router identifier 10.0.200.1, local AS number 65500
+Neighbor Status Codes: m - Under maintenance
+  Neighbor     V AS           MsgRcvd   MsgSent  InQ OutQ  Up/Down State   PfxRcd PfxAcc PfxAdv
+  10.0.14.1    4 65005            158       160    0    0 02:05:28 Estab   3      3      9
+  10.0.14.3    4 65005            160       158    0    0 02:05:29 Estab   3      3      7
+  10.0.15.1    4 66005            159       162    0    0 02:05:30 Estab   3      3      7
+  10.0.15.3    4 66005            157       160    0    0 02:05:29 Estab   3      3      9
+  10.0.200.131 4 65500            157       159    0    0 02:05:28 Estab   9      9      9

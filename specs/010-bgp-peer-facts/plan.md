@@ -7,18 +7,21 @@
 ## Summary
 
 One new platform-neutral fact family, `bgp_peers`, in `internal/fact`, filled on Arista EOS by one
-recipe with four steps. `show bgp neighbors vrf all` gives one record per peer in every VRF: peer
+recipe with five steps. `show bgp neighbors vrf all` gives one record per peer in every VRF: peer
 address and AS, type, state, shutdown and dynamic markers, peer router ID, peer group, description,
 local AS and router ID, and the negotiated families (research R1, R3, R4). The configured families
 come from the three per-family summaries (`show ip bgp summary vrf all`, `show ipv6 bgp summary vrf
 all`, `show bgp evpn summary`): a peer is listed in a summary exactly when it is activated for that
-family, whatever its state (R2). No counter, timer or uptime is mapped (FR-007).
+family, whatever its state (R2). `show bgp peer-group` gives the dynamic marker, which the
+neighbour view does not print (R3, settled from the recordings). No counter, timer or uptime is
+mapped (FR-007).
 
 Three vendor-neutral schema attributes and one merge change in the parser (R5): `EmptyList` stores
 `[]` instead of dropping an empty list, `OnlyWith` keeps a field only on rows where another field
 holds a given value (the negotiated list and the peer router ID, only when `established`), `Set`
 sorts and deduplicates a list, and a merge now adds up the items of a list field instead of keeping
-the first. One pack format addition (R2): a recipe's `covers` key declares the families its
+the first, and a default on a field that is not a merge key now fills the merged row instead of
+each row before the merge (R5, found while implementing). One pack format addition (R2): a recipe's `covers` key declares the families its
 configured list covers, and the registry refuses a recipe whose steps do not produce exactly that
 set. `empty` comes only from the exact `% BGP inactive` answer or an empty peer list; any other
 error output is `parse_failed` (R8). A row that breaks a rule makes the observation `parse_failed`
@@ -57,7 +60,7 @@ fixtures from cEOS 4.36.0F.
 
 **Project Type**: single Go service with data packs.
 
-**Performance Goals**: no target. Four more `show` commands per EOS device. `show bgp neighbors vrf
+**Performance Goals**: no target. Five more `show` commands per EOS device. `show bgp neighbors vrf
 all` is about 120 lines per peer, so a few thousand lines on a large router; outputs are stored by
 content hash and change on every run because of their counters (the rows do not).
 
@@ -111,12 +114,15 @@ specs/010-bgp-peer-facts/
 internal/fact/fact.go              # bgp_peers, Field.EmptyList, OnlyWith and Set, their checks
 internal/parse/parse.go            # list merge, then the EmptyList, OnlyWith and Set pass
 internal/pack/registry.go          # Impl.Covers and its load check, missingCost entry
-internal/graph/                    # test: bgp_peers rows change neither graph nor verdict
+internal/graph/, internal/api/     # tests: bgp_peers rows change no projection; [] and absent served as stored
+internal/testutil/lab.go           # bgp_peers in NoRecipeFamilies (fakeos has no recipe for it)
 packs/arista_eos/recipes/          # bgp_peers.yaml
 packs/arista_eos/templates/        # show_bgp_neighbors_vrf_all, show_ip_bgp_summary_vrf_all,
-                                   # show_ipv6_bgp_summary_vrf_all, show_bgp_evpn_summary (.textfsm)
-packs/arista_eos/testdata/lab/     # sw1_*, sw2_*, sw4_*_empty, dc-leaf1_*, core1_* recordings, .yml,
-                                   # <switch>_bgp_peers.facts.yml
+                                   # show_ipv6_bgp_summary_vrf_all, show_bgp_evpn_summary,
+                                   # show_bgp_peer_group (.textfsm)
+packs/arista_eos/testdata/lab/     # sw1_*, sw2_*, sw4_*_empty, dc-leaf1_*, core1_*, dc-access1_*_empty
+                                   # recordings, the hand-written linklocal_* device,
+                                   # <switch>_bgp_peers.facts.yml (no .yml per recording)
 packs/packs_test.go                # password 7 pattern in TestNoSecretInRecordedOutput
 test/lab/sw1.cfg, sw2.cfg          # ip routing, SVI, loopbacks, router bgp
 test/lab/two-switch.clab.yaml      # topology comment
@@ -130,14 +136,14 @@ README.md, docs/how-to/write-a-pack.md
 ## Implementation order
 
 1. `test/lab` configuration (R10). On the `NetLab` VM: deploy, check the four sessions reach the
-   intended states, record the four step commands on sw1, sw2 and sw4, and on dc-leaf1 and core1 of
-   the EVPN lab. Settle the "to confirm" items of R1, R2, R3, R4, R7, R8 and R9 from the
+   intended states, record the five step commands on sw1, sw2 and sw4, and on dc-leaf1, core1 and
+   dc-access1 of the EVPN lab. Settle the "to confirm" items of R1, R2, R3, R4, R7, R8 and R9 from the
    recordings and update `research.md`.
 2. `internal/fact`: the `bgp_peers` schema, `EmptyList`, `OnlyWith`, `Set`, with tests.
 3. `internal/parse`: the list merge and the pass after the merge, with tests that tie on each side
    of absent against `[]`, steps in two orders, and rule breaches giving `parse_failed`.
    `internal/pack`: `covers` and its load check.
-4. Templates and recipe: the neighbours step, then the three summary steps, each with its `.yml`,
+4. Templates and recipe: the neighbour step, then the three summary steps and the peer-group step,
    then the `facts.yml` files, then the error outputs giving `parse_failed`.
 5. Secret pattern, graph test, `missingCost`, contract, README, write-a-pack guide, Bruno request.
 6. Quickstart sections 4 and 5 on the VM.

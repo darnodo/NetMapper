@@ -90,3 +90,52 @@ func TestVLANListForm(t *testing.T) {
 		}
 	}
 }
+
+// Feature 010: the negotiated list and the peer router ID exist only on an established row, [] is
+// a value and not an absent field, and both lists are sorted sets.
+func TestBGPPeers(t *testing.T) {
+	up := func(change func(map[string]any)) map[string]any {
+		r := map[string]any{
+			"vrf": "default", "peer_address": "10.0.10.2", "peer_as": int64(65102), "type": "ebgp",
+			"state": "established", "shutdown": "no", "dynamic": "no", "local_as": int64(65101),
+			"router_id":                   "10.255.0.1",
+			"configured_address_families": []string{"ipv4 unicast", "ipv6 unicast"},
+			"negotiated_address_families": []string{"ipv4 unicast"},
+			"peer_router_id":              "10.255.0.2",
+		}
+		if change != nil {
+			change(r)
+		}
+		return r
+	}
+	down := func(r map[string]any) {
+		r["state"] = "active"
+		delete(r, "negotiated_address_families")
+		delete(r, "peer_router_id")
+	}
+	for _, c := range []struct {
+		name string
+		row  map[string]any
+		ok   bool
+	}{
+		{"established", up(nil), true},
+		{"established, nothing negotiated", up(func(r map[string]any) { r["negotiated_address_families"] = []string{} }), true},
+		{"established, negotiated missing", up(func(r map[string]any) { delete(r, "negotiated_address_families") }), false},
+		{"established, no peer router ID", up(func(r map[string]any) { delete(r, "peer_router_id") }), true},
+		{"not established", up(down), true},
+		{"not established, negotiated []", up(func(r map[string]any) { down(r); r["negotiated_address_families"] = []string{} }), false},
+		{"not established, peer router ID", up(func(r map[string]any) { down(r); r["peer_router_id"] = "10.255.0.2" }), false},
+		{"configured []", up(func(r map[string]any) { r["configured_address_families"] = []string{} }), true},
+		{"configured missing", up(func(r map[string]any) { delete(r, "configured_address_families") }), false},
+		{"unsorted", up(func(r map[string]any) { r["configured_address_families"] = []string{"l2vpn evpn", "ipv4 unicast"} }), false},
+		{"duplicate", up(func(r map[string]any) { r["negotiated_address_families"] = []string{"ipv4 unicast", "ipv4 unicast"} }), false},
+		{"device state word", up(func(r map[string]any) { r["state"] = "Established" }), false},
+		{"device link word", up(func(r map[string]any) { r["type"] = "external" }), false},
+		{"boolean shutdown", up(func(r map[string]any) { r["shutdown"] = "true" }), false},
+	} {
+		err := Validate("bgp_peers", []map[string]any{c.row})
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err %v, want ok=%v", c.name, err, c.ok)
+		}
+	}
+}

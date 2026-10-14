@@ -1,0 +1,12 @@
+Value Filldown KIND (Static|Dynamic)
+Value Filldown VRF (\S+)
+Value Required NEIGHBOR (\S+)
+
+# Static and dynamic members of each peer group (feature 010, research R3): the neighbour view has
+# no dynamic marker. Static members are recorded too, so a device whose groups have only static
+# members still yields rows.
+Start
+  ^BGP peer-group is -> Clearall
+  ^\s+${KIND} peer-group members:$$
+  ^\s+VRF ${VRF}:$$
+  ^\s+${NEIGHBOR}, state: \S+$$ -> Record

@@ -1,0 +1,10 @@
+Value Filldown VRF (\S+)
+Value Required NEIGHBOR (\d+\.\d+\.\d+\.\d+|[0-9a-fA-F]*:[0-9a-fA-F:.]+(?:%\S+)?)
+
+# A peer is listed here exactly when it is activated for this family, in any state (feature 010,
+# research R2). When a peer of the device has a description, a Description column comes first, so
+# the neighbour is found as the address before the BGP version and the AS. Only the address is read.
+# A link-local peer keeps its zone (fe80::1%Et1), as the neighbour view prints it.
+Start
+  ^BGP summary information for VRF ${VRF}$$
+  ^\s+(.*\s)?${NEIGHBOR}\s+4\s+\d+\s+\d+\s+\d+ -> Record

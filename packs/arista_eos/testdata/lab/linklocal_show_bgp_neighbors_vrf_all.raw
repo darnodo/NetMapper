@@ -1,0 +1,38 @@
+BGP neighbor is 2001:db8::2, remote AS 65102, external link
+  BGP version 4, remote router ID 10.255.0.2, VRF default
+  Last read 00:00:12, last write 00:00:12
+  Hold time is 180, keepalive interval is 60 seconds
+  BGP state is Established, up for 00:10:02
+  Number of transitions to established: 1
+  Neighbor Capabilities:
+    Multiprotocol IPv6 Unicast: advertised and received and negotiated
+    Four Octet ASN: advertised and received and negotiated
+    Route Refresh: advertised and received and negotiated
+  Message Statistics:
+                                  Sent      Rcvd
+    Opens:                           1         1
+    Updates:                         2         2
+Local AS is 65101, local router ID 10.255.0.1
+TTL is 1
+Local TCP address is 2001:db8::1, local port is 179
+Remote TCP address is 2001:db8::2, remote port is 40213
+  TCP state is ESTABLISHED
+BGP neighbor is fe80::1%Et1, remote AS 65103, external link
+  BGP version 4, remote router ID 10.255.0.3, VRF default
+  Last read 00:00:08, last write 00:00:08
+  Hold time is 180, keepalive interval is 60 seconds
+  BGP state is Established, up for 00:09:58
+  Number of transitions to established: 1
+  Neighbor Capabilities:
+    Multiprotocol IPv6 Unicast: advertised and received and negotiated
+    Four Octet ASN: advertised and received and negotiated
+    Route Refresh: advertised and received and negotiated
+  Message Statistics:
+                                  Sent      Rcvd
+    Opens:                           1         1
+    Updates:                         2         2
+Local AS is 65101, local router ID 10.255.0.1
+TTL is 1
+Local TCP address is fe80::2%Et1, local port is 179
+Remote TCP address is fe80::1%Et1, remote port is 51022
+  TCP state is ESTABLISHED

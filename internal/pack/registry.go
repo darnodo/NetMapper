@@ -89,6 +89,9 @@ type Impl struct {
 	Defaults map[string]string `yaml:"defaults"`
 	// Split turns a field's mapped string into an ordered list, cut on the separator given.
 	Split map[string]string `yaml:"split"`
+	// Covers lists, per list field, the values the steps can put there, so a reader knows what an
+	// empty list covers (feature 010). It must equal the literal values the maps give that field.
+	Covers map[string][]string `yaml:"covers"`
 }
 
 type Step struct {
@@ -135,6 +138,7 @@ var missingCost = map[string]string{
 	"management_servers": noManagement,
 	"vlans":              noVLANs,
 	"interface_vlans":    noVLANs,
+	"bgp_peers":          "no BGP sessions for these devices",
 }
 
 const (
@@ -320,12 +324,36 @@ func loadPack(dir string) (*Pack, error) {
 					fail("%s: split separator for %q is empty", where, field)
 				}
 			}
+			for field, declared := range im.Covers {
+				if f, ok := fact.Lookup(family, field); !ok || f.Type != fact.Strings {
+					fail("%s: covers field %q is not a list field of %s", where, field, family)
+					continue
+				}
+				var mapped []string
+				for _, m := range append([]map[string]string{im.Map}, stepMaps(im)...) {
+					if lit, ok := strings.CutPrefix(m[field], "="); ok && !slices.Contains(mapped, lit) {
+						mapped = append(mapped, lit)
+					}
+				}
+				slices.Sort(mapped)
+				if want := slices.Sorted(slices.Values(declared)); !slices.Equal(mapped, want) {
+					fail("%s: covers %s %v, but the steps map %v", where, field, want, mapped)
+				}
+			}
 			if _, err := parseConstraint(im.Versions); err != nil {
 				fail("%s: %v", where, err)
 			}
 		}
 	}
 	return p, errors.Join(errs...)
+}
+
+func stepMaps(im Impl) []map[string]string {
+	var ms []map[string]string
+	for _, s := range im.Steps {
+		ms = append(ms, s.Map)
+	}
+	return ms
 }
 
 func readYAML(path string, v any) error {

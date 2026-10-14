@@ -42,6 +42,11 @@ When two rows merge on `merge_on` and both carry a `strings` field, the later ro
 appended to the earlier row's, skipping those already there. Before this feature the later value
 was dropped; no recipe merged a list field, so no existing family changes (research R5).
 
+A default on a `merge_on` field still fills each row before the merge, so rows join on it. Any
+other default now fills the merged row: before, step 1's row carried `dynamic: no` from the default
+and the peer-group step's `dynamic: yes` was dropped by the merge. Without `merge_on` the result is
+the same as before.
+
 ## `bgp_peers`
 
 One row per BGP peer per VRF.

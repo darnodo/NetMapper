@@ -1,0 +1,8 @@
+# What the bgp_peers recipe must produce from the dc-leaf1 recordings (EVPN lab): eBGP underlay, iBGP to the MLAG peer, EVPN overlay.
+status: collected
+rows:
+  - {"configured_address_families":["ipv4 unicast"],"dynamic":"no","local_as":65001,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.0.1.0","peer_as":65000,"peer_group":"underlay","peer_router_id":"10.0.250.1","router_id":"10.0.250.11","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["ipv4 unicast"],"dynamic":"no","local_as":65001,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.0.2.0","peer_as":65000,"peer_group":"underlay","peer_router_id":"10.0.250.2","router_id":"10.0.250.11","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["ipv4 unicast"],"dynamic":"no","local_as":65001,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.0.3.1","peer_as":65001,"peer_group":"underlay_ibgp","peer_router_id":"10.0.250.12","router_id":"10.0.250.11","shutdown":"no","state":"established","type":"ibgp","vrf":"default"}
+  - {"configured_address_families":["l2vpn evpn"],"dynamic":"no","local_as":65001,"negotiated_address_families":["l2vpn evpn"],"peer_address":"10.0.250.1","peer_as":65000,"peer_group":"evpn","peer_router_id":"10.0.250.1","router_id":"10.0.250.11","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["l2vpn evpn"],"dynamic":"no","local_as":65001,"negotiated_address_families":["l2vpn evpn"],"peer_address":"10.0.250.2","peer_as":65000,"peer_group":"evpn","peer_router_id":"10.0.250.2","router_id":"10.0.250.11","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}

@@ -115,8 +115,8 @@ A recipe says how to collect one fact family. The families and their fields are 
 platform-neutral, listed in [fact-families.md](../../specs/001-crawl-loop/contracts/fact-families.md):
 `neighbours` and `interfaces` for the graph, six management families that describe the device
 itself (`snmp`, `aaa_servers`, `local_users`, `management_apis`, `aaa_methods`,
-`management_servers`), and two layer 2 families (`vlans`, `interface_vlans`). `identity` comes from
-the fingerprint and identifiers above.
+`management_servers`), two layer 2 families (`vlans`, `interface_vlans`) and one routing family
+(`bgp_peers`). `identity` comes from the fingerprint and identifiers above.
 
 Every recipe is optional: a pack only has to fingerprint its platform. What a missing recipe costs:
 
@@ -126,6 +126,7 @@ Every recipe is optional: a pack only has to fingerprint its platform. What a mi
 | `interfaces` | Only ports named by a neighbour exist, with no description, state, speed or MTU. |
 | the six management families | No management inventory for these devices: no SNMP access, AAA servers, accounts, management APIs, method lists or NTP, syslog and DNS servers. The graph is unaffected. |
 | `vlans`, `interface_vlans` | No VLAN data for these devices: no declared VLANs, access ports, trunks or port-channel members. Once L2 domains are built (#37), these devices will join none. |
+| `bgp_peers` | No BGP sessions for these devices: no peers, states or address families. The graph is unaffected. |
 
 NetMapper logs a warning when it loads the packs, once for each family a pack has no recipe for,
 and each device gets an observation `unsupported` with detail `no_recipe` for it. A recipe whose
@@ -160,7 +161,9 @@ implementations:                     # the first one whose version and transport
   that yields no row is `parse_failed`, which shows up as a finding instead of passing silently.
 - A family with several commands uses several steps and `merge_on` to join rows on key fields.
   Rows of the same step that share the key merge too: `show tacacs` lists a server, then the same
-  server again as a member of its group, and the two become one row.
+  server again as a member of its group, and the two become one row. A single value keeps the
+  first row's; a list adds up the items of every row, so `bgp_peers` gets one configured address
+  family from each family summary step.
 - A step can carry its own `map`, merged over the implementation's for the rows of that step. It is
   how one family gives each command its literal:
 
@@ -175,7 +178,9 @@ implementations:                     # the first one whose version and transport
   ```
 
 - `defaults` sets a field when a row has no value for it, after `map` and `values`:
-  `defaults: { vrf: default }`. The value must be valid for the field.
+  `defaults: { vrf: default }`. The value must be valid for the field. A default on a `merge_on`
+  field fills each row before the merge, so rows join on it; any other default fills the merged
+  row, so a later step's value (`dynamic: yes` from a peer-group step) is not hidden by it.
 - `split` cuts a mapped string into a list, for a list field such as `methods`:
   `split: { methods: ', ' }`. A TextFSM `List` value already gives a list. `values` applies to each
   item of a list.
@@ -185,6 +190,14 @@ implementations:                     # the first one whose version and transport
   per item. Use `values` for the device's words: `{ All: 1-4094, None: '' }` on EOS. A token that is
   not a VLAN ID or range makes the observation `parse_failed`. VLAN IDs (`vlan_id`, `access_vlan`,
   `native_vlan`) must be 1 to 4094.
+- `covers` declares, per list field, the values the steps can put there, when a list holds only
+  what the pack reads: `covers: { configured_address_families: [ipv4 unicast, ipv6 unicast, l2vpn evpn] }`
+  on `bgp_peers`. It must equal the `=` literals the steps map into that field, or the pack is
+  refused. A reader learns from it what an empty list covers.
+- Some list fields follow schema rules the parser applies, so a pack maps only what the device
+  prints: the two `bgp_peers` address family lists are stored as `[]` when empty, sorted, and the
+  negotiated one (like `peer_router_id`) is kept only when `state` is `established`, even when the
+  device still prints the last session's values.
 - **No command may print a secret.** Every output is stored as evidence and served by the API: a
   community string, a server key or a password hash in it is a secret in the database. Use a
   command that does not print it, or the platform's sanitized configuration (`show running-config

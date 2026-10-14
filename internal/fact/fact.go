@@ -29,6 +29,15 @@ type Field struct {
 	VLANList bool
 	// VLANID: an int field holding one VLAN ID, 1 to 4094 (feature 008).
 	VLANID bool
+	// EmptyList: a strings field stored as [] when it has no item, instead of left out (feature
+	// 010). The exception to the empty-set rule of feature 008: here [] means "none", absent "unknown".
+	EmptyList bool
+	// Set: a strings field whose order means nothing. The parser sorts it and drops duplicates, so
+	// the order of steps or of output lines never changes a row (feature 010).
+	Set bool
+	// OnlyWith: the field is present exactly when the field OnlyWith[0] holds OnlyWith[1], such as
+	// {"state", "established"} (feature 010).
+	OnlyWith [2]string
 }
 
 var Families = map[string][]Field{
@@ -120,7 +129,30 @@ var Families = map[string][]Field{
 		{Name: "active_vlans", Type: Strings, VLANList: true},
 		{Name: "channel", Type: String, Canonical: true}, // member rows only: the port-channel
 	},
+	// The routing families (feature 010): the engine reads none of them, and no routing peer
+	// queues a find. One row per BGP peer per VRF. No counter, timer or uptime: two collections of
+	// an unchanged network give the same rows.
+	"bgp_peers": {
+		{Name: "vrf", Type: String, Required: true},
+		{Name: "peer_address", Type: String, Required: true},
+		{Name: "peer_as", Type: Int, Required: true},
+		{Name: "type", Type: String, Required: true, Enum: []string{"ebgp", "ibgp"}},
+		{Name: "state", Type: String, Required: true, Enum: []string{"idle", "connect", "active", "opensent", "openconfirm", "established", "other"}},
+		{Name: "shutdown", Type: String, Required: true, Enum: []string{"yes", "no"}}, // shut by configuration
+		{Name: "dynamic", Type: String, Required: true, Enum: []string{"yes", "no"}},  // accepted from a listen range
+		{Name: "local_as", Type: Int, Required: true},
+		{Name: "router_id", Type: String, Required: true},
+		// Only the families the recipe covers (its covers key); [] means none of them.
+		{Name: "configured_address_families", Type: Strings, Required: true, EmptyList: true, Set: true},
+		// Absent when the session is not established, [] when it is and nothing was negotiated.
+		{Name: "negotiated_address_families", Type: Strings, EmptyList: true, Set: true, OnlyWith: established},
+		{Name: "peer_router_id", Type: String, OnlyWith: established}, // learned from the peer
+		{Name: "peer_group", Type: String},
+		{Name: "description", Type: String},
+	},
 }
+
+var established = [2]string{"state", "established"}
 
 // Lookup returns the schema of one field.
 func Lookup(family, name string) (Field, bool) {
@@ -155,6 +187,15 @@ func Validate(family string, rows []map[string]any) error {
 			if _, typed := row[f.TypedBy]; ok && f.TypedBy != "" && !typed {
 				return fmt.Errorf("%s row %d: %q needs %q beside it", family, i, f.Name, f.TypedBy)
 			}
+			if f.OnlyWith[0] != "" {
+				holds := row[f.OnlyWith[0]] == f.OnlyWith[1]
+				if ok && !holds {
+					return fmt.Errorf("%s row %d: %q is only allowed when %s is %s", family, i, f.Name, f.OnlyWith[0], f.OnlyWith[1])
+				}
+				if !ok && holds && f.EmptyList {
+					return fmt.Errorf("%s row %d: %q is required when %s is %s", family, i, f.Name, f.OnlyWith[0], f.OnlyWith[1])
+				}
+			}
 		}
 	}
 	return nil
@@ -183,11 +224,24 @@ func check(f Field, v any) error {
 		if ok && f.VLANList && !isVLANList(l) {
 			return fmt.Errorf("field %q: %v is not sorted, merged VLAN ranges (1 to 4094)", f.Name, l)
 		}
+		if ok && f.Set && !isSet(l) {
+			return fmt.Errorf("field %q: %v is not sorted with no duplicate", f.Name, l)
+		}
 	}
 	if !ok {
 		return fmt.Errorf("field %q: %v (%T) is not a valid %s", f.Name, v, v, f.Type)
 	}
 	return nil
+}
+
+// isSet reports whether items are sorted ascending with no duplicate.
+func isSet(items []string) bool {
+	for i := 1; i < len(items); i++ {
+		if items[i-1] >= items[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // isVLANList reports whether items are VLAN ranges in their one normal form: each N or lo-hi with

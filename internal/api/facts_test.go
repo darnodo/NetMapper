@@ -92,3 +92,33 @@ func exec(t *testing.T, db *pgxpool.Pool, sql string) {
 		t.Fatal(err)
 	}
 }
+
+// Feature 010, FR-016 and FR-005a: an empty list and an absent one are served as stored, so a
+// reader can tell "established, nothing negotiated" from "not established".
+func TestBGPEmptyAndAbsentLists(t *testing.T) {
+	l := standard(t)
+	c := newClient(t, l)
+	exec(t, l.DB, `UPDATE observation SET status = 'collected', detail = NULL, parsed = '[
+	  {"vrf": "default", "peer_address": "10.0.10.2", "peer_as": 65102, "type": "ebgp",
+	   "state": "established", "shutdown": "no", "dynamic": "no", "local_as": 65101,
+	   "router_id": "10.255.0.1", "configured_address_families": [], "negotiated_address_families": []},
+	  {"vrf": "default", "peer_address": "10.255.0.2", "peer_as": 65199, "type": "ebgp",
+	   "state": "connect", "shutdown": "no", "dynamic": "no", "local_as": 65101,
+	   "router_id": "10.255.0.1", "configured_address_families": ["ipv4 unicast"]}]'
+	  WHERE fact_family = 'bgp_peers' AND host(target) = '10.0.0.1'`)
+	out := c.json("/v1/devices/sw1/facts/bgp_peers", http.StatusOK)
+	rows := list(out["observations"])[0]["rows"].([]any)
+	if len(rows) != 2 {
+		t.Fatalf("rows: %v", rows)
+	}
+	up, down := rows[0].(map[string]any), rows[1].(map[string]any)
+	if neg, ok := up["negotiated_address_families"].([]any); !ok || len(neg) != 0 {
+		t.Errorf("established row: negotiated %#v, want []", up["negotiated_address_families"])
+	}
+	if conf, ok := up["configured_address_families"].([]any); !ok || len(conf) != 0 {
+		t.Errorf("established row: configured %#v, want []", up["configured_address_families"])
+	}
+	if _, ok := down["negotiated_address_families"]; ok {
+		t.Errorf("row not established has a negotiated list: %v", down)
+	}
+}

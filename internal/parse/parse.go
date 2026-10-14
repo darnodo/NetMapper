@@ -67,10 +67,43 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 	if empty {
 		return Empty, nil, nil
 	}
+	for _, row := range rows {
+		for field, v := range im.Defaults {
+			if _, set := row[field]; !set {
+				row[field] = v
+			}
+		}
+	}
+	settle(family, rows)
 	if err := fact.Validate(family, rows); err != nil {
 		return ParseFailed, nil, err
 	}
 	return Collected, rows, nil
+}
+
+// settle applies the schema's row rules once every step is merged (feature 010): an OnlyWith field
+// is dropped where its condition does not hold (a device may still print the last session's
+// values), an EmptyList field with no item becomes [], and a Set field is sorted and deduplicated.
+// It removes nothing else: a row still breaking a rule fails Validate, and the whole observation
+// is parse_failed.
+func settle(family string, rows []map[string]any) {
+	for _, row := range rows {
+		for _, f := range fact.Families[family] {
+			holds := f.OnlyWith[0] == "" || row[f.OnlyWith[0]] == f.OnlyWith[1]
+			if !holds {
+				delete(row, f.Name)
+				continue
+			}
+			if _, ok := row[f.Name]; !ok && f.EmptyList {
+				row[f.Name] = []string{}
+			}
+			if l, ok := row[f.Name].([]string); ok && f.Set {
+				l = slices.Clone(l)
+				slices.Sort(l)
+				row[f.Name] = slices.Compact(l)
+			}
+		}
+	}
 }
 
 // nothing reports whether out says there is nothing to report: it is blank, or every non-blank
@@ -132,8 +165,9 @@ func walkRows(out []byte, m map[string]string) ([]map[string]any, error) {
 
 // mapRow builds one fact row from one template row, with m the step's effective map. A list field
 // keeps a template List as a list and cuts a string on its split separator; values translate each
-// item, and a VLAN list is then normalised (feature 008). Defaults fill the fields still absent at
-// the end.
+// item, and a VLAN list is then normalised (feature 008). A default on a merge_on field fills the
+// row here, so rows join on it; every other default fills the merged row in Parse, so a later step's
+// value is not shadowed by an earlier row's default (feature 010).
 func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, m map[string]string, raw map[string]any) (map[string]any, error) {
 	row := map[string]any{}
 	for field, src := range m {
@@ -205,7 +239,7 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, m map[str
 		}
 	}
 	for field, v := range im.Defaults {
-		if _, set := row[field]; !set {
+		if _, set := row[field]; !set && slices.Contains(im.MergeOn, field) {
 			row[field] = v
 		}
 	}
@@ -229,7 +263,8 @@ func translate(tr map[string]string, s string) (string, bool) {
 }
 
 // merge adds rows to the rows so far, joining on the merge_on fields: rows of a later step, and
-// rows of the same step that share a key.
+// rows of the same step that share a key. A scalar keeps its first value; a list adds up the items
+// it does not hold yet (feature 010: one family per summary step).
 func merge(rows, more []map[string]any, on []string) []map[string]any {
 	if len(on) == 0 {
 		return append(rows, more...)
@@ -248,8 +283,20 @@ func merge(rows, more []map[string]any, on []string) []map[string]any {
 	for _, r := range more {
 		if into, ok := index[key(r)]; ok {
 			for k, v := range r {
-				if _, set := into[k]; !set {
+				old, set := into[k]
+				if !set {
 					into[k] = v
+					continue
+				}
+				if l, ok := old.([]string); ok {
+					if more, ok := v.([]string); ok {
+						for _, it := range more {
+							if !slices.Contains(l, it) {
+								l = append(l, it)
+							}
+						}
+						into[k] = l
+					}
 				}
 			}
 			continue
