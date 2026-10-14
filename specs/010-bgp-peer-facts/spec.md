@@ -26,6 +26,11 @@ changes, but it is a status, not volatile data, so it is collected."
   that an empty set is an absent field, and the fact families contract says so for this family. A
   family configured but not negotiated on an established session is a capability mismatch, visible
   on the row itself, with no stored mismatch field.
+- **The configured list covers a declared set of families.** Added at plan review. A device may
+  not print per peer which families are configured, and a pack may read only some of them. Each
+  recipe declares the families its configured list covers; an empty list means "none of those",
+  not "carries nothing". Both lists are sorted and hold no duplicate, so the order commands run in
+  never shows up as a difference between two runs.
 - **Dynamic peers are rows, marked as dynamic.** Added by clarification. A peer accepted from a
   listen range is a live adjacency, so it is recorded like a configured peer, with a marker saying
   it is dynamic. The marker tells a later diff that its disappearance is a state change, not a
@@ -72,14 +77,27 @@ changes, but it is a status, not volatile data, so it is collected."
   dynamic. A dynamic peer is a live adjacency; the marker tells the diff that its disappearance is a
   state change, not a configuration change.
 
+### Plan review 2026-10-14
+
+- The configured list covers only the families the recipe reads, and the recipe declares that set.
+- The summaries the configured list comes from run across every VRF; core1's sessions in VRF `gold`
+  carry their configured families.
+- `empty` comes only from the device's exact "BGP not running" output. A denied command or any other
+  error is `parse_failed`.
+- Both lists are deduplicated and sorted.
+- A row that breaks the rules of FR-005a never disappears silently: the observation is
+  `parse_failed` and a finding records why.
+- Update source is removed from FR-006 and story 1 (agreed).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - See the BGP sessions of a device (Priority: P1)
 
 An operator crawls an Arista network. For each device, NetMapper now records its BGP sessions: in
 which VRF, the local AS and router ID, the peer's address and AS, whether the session is eBGP or
-iBGP, its state, which address families it carries, and the configured peer group, description
-and update source. The EVPN overlay sessions are among them.
+iBGP, its state, which address families it carries, and the configured peer group and
+description. The EVPN overlay sessions are among them. (Update source was dropped during planning,
+research R6.)
 
 **Why this priority**: "what does this device peer with, and is it up" is the first question when
 tracing a path or checking a migration. It is the reason for the feature.
@@ -96,8 +114,9 @@ Then run the template tests with the lab stopped: they pass from the recorded fi
    as both configured and negotiated address family, and the peer group from the configuration.
 2. **Given** the same leaf with EVPN sessions to the spines' loopbacks, **When** a crawl runs,
    **Then** each has a row with `l2vpn evpn` configured and negotiated.
-3. **Given** a device with BGP sessions in a VRF other than `default`, **When** a crawl runs,
-   **Then** each row names its VRF, and the local AS and router ID are those of that VRF.
+3. **Given** a device with BGP sessions in a VRF other than `default` (core1, VRF `gold`), **When**
+   a crawl runs, **Then** each row names its VRF, the local AS and router ID are those of that VRF,
+   and its configured families are recorded as for a session in `default`.
 4. **Given** a crawl run twice a few minutes apart with traffic flowing and no change to the
    network, **When** the two observations are compared, **Then** their rows are identical.
 
@@ -152,7 +171,10 @@ and check the observation is `empty`, and that a device of another platform give
    `empty`.
 2. **Given** an output the template does not understand, **When** a crawl runs, **Then** the
    observation is `parse_failed`, never `empty`.
-3. **Given** a device of another platform, **When** a crawl runs, **Then** `bgp_peers` is
+3. **Given** a command the device refuses (authorization denied, invalid input) or any error line
+   other than the exact "BGP not running" one, **When** a crawl runs, **Then** the observation is
+   `parse_failed` with a finding, never `empty`.
+4. **Given** a device of another platform, **When** a crawl runs, **Then** `bgp_peers` is
    `unsupported` with detail `no_recipe`, and the snapshot verdict is unchanged.
 
 ---
@@ -165,6 +187,9 @@ and check the observation is `empty`, and that a device of another platform give
   families.
 - A session carrying several address families (for example `ipv4 unicast` and `l2vpn evpn` on one
   peer): one row, with both in each list.
+- A peer activated only for a family the recipe does not cover (for example VPN-IPv4, labeled
+  unicast, flowspec): its configured list is empty, which reads "none of the covered families",
+  and the family can still appear in its negotiated list. Covering it is a new recipe step later.
 - A family negotiated but not configured locally: not expected, since a speaker only negotiates
   what it is configured for. If a device prints it, it is recorded as printed in the negotiated
   list.
@@ -175,11 +200,11 @@ and check the observation is `empty`, and that a device of another platform give
 - A peer with no family configured explicitly, relying on the device's default (on most platforms
   `ipv4 unicast`): the configured list holds the family in effect for that peer, not an empty list.
 - The same peer address in two VRFs: two rows, told apart by VRF.
-- A peer that inherits its AS, description or update source from a peer group: the row records the
+- A peer that inherits its AS or description from a peer group: the row records the
   value in effect for that peer, and names the peer group.
 - A session that flaps between two crawls: each observation records the state seen at collection
   time. How often a session flaps is telemetry, not recorded.
-- A peer configured with no description, peer group or update source: those fields are absent.
+- A peer configured with no description or peer group: those fields are absent.
 - A peer accepted from a listen range (dynamic peer) rather than configured one by one: a row like
   any other, marked as dynamic. When it disconnects it is no longer listed and has no row in the
   next observation; the marker on its last row says that was a state change.
@@ -219,17 +244,33 @@ and check the observation is `empty`, and that a device of another platform give
   list and not in the negotiated list of an established session is a capability mismatch. It MUST
   be readable from the row alone, by comparing its two lists, with no other family or device
   needed, and is not stored as a field of its own. The pack MUST NOT infer one list from the other.
+  A row that breaks these rules MUST NOT be dropped silently: the observation is `parse_failed`
+  and a finding records the reason.
+- **FR-005c**: The configured list MUST cover only the families the recipe reads, and each recipe
+  MUST declare that set, so an empty or partial list can be read against it. A recipe whose steps
+  produce a family outside its declared set, or declare a family no step produces, MUST be refused
+  when the pack loads.
+- **FR-005d**: Both lists MUST be sorted and hold no duplicate, whatever the order of commands or of
+  the device's output.
 - **FR-005b**: Every row MUST say whether the peer is dynamic (accepted from a listen range) or
   configured one by one. Dynamic peers MUST be recorded, not filtered out.
-- **FR-006**: A row MUST carry, when known, the peer's router ID, the peer group, the description and
-  the update source. A field the device does not report is absent, never empty or zero.
+- **FR-006**: A row MUST carry, when known, the peer's router ID, the peer group and the
+  description. A field the device does not report is absent, never empty or zero. The peer's router
+  ID is learned from the peer and follows the negotiated list's rule: absent when the session is
+  not `established`. (Amended during planning, research R6: the configured update source is not
+  printed by the device's peer view, only in its configuration, usually through a peer group; it is
+  left for a later change.)
 - **FR-007**: A row MUST NOT carry uptime, message, queue or prefix counts, timers, or last-reset
   details. Two crawls of an unchanged network MUST give the same rows.
 - **FR-008**: No configured BGP password MUST appear in any recorded output. The recipe MUST use
   commands that do not print it, and the existing secret check MUST cover the BGP password of
   `test/lab`.
-- **FR-009**: A device with no BGP peer MUST produce an `empty` observation; an output the template
-  does not understand MUST produce `parse_failed`.
+- **FR-009**: A device with no BGP peer MUST produce an `empty` observation, not a `collected` one
+  with no row. `empty` MUST come only from outputs the pack declares as "nothing here": the
+  device's exact "BGP not running" answer, or a peer list with no peer. A refused command, an
+  invalid command or any other error output MUST produce `parse_failed`, so a later diff never
+  reads an error as sessions that disappeared. An output the template does not understand MUST
+  produce `parse_failed`.
 - **FR-010**: The Arista EOS pack MUST provide a recipe for the new family; no other pack changes.
   Commands MUST be read only (constitution IV).
 - **FR-011**: The schema of the new family MUST be published in the fact families contract in the
@@ -243,7 +284,8 @@ and check the observation is `empty`, and that a device of another platform give
   cases) MUST keep working.
 - **FR-013**: Every row type of stories 1 and 2 (underlay eBGP, iBGP, EVPN overlay, a non-default
   VRF, an IPv6 session if a lab has one, an established session with a password, a session not up,
-  a session shut down, an established session with a capability mismatch, a dynamic peer) and the `empty` case MUST be covered by a template test against output
+  a session shut down, an established session with a capability mismatch, a dynamic peer), the
+  `empty` case and an error output giving `parse_failed` MUST be covered by a test against output
   recorded from `test/lab` or arista-evpn-vxlan-clab, runnable with no lab deployed.
 - **FR-014**: The configuration added to `test/lab` and the way to record fixtures from it MUST be
   documented in the same change (topology comments and the feature quickstart).
