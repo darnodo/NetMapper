@@ -3,6 +3,7 @@ package fake
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"slices"
 	"strings"
@@ -20,6 +21,8 @@ type Device struct {
 	Block      map[string]bool   // command blocks until its context ends
 	Stall      map[string]bool   // command stops sending: ErrIdleTimeout
 	Overrun    map[string]bool   // command outlives its deadline: ErrDeadline
+	Drop       map[string]bool   // command fails mid-output: the session dropped
+	NoPrompt   bool              // the CLI never prints a prompt after login: Open gives ErrIdleTimeout
 }
 
 type Open struct {
@@ -70,6 +73,9 @@ func (t *tr) Open(ctx context.Context, target transport.Target, cred transport.C
 	if slices.Contains(d.Reject, cred.Set) {
 		return nil, &transport.AuthError{Evidence: []byte(d.Evidence)}
 	}
+	if d.NoPrompt && t.name == "ssh" {
+		return nil, transport.ErrIdleTimeout // as the SSH transport does (TestOpenSlowCLI)
+	}
 	return &session{t, target.Addr, d}, nil
 }
 
@@ -98,6 +104,8 @@ func (s *session) Run(ctx context.Context, step transport.Step) (transport.RawOu
 		return transport.RawOutput{}, transport.ErrIdleTimeout
 	case s.d.Overrun[c]:
 		return transport.RawOutput{}, transport.ErrDeadline
+	case s.d.Drop[c]:
+		return transport.RawOutput{}, errors.New("session dropped")
 	}
 	return transport.RawOutput{Bytes: []byte(s.d.CLI[step.Command])}, nil
 }

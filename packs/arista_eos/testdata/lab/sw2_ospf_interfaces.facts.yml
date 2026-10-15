@@ -1,0 +1,8 @@
+# What the ospf_interfaces recipe must produce from the sw2 recordings. sw2 (test/lab/sw2.cfg): the mirror of sw1, sw2 DR on the broadcast segments.
+status: collected
+rows:
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"none","cost":10,"dr_router_id":"10.255.0.2","instance":"1","interface":"Loopback0","network_type":"broadcast","passive":"yes","router_id":"10.255.0.2","state":"dr","vrf":"default"}
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"message_digest","bdr_router_id":"10.255.0.1","cost":10,"dr_router_id":"10.255.0.2","instance":"1","interface":"Vlan41","network_type":"broadcast","passive":"no","router_id":"10.255.0.2","state":"dr","vrf":"default"}
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"none","bdr_router_id":"10.255.0.1","cost":10,"dr_router_id":"10.255.0.2","instance":"1","interface":"Vlan44","network_type":"broadcast","passive":"no","router_id":"10.255.0.2","state":"dr","vrf":"default"}
+  - {"area":"0.0.0.1","area_type":"stub","auth_type":"none","cost":10,"instance":"1","interface":"Vlan42","network_type":"point_to_point","passive":"no","router_id":"10.255.0.2","state":"point_to_point","vrf":"default"}
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"message_digest","bdr_router_id":"10.255.2.1","cost":10,"dr_router_id":"10.255.2.2","instance":"2","interface":"Vlan43","network_type":"broadcast","passive":"no","router_id":"10.255.2.2","state":"dr","vrf":"blue"}

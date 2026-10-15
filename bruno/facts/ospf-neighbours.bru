@@ -1,0 +1,15 @@
+meta {
+  name: ospf-neighbours
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/ospf_neighbours
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}

@@ -1,0 +1,47 @@
+Neighbor 10.255.0.2, instance 1, VRF default, interface address 10.0.41.2
+  In area 0.0.0.0 interface Vlan41
+  Neighbor priority is 1, State is FULL, 7 state changes
+  Adjacency was established 00:01:17 ago
+  Current state was established 00:01:17 ago
+  DR IP Address 10.0.41.2 BDR IP Address 10.0.41.1
+  Options is E
+  Dead timer is due in 00:00:34
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 0 times to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0
+Neighbor 10.255.0.2, instance 1, VRF default, interface address 10.0.44.2
+  In area 0.0.0.0 interface Vlan44
+  Neighbor priority is 1, State is EXCHANGE, 5 state changes
+  Current state was established 00:00:17 ago
+  DR IP Address 10.0.44.2 BDR IP Address 10.0.44.1
+  Options is E
+  Dead timer is due in 00:00:29
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 0 times to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0
+Neighbor 10.255.0.2, instance 1, VRF default, interface address 10.0.42.2
+  In area 0.0.0.1 interface Vlan42
+  Neighbor priority is 0, State is FULL, 7 state changes
+  Adjacency was established 00:01:54 ago
+  Current state was established 00:01:54 ago
+  DR IP Address 0.0.0.0 BDR IP Address 0.0.0.0
+  Options is (null)
+  Dead timer is due in 00:00:37
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 0 times to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0
+Neighbor 10.255.2.2, instance 2, VRF blue, interface address 10.0.43.2
+  In area 0.0.0.0 interface Vlan43
+  Neighbor priority is 1, State is FULL, 7 state changes
+  Adjacency was established 00:01:17 ago
+  Current state was established 00:01:17 ago
+  DR IP Address 10.0.43.2 BDR IP Address 10.0.43.1
+  Options is E
+  Dead timer is due in 00:00:34
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 0 times to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0

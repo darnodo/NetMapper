@@ -38,6 +38,12 @@ type Field struct {
 	// OnlyWith: the field is present exactly when the field OnlyWith[0] holds OnlyWith[1], such as
 	// {"state", "established"} (feature 010).
 	OnlyWith [2]string
+	// Missing: the value the parser sets when no step gives the field, such as "unknown"; the
+	// field must also be Required (feature 011).
+	Missing string
+	// DottedID: a 32-bit ID in dotted form; the parser converts a plain integer from 0 to
+	// 4294967295 (1 becomes 0.0.0.1) (feature 011).
+	DottedID bool
 }
 
 var Families = map[string][]Field{
@@ -129,8 +135,8 @@ var Families = map[string][]Field{
 		{Name: "active_vlans", Type: Strings, VLANList: true},
 		{Name: "channel", Type: String, Canonical: true}, // member rows only: the port-channel
 	},
-	// The routing families (feature 010): the engine reads none of them, and no routing peer
-	// queues a find. One row per BGP peer per VRF. No counter, timer or uptime: two collections of
+	// The routing families (features 010 and 011): the engine reads none of them, and no routing
+	// peer queues a find. One row per BGP peer per VRF. No counter, timer or uptime: two collections of
 	// an unchanged network give the same rows.
 	"bgp_peers": {
 		{Name: "vrf", Type: String, Required: true},
@@ -149,6 +155,37 @@ var Families = map[string][]Field{
 		{Name: "peer_router_id", Type: String, OnlyWith: established}, // learned from the peer
 		{Name: "peer_group", Type: String},
 		{Name: "description", Type: String},
+	},
+	// One row per OSPFv2 interface, identified by vrf and interface; instance and area data are
+	// repeated on each row. Timers and counters are not recorded (feature 011).
+	"ospf_interfaces": {
+		{Name: "vrf", Type: String, Required: true},
+		{Name: "instance", Type: String, Required: true},
+		{Name: "router_id", Type: String, Required: true},
+		{Name: "interface", Type: String, Required: true, Canonical: true},
+		{Name: "area", Type: String, Required: true, DottedID: true},
+		{Name: "area_type", Type: String, Required: true, Enum: []string{"normal", "stub", "nssa"}},
+		{Name: "network_type", Type: String, Required: true, Enum: []string{"broadcast", "point_to_point", "nbma", "point_to_multipoint", "loopback", "other"}},
+		{Name: "cost", Type: Int, Required: true},
+		{Name: "passive", Type: String, Required: true, Enum: []string{"yes", "no"}},
+		{Name: "state", Type: String, Required: true, Enum: []string{"dr", "bdr", "drother", "point_to_point", "loopback", "waiting", "down", "other"}},
+		// message_digest: a keyed hash whose algorithm the device does not print (EOS: md5 and sha alike).
+		{Name: "auth_type", Type: String, Required: true, Missing: "unknown", Enum: []string{"none", "simple", "md5", "sha", "message_digest", "other", "unknown"}},
+		// A router ID on every transport, or "unknown" when a router holds the role and its router ID
+		// could not be resolved; never an interface address (FR-004a).
+		{Name: "dr_router_id", Type: String},
+		{Name: "bdr_router_id", Type: String},
+	},
+	// One row per OSPFv2 adjacency, identified by vrf, interface and neighbour_router_id.
+	"ospf_neighbours": {
+		{Name: "vrf", Type: String, Required: true},
+		{Name: "instance", Type: String, Required: true},
+		{Name: "router_id", Type: String, Required: true},
+		{Name: "interface", Type: String, Required: true, Canonical: true},
+		{Name: "area", Type: String, Required: true, DottedID: true},
+		{Name: "neighbour_router_id", Type: String, Required: true},
+		{Name: "neighbour_address", Type: String, Required: true},
+		{Name: "state", Type: String, Required: true, Enum: []string{"down", "attempt", "init", "2way", "exstart", "exchange", "loading", "full", "other"}},
 	},
 }
 
@@ -207,6 +244,9 @@ func check(f Field, v any) error {
 	case String:
 		s, isStr := v.(string)
 		ok = isStr && (f.Enum == nil || slices.Contains(f.Enum, s))
+		if ok && f.DottedID && !IsDottedID(s) {
+			return fmt.Errorf("field %q: %q is not a dotted 32-bit ID", f.Name, s)
+		}
 	case Int:
 		var n int64
 		switch x := v.(type) {
@@ -232,6 +272,31 @@ func check(f Field, v any) error {
 		return fmt.Errorf("field %q: %v (%T) is not a valid %s", f.Name, v, v, f.Type)
 	}
 	return nil
+}
+
+// IsDottedID reports whether s is four decimal octets, 0 to 255, such as 0.0.0.1.
+func IsDottedID(s string) bool {
+	parts := strings.Split(s, ".")
+	if len(parts) != 4 {
+		return false
+	}
+	for _, p := range parts {
+		n, err := strconv.Atoi(p)
+		if err != nil || n < 0 || n > 255 || strconv.Itoa(n) != p {
+			return false
+		}
+	}
+	return true
+}
+
+// DottedID converts a plain integer from 0 to 4294967295 to dotted form (1 becomes 0.0.0.1) and
+// returns any other value unchanged, so Validate can refuse it.
+func DottedID(s string) string {
+	n, err := strconv.ParseUint(s, 10, 32)
+	if err != nil {
+		return s
+	}
+	return fmt.Sprintf("%d.%d.%d.%d", n>>24, n>>16&255, n>>8&255, n&255)
 }
 
 // isSet reports whether items are sorted ascending with no duplicate.

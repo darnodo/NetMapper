@@ -1,0 +1,47 @@
+Neighbor 10.255.0.1, instance 1, VRF default, interface address 10.0.41.1
+  In area 0.0.0.0 interface Vlan41
+  Neighbor priority is 1, State is FULL, 7 state changes
+  Adjacency was established 00:01:19 ago
+  Current state was established 00:01:19 ago
+  DR IP Address 10.0.41.2 BDR IP Address 10.0.41.1
+  Options is E
+  Dead timer is due in 00:00:37
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 1 time to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0
+Neighbor 10.255.0.1, instance 1, VRF default, interface address 10.0.44.1
+  In area 0.0.0.0 interface Vlan44
+  Neighbor priority is 1, State is EXCH START, 4 state changes
+  Current state was established 00:01:24 ago
+  DR IP Address 10.0.44.2 BDR IP Address 10.0.44.1
+  Options is E
+  Dead timer is due in 00:00:32
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 0 times to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0
+Neighbor 10.255.0.1, instance 1, VRF default, interface address 10.0.42.1
+  In area 0.0.0.1 interface Vlan42
+  Neighbor priority is 0, State is FULL, 7 state changes
+  Adjacency was established 00:01:56 ago
+  Current state was established 00:01:56 ago
+  DR IP Address 0.0.0.0 BDR IP Address 0.0.0.0
+  Options is (null)
+  Dead timer is due in 00:00:32
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 1 time to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0
+Neighbor 10.255.2.1, instance 2, VRF blue, interface address 10.0.43.1
+  In area 0.0.0.0 interface Vlan43
+  Neighbor priority is 1, State is FULL, 7 state changes
+  Adjacency was established 00:01:20 ago
+  Current state was established 00:01:20 ago
+  DR IP Address 10.0.43.2 BDR IP Address 10.0.43.1
+  Options is E
+  Dead timer is due in 00:00:38
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 1 time to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0

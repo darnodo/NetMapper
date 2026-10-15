@@ -1,0 +1,3 @@
+# What the ospf_neighbours recipe must produce from the sw4noadj recordings. sw4 with OSPF and no adjacency: the guard shows OSPF running, the neighbour view is blank.
+status: empty
+rows: []

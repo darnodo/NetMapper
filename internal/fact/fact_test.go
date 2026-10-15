@@ -139,3 +139,73 @@ func TestBGPPeers(t *testing.T) {
 		}
 	}
 }
+
+func TestOSPFFamilies(t *testing.T) {
+	iface := func(change map[string]any) map[string]any {
+		row := map[string]any{"vrf": "default", "instance": "1", "router_id": "10.0.200.1", "interface": "Ethernet5.100",
+			"area": "0.0.0.0", "area_type": "normal", "network_type": "broadcast", "cost": int64(10), "passive": "no",
+			"state": "dr", "auth_type": "none", "dr_router_id": "10.0.200.1", "bdr_router_id": "10.0.200.2"}
+		for k, v := range change {
+			if v == nil {
+				delete(row, k)
+			} else {
+				row[k] = v
+			}
+		}
+		return row
+	}
+	nbr := map[string]any{"vrf": "default", "instance": "1", "router_id": "10.0.200.1", "interface": "Ethernet5.100",
+		"area": "0.0.0.0", "neighbour_router_id": "10.0.200.2", "neighbour_address": "10.0.200.129", "state": "full"}
+	noID := map[string]any{}
+	for k, v := range nbr {
+		if k != "neighbour_router_id" {
+			noID[k] = v
+		}
+	}
+	for _, c := range []struct {
+		family string
+		row    map[string]any
+		ok     bool
+	}{
+		{"ospf_interfaces", iface(nil), true},
+		{"ospf_interfaces", iface(map[string]any{"auth_type": nil}), false}, // a row that skipped the parser
+		{"ospf_interfaces", iface(map[string]any{"auth_type": "unknown"}), true},
+		{"ospf_interfaces", iface(map[string]any{"auth_type": "message_digest"}), true},
+		{"ospf_interfaces", iface(map[string]any{"auth_type": "md5-hmac"}), false},
+		{"ospf_interfaces", iface(map[string]any{"state": "DR"}), false},
+		{"ospf_interfaces", iface(map[string]any{"passive": "true"}), false},
+		{"ospf_interfaces", iface(map[string]any{"network_type": "Broadcast"}), false},
+		{"ospf_interfaces", iface(map[string]any{"dr_router_id": "unknown", "bdr_router_id": nil}), true},
+		{"ospf_interfaces", iface(map[string]any{"area": "1"}), false},
+		{"ospf_interfaces", iface(map[string]any{"area": "0.0.0.256"}), false},
+		{"ospf_interfaces", iface(map[string]any{"area": "0.0.0.1"}), true},
+		{"ospf_neighbours", nbr, true},
+		{"ospf_neighbours", noID, false},
+	} {
+		err := Validate(c.family, []map[string]any{c.row})
+		if (err == nil) != c.ok {
+			t.Errorf("%s %v: err %v, want ok=%v", c.family, c.row, err, c.ok)
+		}
+	}
+}
+
+// A field the parser fills when missing must still be required, so a row written without the
+// parser is refused (feature 011).
+func TestMissingIsRequired(t *testing.T) {
+	for family, fields := range Families {
+		for _, f := range fields {
+			if f.Missing != "" && !f.Required {
+				t.Errorf("%s.%s has Missing %q but is not Required", family, f.Name, f.Missing)
+			}
+		}
+	}
+}
+
+func TestDottedID(t *testing.T) {
+	for in, want := range map[string]string{"1": "0.0.0.1", "256": "0.0.1.0", "0": "0.0.0.0", "4294967295": "255.255.255.255",
+		"0.0.0.1": "0.0.0.1", "4294967296": "4294967296", "x": "x"} {
+		if got := DottedID(in); got != want {
+			t.Errorf("DottedID(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

@@ -1,0 +1,50 @@
+family: ospf_interfaces
+implementations:
+  - id: ospf-interfaces-cli
+    versions: '>=4.36'   # only 4.36 recorded and scanned for secrets (feature 011, research R13)
+    transport: ssh
+    # The text views print nothing at all without OSPF, and a blank output can also come from a
+    # broken read, so a guard decides "no OSPF here" from the JSON answer {"vrfs": {}} instead
+    # (research R14). Neither the interface view nor the neighbour view prints the local router ID
+    # or the area type, so the instance view is joined onto the rows on vrf, instance and area; an
+    # area with no interface row is information the spec does not record, hence `ignore` (R2).
+    # No timer, counter or age is mapped (FR-007).
+    steps:
+      - command: show ip ospf vrf all | json | no-more
+        template: show_ip_ospf_vrf_all_json.textfsm
+        guard: true
+        nothing_pattern: '^\{"vrfs":\{\}\}$'
+        # The JSON counts the interfaces of each area: a blank interface view while that count is
+        # above zero is a broken read, not "no interface" (research R14, issue #15 class).
+        expect_rows: NUM_INTF
+      - command: show ip ospf interface vrf all | no-more
+        template: show_ip_ospf_interface_vrf_all.textfsm
+        map:
+          vrf: VRF
+          instance: INSTANCE
+          interface: INTERFACE
+          area: AREA
+          network_type: NETWORK_TYPE
+          cost: COST
+          state: STATE
+          dr_router_id: DR
+          bdr_router_id: BDR
+          passive: PASSIVE
+          auth_type: AUTH
+      - command: show ip ospf vrf all | no-more
+        template: show_ip_ospf_vrf_all.textfsm
+        join_on: [vrf, instance, area]
+        unmatched: ignore
+        map: { vrf: VRF, instance: INSTANCE, area: AREA, router_id: ROUTER_ID, area_type: AREA_TYPE }
+    merge_on: [vrf, interface]
+    values:
+      network_type: { Broadcast: broadcast, Point-To-Point: point_to_point, NBMA: nbma, Point-To-Multipoint: point_to_multipoint, '*': other }
+      state: { DR: dr, Backup DR: bdr, DR Other: drother, P2P: point_to_point, Loopback: loopback, Waiting: waiting, Down: down, '*': other }
+      passive: { Passive Interface: 'yes' }
+      # EOS prints md5 and sha256 keys alike (research R6). No default: a missing value is "unknown".
+      auth_type: { No authentication: none, Message-digest authentication: message_digest, '*': other }
+      # No '*': an unknown wording leaves the required field missing, so parse_failed (research R4).
+      area_type: { normal: normal, stub: stub, NSSA: nssa }
+      dr_router_id: { 0.0.0.0: '' }
+      bdr_router_id: { 0.0.0.0: '' }
+    defaults: { passive: 'no' }

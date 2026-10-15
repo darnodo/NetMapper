@@ -486,3 +486,34 @@ func TestBGPPeersAreNotRead(t *testing.T) {
 		t.Errorf("bgp_peers changed the projection:\n got %v\nwant %v", got, want)
 	}
 }
+
+// Feature 011, FR-015: OSPF rows are read by no projection. A snapshot whose devices carry an
+// OSPF interface and an adjacency towards the other device projects exactly what it did without.
+func TestOSPFNotProjected(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p1 sw2 10.0.0.2 p1 "+MAC("S002")),
+		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1 p1 "+MAC("S001")),
+	})
+	want := dump(l)
+	if _, err := l.DB.Exec(context.Background(), `
+		UPDATE observation SET status = 'collected', detail = NULL, parsed = CASE fact_family
+		WHEN 'ospf_interfaces' THEN '[{"vrf": "default", "instance": "1", "router_id": "10.0.0.1",
+		   "interface": "port1", "area": "0.0.0.0", "area_type": "normal", "network_type": "broadcast",
+		   "cost": 10, "passive": "no", "state": "dr", "auth_type": "none", "dr_router_id": "10.0.0.1",
+		   "bdr_router_id": "10.0.0.2"}]'::jsonb
+		ELSE '[{"vrf": "default", "instance": "1", "router_id": "10.0.0.1", "interface": "port1",
+		   "area": "0.0.0.0", "neighbour_router_id": "10.0.0.2", "neighbour_address": "10.0.0.2",
+		   "state": "full"}]'::jsonb END
+		WHERE fact_family IN ('ospf_interfaces', 'ospf_neighbours')`); err != nil {
+		t.Fatal(err)
+	}
+	if n := l.Int(`SELECT count(*) FROM observation WHERE fact_family LIKE 'ospf_%' AND status = 'collected'`); n != 4 {
+		t.Fatalf("%d OSPF observations set to collected, want 4", n)
+	}
+	if _, err := graph.Project(context.Background(), l.DB, l.Registry, snap(l)); err != nil {
+		t.Fatal(err)
+	}
+	if got := dump(l); !slices.Equal(got, want) {
+		t.Errorf("OSPF rows changed the projection:\n got %v\nwant %v", got, want)
+	}
+}

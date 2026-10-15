@@ -1,0 +1,32 @@
+family: ospf_neighbours
+implementations:
+  - id: ospf-neighbours-cli
+    versions: '>=4.36'   # only 4.36 recorded and scanned for secrets (feature 011, research R13)
+    transport: ssh
+    # Same guard and joined instance view as ospf_interfaces (research R2, R14). With OSPF running,
+    # a blank neighbour view means no adjacency, and every area then matches no row: normal, hence
+    # `ignore`. No timer, counter or age is mapped (FR-007).
+    steps:
+      - command: show ip ospf vrf all | json | no-more
+        template: show_ip_ospf_vrf_all_json.textfsm
+        guard: true
+        nothing_pattern: '^\{"vrfs":\{\}\}$'
+      - command: show ip ospf neighbor detail vrf all | no-more
+        template: show_ip_ospf_neighbor_detail_vrf_all.textfsm
+        map:
+          vrf: VRF
+          instance: INSTANCE
+          interface: INTERFACE
+          area: AREA
+          neighbour_router_id: NEIGHBOR_ID
+          neighbour_address: ADDRESS
+          state: STATE
+      - command: show ip ospf vrf all | no-more
+        template: show_ip_ospf_vrf_all.textfsm
+        join_on: [vrf, instance, area]
+        unmatched: ignore
+        map: { vrf: VRF, instance: INSTANCE, area: AREA, router_id: ROUTER_ID }
+    merge_on: [vrf, interface, neighbour_router_id]
+    values:
+      # EOS spellings recorded on test/lab (research R4).
+      state: { DOWN: down, ATTEMPT: attempt, INIT: init, 2 WAYS: 2way, EXCH START: exstart, EXCHANGE: exchange, LOADING: loading, FULL: full, '*': other }

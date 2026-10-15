@@ -1,0 +1,8 @@
+# What the ospf_interfaces recipe must produce from the sw1 recordings. sw1 (test/lab/sw1.cfg): passive Loopback0, VLAN 41 message-digest, VLAN 42 point-to-point stub area 1, VLAN 43 in VRF blue, VLAN 44 MTU mismatch. EOS prints md5 and sha256 alike: message_digest.
+status: collected
+rows:
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"none","cost":10,"dr_router_id":"10.255.0.1","instance":"1","interface":"Loopback0","network_type":"broadcast","passive":"yes","router_id":"10.255.0.1","state":"dr","vrf":"default"}
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"message_digest","bdr_router_id":"10.255.0.1","cost":10,"dr_router_id":"10.255.0.2","instance":"1","interface":"Vlan41","network_type":"broadcast","passive":"no","router_id":"10.255.0.1","state":"bdr","vrf":"default"}
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"none","bdr_router_id":"10.255.0.1","cost":10,"dr_router_id":"10.255.0.2","instance":"1","interface":"Vlan44","network_type":"broadcast","passive":"no","router_id":"10.255.0.1","state":"bdr","vrf":"default"}
+  - {"area":"0.0.0.1","area_type":"stub","auth_type":"none","cost":10,"instance":"1","interface":"Vlan42","network_type":"point_to_point","passive":"no","router_id":"10.255.0.1","state":"point_to_point","vrf":"default"}
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"message_digest","bdr_router_id":"10.255.2.1","cost":10,"dr_router_id":"10.255.2.2","instance":"2","interface":"Vlan43","network_type":"broadcast","passive":"no","router_id":"10.255.2.1","state":"bdr","vrf":"blue"}

@@ -1,0 +1,4 @@
+# What the ospf_neighbours recipe must produce from the core1 recordings. core1 of the EVPN lab: one full adjacency to core2 on Ethernet5.100.
+status: collected
+rows:
+  - {"area":"0.0.0.0","instance":"1","interface":"Ethernet5.100","neighbour_address":"10.0.200.129","neighbour_router_id":"10.0.200.2","router_id":"10.0.200.1","state":"full","vrf":"default"}

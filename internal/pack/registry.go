@@ -24,10 +24,13 @@ import (
 )
 
 type Pack struct {
-	Name     string   `yaml:"name"`
-	Version  int      `yaml:"version"`
-	ReadOnly []string `yaml:"read_only"`
-	Probe    *struct {
+	Name    string `yaml:"name"`
+	Version int    `yaml:"version"`
+	// PackSchema is the pack format version; absent means 1. Version 2 adds the guard,
+	// nothing_pattern, expect_rows, join_on and unmatched step keys (feature 011).
+	PackSchema int      `yaml:"pack_schema"`
+	ReadOnly   []string `yaml:"read_only"`
+	Probe      *struct {
 		SNMP []ProbeOID `yaml:"snmp"`
 	} `yaml:"probe"`
 	Fingerprint struct {
@@ -104,6 +107,20 @@ type Step struct {
 	// Map is merged over the implementation's map for the rows of this step only, so each step of
 	// one family can set its own literal (protocol: '=tacacs', api: '=gnmi').
 	Map map[string]string `yaml:"map"`
+	// Guard: the step decides whether the family has anything on this device; it creates no row
+	// (feature 011, data-model.md).
+	Guard bool `yaml:"guard"`
+	// NothingPattern: a guard's "nothing here" pattern, matched against the whole output with all
+	// whitespace removed.
+	NothingPattern string `yaml:"nothing_pattern"`
+	// ExpectRows: a guard template value holding counts (such as the interfaces per area). When
+	// they add up to more than zero, the steps after the guard must give a row (feature 011).
+	ExpectRows string `yaml:"expect_rows"`
+	// JoinOn: the step only adds fields to rows already there holding the same values on these
+	// fields; it never creates a row.
+	JoinOn []string `yaml:"join_on"`
+	// Unmatched: what a join row that matches no row does, "fail" or "ignore".
+	Unmatched string `yaml:"unmatched"`
 }
 
 // Registry is the set of loaded packs, in load order.
@@ -139,11 +156,14 @@ var missingCost = map[string]string{
 	"vlans":              noVLANs,
 	"interface_vlans":    noVLANs,
 	"bgp_peers":          "no BGP sessions for these devices",
+	"ospf_interfaces":    noOSPF,
+	"ospf_neighbours":    noOSPF,
 }
 
 const (
 	noManagement = "no management inventory for these devices"
 	noVLANs      = "no VLAN data for these devices; they will join no L2 domain"
+	noOSPF       = "no OSPF data for these devices"
 )
 
 // Load loads the given pack directories and refuses the whole set if any check fails. A platform
@@ -199,6 +219,9 @@ func loadPack(dir string) (*Pack, error) {
 	fail := func(format string, a ...any) { errs = append(errs, fmt.Errorf(format, a...)) }
 	if p.Name == "" {
 		fail("name is required")
+	}
+	if p.PackSchema < 0 || p.PackSchema > 2 {
+		fail("pack_schema %d is not a known pack format (1 or 2)", p.PackSchema)
 	}
 
 	h := sha256.New()
@@ -279,9 +302,50 @@ func loadPack(dir string) (*Pack, error) {
 			if len(im.Steps) == 0 {
 				fail("%s: no steps", where)
 			}
-			for _, s := range im.Steps {
+			createsRows := false
+			for i, s := range im.Steps {
 				for _, re := range s.EmptyLines {
 					compiles(where+" empty_lines", re)
+				}
+				step := fmt.Sprintf("%s step %d", where, i+1)
+				if p.PackSchema < 2 && (s.Guard || s.NothingPattern != "" || s.ExpectRows != "" || len(s.JoinOn) > 0 || s.Unmatched != "") {
+					fail("%s: guard, nothing_pattern, expect_rows, join_on and unmatched need pack_schema 2", step)
+				}
+				if s.ExpectRows != "" && !s.Guard {
+					fail("%s: expect_rows is only for a guard", step)
+				}
+				switch {
+				case s.Guard:
+					if i != 0 {
+						fail("%s: a guard must be the first step", step)
+					}
+					if len(s.Map) > 0 || len(s.EmptyLines) > 0 {
+						fail("%s: a guard has no map and no empty_lines", step)
+					}
+					if s.NothingPattern == "" {
+						fail("%s: a guard needs a nothing_pattern", step)
+					}
+					compiles(step+" nothing_pattern", s.NothingPattern)
+				case s.NothingPattern != "":
+					fail("%s: nothing_pattern is only for a guard", step)
+				}
+				if len(s.JoinOn) > 0 {
+					if !createsRows {
+						fail("%s: join_on needs a step that creates rows before it", step)
+					}
+					if s.Unmatched != "fail" && s.Unmatched != "ignore" {
+						fail("%s: join_on needs unmatched: fail or ignore", step)
+					}
+					for _, field := range s.JoinOn {
+						if _, ok := fact.Lookup(family, field); !ok {
+							fail("%s: join_on field %q is not a field of %s", step, field, family)
+						}
+					}
+				} else if s.Unmatched != "" {
+					fail("%s: unmatched is only for a join_on step", step)
+				}
+				if !s.Guard && len(s.JoinOn) == 0 {
+					createsRows = true
 				}
 				if s.Command != "" {
 					readOnly(where, s.Command)
@@ -312,6 +376,8 @@ func loadPack(dir string) (*Pack, error) {
 				f, ok := fact.Lookup(family, field)
 				if !ok {
 					fail("%s: default for %q, not a field of %s", where, field, family)
+				} else if f.Missing != "" {
+					fail("%s: %q takes %q when missing and cannot have a default", where, field, f.Missing)
 				} else if f.Type != fact.String || (f.Enum != nil && !slices.Contains(f.Enum, v)) {
 					fail("%s: default %q is not a valid value of %s", where, v, field)
 				}

@@ -164,6 +164,18 @@ Tables referencing the partitioned `observation` carry `snapshot_id` and use com
 
 ## Still open
 
+- A step deadline or a dropped session fails the scrape task and leaves no observation for the
+  family, although `observation.status` is never nullable: that family's outcome on that device is
+  recorded nowhere as a status. Feature 011 kept the behaviour (its FR-009 names "no observation,
+  the task failing" beside `unreachable` and `parse_failed`) because changing it touches every
+  family. Tracked in [#48](https://github.com/darnodo/NetMapper/issues/48)
+
+- A blank output returned with no transport error is read as a command that completed (issue #15
+  class: a prompt race). Feature 011 closes it for "no OSPF here" with a guard step whose "nothing
+  here" answer is not blank, and for OSPF interfaces with the guard's interface count; on a device
+  that runs OSPF, a blank neighbour output still reads as "no adjacency". Not seen on EOS 4.36; to
+  revisit if it is
+
 - `PackRegistry` and `Parser` are concrete in the first slice (`pack.Registry`, `parse.Parse`), since each has one implementation. They become interfaces when a second implementation appears, not before
 
 - the exact partition granularity for `observation`, which depends on the same measurement

@@ -1,0 +1,15 @@
+Value Filldown INSTANCE (\S+)
+Value Filldown ROUTER_ID (\S+)
+Value Filldown VRF (\S+)
+Value Required AREA (\S+)
+Value AREA_TYPE (\S+)
+
+# One record per area of each instance, joined onto the interface and neighbour rows for the
+# router ID and the area type (feature 011, research R2). LSA, SPF, throttle and threshold lines
+# are not captured (FR-007).
+Start
+  ^OSPF instance -> Continue.Record
+  ^OSPF instance ${INSTANCE} with ID ${ROUTER_ID} VRF ${VRF}$$
+  ^\s+Area \S+$$ -> Continue.Record
+  ^\s+Area ${AREA}$$
+  ^\s+It is a ${AREA_TYPE} area

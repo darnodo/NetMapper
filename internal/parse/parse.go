@@ -27,9 +27,45 @@ const (
 // Parse maps outputs (one per step of im) into rows of family. Empty output is Empty; a step that
 // yields no row from non-empty output is ParseFailed (research R9), with err saying why.
 func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs [][]byte) (status string, rows []map[string]any, err error) {
+	status, rows, _, err = ParseDetail(reg, platform, family, im, outputs)
+	return status, rows, err
+}
+
+// ParseDetail is Parse that also returns the keys of join rows that matched no row, for a step
+// with unmatched: ignore, so the caller can log them (feature 011, research R2).
+//
+// A guard step (feature 011, research R14) decides whether there is anything here: a blank output
+// is ParseFailed; an output whose whitespace-free form matches its nothing_pattern makes the
+// observation Empty, and every other step must then be nothing too; any other output must yield a
+// template row, and those rows are dropped. A join_on step adds fields to the rows so far and
+// never creates or counts as a row.
+func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outputs [][]byte) (status string, rows []map[string]any, unmatched []string, err error) {
 	p := reg.Pack(platform)
 	empty := true
+	guardSaysNothing := false
+	expected := 0 // rows the guard counts, when its step declares expect_rows
 	for i, st := range im.Steps {
+		if st.Guard {
+			flat := strings.Join(strings.Fields(string(outputs[i])), "")
+			switch {
+			case flat == "":
+				return ParseFailed, nil, nil, fmt.Errorf("%s: guard step gave a blank output", st.Command)
+			case regexp.MustCompile(st.NothingPattern).MatchString(flat):
+				guardSaysNothing = true
+			default:
+				raw, err := textFSM(p.Templates[st.Template], outputs[i])
+				if err == nil && len(raw) == 0 {
+					err = fmt.Errorf("%s: template %s yielded no row", st.Command, st.Template)
+				}
+				if err != nil {
+					return ParseFailed, nil, nil, err
+				}
+				if st.ExpectRows != "" {
+					expected = countOf(raw, st.ExpectRows)
+				}
+			}
+			continue
+		}
 		fields := im.Map
 		if len(st.Map) > 0 {
 			fields = map[string]string{} // im.Map may be nil: a recipe can map per step only
@@ -41,6 +77,8 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 		case st.Walk != "":
 			raw, err = walkRows(outputs[i], fields)
 		case nothing(st.EmptyLines, outputs[i]):
+		case guardSaysNothing:
+			err = fmt.Errorf("%s: the guard says there is nothing here, but this step has output", st.Command)
 		default:
 			raw, err = textFSM(p.Templates[st.Template], outputs[i])
 			if err == nil && len(raw) == 0 {
@@ -48,24 +86,35 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 			}
 		}
 		if err != nil {
-			return ParseFailed, nil, err
+			return ParseFailed, nil, nil, err
 		}
 		if len(raw) == 0 {
 			continue
 		}
-		empty = false
 		var mapped []map[string]any
 		for _, r := range raw {
 			m, err := mapRow(reg, platform, family, im, fields, r)
 			if err != nil {
-				return ParseFailed, nil, err
+				return ParseFailed, nil, nil, err
 			}
 			mapped = append(mapped, m)
 		}
+		if len(st.JoinOn) > 0 {
+			missed := join(rows, mapped, st.JoinOn)
+			if len(missed) > 0 && st.Unmatched == "fail" {
+				return ParseFailed, nil, nil, fmt.Errorf("%s: no row for %s", st.Command, missed[0])
+			}
+			unmatched = append(unmatched, missed...)
+			continue
+		}
+		empty = false
 		rows = merge(rows, mapped, im.MergeOn)
 	}
-	if empty {
-		return Empty, nil, nil
+	if empty && expected > 0 {
+		return ParseFailed, nil, nil, fmt.Errorf("the guard counts %d, but no step after it gave a row", expected)
+	}
+	if empty || guardSaysNothing {
+		return Empty, nil, unmatched, nil
 	}
 	for _, row := range rows {
 		for field, v := range im.Defaults {
@@ -76,14 +125,15 @@ func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs []
 	}
 	settle(family, rows)
 	if err := fact.Validate(family, rows); err != nil {
-		return ParseFailed, nil, err
+		return ParseFailed, nil, nil, err
 	}
-	return Collected, rows, nil
+	return Collected, rows, unmatched, nil
 }
 
 // settle applies the schema's row rules once every step is merged (feature 010): an OnlyWith field
 // is dropped where its condition does not hold (a device may still print the last session's
-// values), an EmptyList field with no item becomes [], and a Set field is sorted and deduplicated.
+// values), an EmptyList field with no item becomes [], a Set field is sorted and deduplicated, and
+// a field with a Missing value that no step gave takes it (feature 011: auth_type "unknown").
 // It removes nothing else: a row still breaking a rule fails Validate, and the whole observation
 // is parse_failed.
 func settle(family string, rows []map[string]any) {
@@ -101,6 +151,9 @@ func settle(family string, rows []map[string]any) {
 				l = slices.Clone(l)
 				slices.Sort(l)
 				row[f.Name] = slices.Compact(l)
+			}
+			if _, ok := row[f.Name]; !ok && f.Missing != "" {
+				row[f.Name] = f.Missing
 			}
 		}
 	}
@@ -220,6 +273,9 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, m map[str
 		if f.Canonical {
 			s = reg.Normalise(platform, s)
 		}
+		if f.DottedID {
+			s = fact.DottedID(s) // an area printed as an integer (feature 011, FR-003)
+		}
 		if f.MAC {
 			s = pack.NormaliseMAC(s)
 		}
@@ -269,13 +325,7 @@ func merge(rows, more []map[string]any, on []string) []map[string]any {
 	if len(on) == 0 {
 		return append(rows, more...)
 	}
-	key := func(r map[string]any) string {
-		var b strings.Builder
-		for _, k := range on {
-			fmt.Fprintf(&b, "%v\x00", r[k])
-		}
-		return b.String()
-	}
+	key := func(r map[string]any) string { return keyOf(r, on) }
 	index := map[string]map[string]any{}
 	for _, r := range rows {
 		index[key(r)] = r
@@ -305,4 +355,59 @@ func merge(rows, more []map[string]any, on []string) []map[string]any {
 		index[key(r)] = r // rows of one step merge too: a server line and its group line
 	}
 	return rows
+}
+
+// countOf adds up the integers a template value holds across rows, whether one per row or a list.
+func countOf(rows []map[string]any, value string) int {
+	n := 0
+	for _, r := range rows {
+		var items []string
+		switch v := r[value].(type) {
+		case string:
+			items = []string{v}
+		case []string:
+			items = v
+		}
+		for _, it := range items {
+			c, _ := strconv.Atoi(it)
+			n += c
+		}
+	}
+	return n
+}
+
+func keyOf(r map[string]any, on []string) string {
+	var b strings.Builder
+	for _, k := range on {
+		fmt.Fprintf(&b, "%v\x00", r[k])
+	}
+	return b.String()
+}
+
+// join adds the fields of each joined row to every row holding the same values on the on fields,
+// without overwriting a value already set, and never adds a row (feature 011). It returns the
+// keys, as "field=value, ...", of the joined rows that matched no row.
+func join(rows, more []map[string]any, on []string) (unmatched []string) {
+	for _, r := range more {
+		hit := false
+		for _, into := range rows {
+			if keyOf(into, on) != keyOf(r, on) {
+				continue
+			}
+			hit = true
+			for k, v := range r {
+				if _, set := into[k]; !set {
+					into[k] = v
+				}
+			}
+		}
+		if !hit {
+			var parts []string
+			for _, k := range on {
+				parts = append(parts, fmt.Sprintf("%s=%v", k, r[k]))
+			}
+			unmatched = append(unmatched, strings.Join(parts, ", "))
+		}
+	}
+	return unmatched
 }

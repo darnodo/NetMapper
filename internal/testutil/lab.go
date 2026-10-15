@@ -215,10 +215,11 @@ func (l *Lab) Outcomes(job int64) []string {
 }
 
 // NoRecipeFamilies are the families fakeos has no recipe for, on purpose: the management families
-// of feature 007, the layer 2 families of feature 008 and bgp_peers of feature 010. Every fakeos
+// of feature 007, the layer 2 families of feature 008, bgp_peers of feature 010 and the OSPF
+// families of feature 011. Every fakeos
 // device records each one unsupported/no_recipe, which Outcomes leaves out so the crawl tests keep
 // reading what they test. AllOutcomes keeps them.
-var NoRecipeFamilies = []string{"snmp", "aaa_servers", "local_users", "management_apis", "aaa_methods", "management_servers", "vlans", "interface_vlans", "bgp_peers"}
+var NoRecipeFamilies = []string{"snmp", "aaa_servers", "local_users", "management_apis", "aaa_methods", "management_servers", "vlans", "interface_vlans", "bgp_peers", "ospf_interfaces", "ospf_neighbours"}
 
 // AllOutcomes is Outcomes with nothing left out.
 func (l *Lab) AllOutcomes(job int64) []string {

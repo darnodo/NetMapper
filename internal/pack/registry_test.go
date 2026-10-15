@@ -139,9 +139,10 @@ func TestLoadWarnsMissingFamily(t *testing.T) {
 		t.Fatal(err)
 	}
 	// fakeos also has no recipe for the six management families (feature 007), the two layer 2
-	// families (feature 008) and bgp_peers (feature 010): one line each.
+	// families (feature 008), bgp_peers (feature 010) and the two OSPF families (feature 011): one
+	// line each.
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	if len(lines) != 10 || !strings.Contains(buf.String(), "family=vlans effect=\"no VLAN data") || !strings.Contains(buf.String(), "pack=fakeos family=neighbours") {
+	if len(lines) != 12 || !strings.Contains(buf.String(), "family=ospf_neighbours effect=\"no OSPF data") || !strings.Contains(buf.String(), "family=vlans effect=\"no VLAN data") || !strings.Contains(buf.String(), "pack=fakeos family=neighbours") {
 		t.Errorf("warnings = %q", buf.String())
 	}
 	for _, l := range lines {
@@ -217,5 +218,99 @@ func TestCovers(t *testing.T) {
 				t.Errorf("got %v, want %q", err, c.want)
 			}
 		})
+	}
+}
+
+// ospfRecipe is an ospf_neighbours recipe for fakeos with a guard and a join step, written only
+// into a test's own copy of the pack (feature 011).
+const ospfRecipe = `family: ospf_neighbours
+implementations:
+  - id: ospf-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display ospf json
+        template: display_peers.textfsm
+        guard: true
+        nothing_pattern: '^\{"vrfs":\{\}\}$'
+      - command: display ospf neighbours
+        template: display_peers.textfsm
+        map: { vrf: VRF, interface: PEER, neighbour_router_id: PEER_ID, state: STATE }
+      - command: display ospf
+        template: display_family.textfsm
+        join_on: [vrf]
+        unmatched: ignore
+        map: { vrf: VRF, router_id: PEER }
+    merge_on: [vrf, interface, neighbour_router_id]
+`
+
+// Feature 011: pack_schema 2 enables guard, nothing_pattern, join_on and unmatched; a pack without
+// pack_schema is version 1 and keeps loading, covers included.
+func TestPackSchema(t *testing.T) {
+	for _, c := range []struct{ name, schema, old, new, want string }{
+		{"version 2 loads", "2", "", "", ""},
+		{"version 1 refuses the new keys", "", "", "", "need pack_schema 2"},
+		{"unknown version", "3", "", "", "pack_schema 3 is not a known pack format"},
+		{"guard not first", "2", "      - command: display ospf neighbours\n        template: display_peers.textfsm\n", "      - command: display ospf neighbours\n        template: display_peers.textfsm\n        guard: true\n        nothing_pattern: x\n", "a guard must be the first step"},
+		{"guard with a map", "2", "        guard: true\n", "        guard: true\n        map: { vrf: VRF }\n", "a guard has no map and no empty_lines"},
+		{"guard with empty_lines", "2", "        guard: true\n", "        guard: true\n        empty_lines: ['^$']\n", "a guard has no map and no empty_lines"},
+		{"guard without nothing_pattern", "2", "        nothing_pattern: '^\\{\"vrfs\":\\{\\}\\}$'\n", "", "a guard needs a nothing_pattern"},
+		{"nothing_pattern that does not compile", "2", `'^\{"vrfs":\{\}\}$'`, `'(('`, "nothing_pattern"},
+		{"nothing_pattern on a step that is not a guard", "2", "        join_on: [vrf]\n", "        join_on: [vrf]\n        nothing_pattern: x\n", "nothing_pattern is only for a guard"},
+		{"join_on with no row step before it", "2", "      - command: display ospf neighbours\n        template: display_peers.textfsm\n        map: { vrf: VRF, interface: PEER, neighbour_router_id: PEER_ID, state: STATE }\n", "", "join_on needs a step that creates rows before it"},
+		{"join_on without unmatched", "2", "        unmatched: ignore\n", "", "join_on needs unmatched: fail or ignore"},
+		{"unmatched with another value", "2", "unmatched: ignore", "unmatched: drop", "join_on needs unmatched: fail or ignore"},
+		{"unmatched without join_on", "2", "        join_on: [vrf]\n", "", "unmatched is only for a join_on step"},
+		{"join_on field not in the schema", "2", "join_on: [vrf]", "join_on: [colour]", `join_on field "colour" is not a field of ospf_neighbours`},
+		{"expect_rows on a step that is not a guard", "2", "        join_on: [vrf]\n", "        join_on: [vrf]\n        expect_rows: PEER\n", "expect_rows is only for a guard"},
+		{"expect_rows on a guard loads", "2", "        guard: true\n", "        guard: true\n        expect_rows: PEER\n", ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := copyPack(t, "", "", "")
+			if c.schema != "" {
+				b, _ := os.ReadFile(filepath.Join(dir, "pack.yaml"))
+				os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte(strings.Replace(string(b), "version: 1\n", "version: 1\npack_schema: "+c.schema+"\n", 1)), 0o644)
+			}
+			os.WriteFile(filepath.Join(dir, "recipes", "ospf_neighbours.yaml"), []byte(strings.Replace(ospfRecipe, c.old, c.new, 1)), 0o644)
+			_, err := Load(base, dir)
+			if c.want == "" {
+				if err != nil {
+					t.Errorf("refused: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("got %v, want %q", err, c.want)
+			}
+		})
+	}
+	// covers of feature 010 stays valid in both versions.
+	for _, schema := range []string{"", "pack_schema: 2\n"} {
+		dir := copyPack(t, "", "", "")
+		b, _ := os.ReadFile(filepath.Join(dir, "pack.yaml"))
+		os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte(strings.Replace(string(b), "version: 1\n", "version: 1\n"+schema, 1)), 0o644)
+		os.WriteFile(filepath.Join(dir, "recipes", "bgp_peers.yaml"), []byte(bgpRecipe), 0o644)
+		if _, err := Load(base, dir); err != nil {
+			t.Errorf("covers with %q: %v", schema, err)
+		}
+	}
+}
+
+// Feature 011, FR-004: a field that takes a value when missing (auth_type: unknown) cannot have a
+// recipe default, so no pack turns a missing value into none.
+func TestNoDefaultOnMissing(t *testing.T) {
+	dir := copyPack(t, "", "", "")
+	recipe := `family: ospf_interfaces
+implementations:
+  - id: ospf-if-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display ospf interfaces
+        template: display_peers.textfsm
+        map: { vrf: VRF, interface: PEER }
+    defaults: { auth_type: none }
+`
+	os.WriteFile(filepath.Join(dir, "recipes", "ospf_interfaces.yaml"), []byte(recipe), 0o644)
+	if _, err := Load(base, dir); err == nil || !strings.Contains(err.Error(), `"auth_type" takes "unknown" when missing and cannot have a default`) {
+		t.Errorf("got %v", err)
 	}
 }
