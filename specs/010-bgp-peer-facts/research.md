@@ -281,3 +281,33 @@ need a change, vendor-neutral, in `internal/fact` and `internal/parse`:
 
 - **Decision**: `versions: '>=4.36'`, the only version recorded and scanned for secrets, like the
   recipes of features 007 and 008.
+
+## R14. A peer that connects or leaves during one collection
+
+Added for [#44](https://github.com/darnodo/NetMapper/issues/44), after the feature shipped.
+
+- **Seen in the code**: the five steps run one after the other and merged on `[vrf, peer_address]`.
+  A peer that connected after the neighbour view but before a later step got a row from that step
+  alone, with no AS or state, which failed `fact.Validate` and made the whole observation
+  `parse_failed`. A dynamic peer that left before the peer-group step kept the default
+  `dynamic: no`, and an empty configured list if it was gone from the summaries too.
+- **Detection rule**:
+  - The neighbour view decides which peers the observation holds. The summaries and the peer-group
+    view only add fields to its rows. A peer that one of them lists and the neighbour view does not
+    connected during the collection.
+  - The neighbour view names the peer group of each member, and the peer-group view lists every
+    member of every group, static or dynamic, whatever its state (R3). A row that names a peer
+    group but is not in the peer-group view was dropped during the collection. A peer with no peer
+    group is never in the peer-group view, so the check does not apply to it.
+  - Either way the peer gets no row and a `collection_disagreement` finding (domain
+    `data_quality`) names the device as its subject and the peer, with the command that disagreed,
+    in its detail. The other rows are kept and the observation is `collected` (or `empty` if no
+    row is left).
+- **In the engine**: the four later steps are `join_on: [vrf, peer_address]` steps (feature 011)
+  with `unmatched: report`, so their rows can no longer create one. `lists_every: peer_group` on the
+  peer-group step drops and reports the rows it does not list. A join step now adds up list items
+  like a merge does, so the three summaries still build one configured list.
+- **Not covered**: a peer that leaves and comes back between two steps looks the same to every
+  command and is recorded as seen. A configured peer never vanishes from any view when its
+  session goes down, only a dynamic one does, and a dynamic peer always names its listen range's
+  peer group, so the peer-group check covers every peer that can leave.
