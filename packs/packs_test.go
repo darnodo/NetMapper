@@ -615,7 +615,10 @@ func TestBGPErrorsAreNotEmpty(t *testing.T) {
 	if s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw4")); s != parse.Empty || rows != nil {
 		t.Errorf("sw4: %s %v %v, want empty", s, err, rows)
 	}
-	// sw2 after its dynamic peer left: the peer group lists no member, which is nothing to report.
+	// sw2 after its dynamic peer left: the peer group lists no member, which is nothing to report,
+	// not an error. Paired with sw2's neighbour view, which still lists the peer in group DYN, this
+	// is the leave case of #44: the peer's row is now dropped and reported as a disagreement
+	// (lists_every: peer_group, research R14). Before, it was kept with the default dynamic: no.
 	s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw2", "sw2_show_bgp_peer_group_nomembers_empty.raw"))
 	if s != parse.Collected {
 		t.Fatalf("sw2 with no member: %s %v", s, err)

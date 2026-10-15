@@ -46,7 +46,7 @@ func TestCollectionDisagreement(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, "pack.yaml"))
-	os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte(strings.Replace(string(b), "version: 1\n", "version: 1\npack_schema: 2\n", 1)), 0o644)
+	os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte(strings.Replace(string(b), "version: 1\n", "version: 1\npack_schema: 3\n", 1)), 0o644)
 	os.WriteFile(filepath.Join(dir, "recipes", "bgp_peers.yaml"), []byte(churnRecipe), 0o644)
 	reg, err := pack.Load(filepath.Join(Root(), "packs", "_base"), dir)
 	if err != nil {

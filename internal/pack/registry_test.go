@@ -244,14 +244,15 @@ implementations:
     merge_on: [vrf, interface, neighbour_router_id]
 `
 
-// Feature 011: pack_schema 2 enables guard, nothing_pattern, join_on and unmatched (lists_every and
-// unmatched: report came with issue #44); a pack without
-// pack_schema is version 1 and keeps loading, covers included.
+// Feature 011: pack_schema 2 enables guard, nothing_pattern, join_on and unmatched; issue #44:
+// pack_schema 3 enables unmatched: report and lists_every. A pack without pack_schema is version 1
+// and keeps loading, covers included.
 func TestPackSchema(t *testing.T) {
 	for _, c := range []struct{ name, schema, old, new, want string }{
 		{"version 2 loads", "2", "", "", ""},
 		{"version 1 refuses the new keys", "", "", "", "need pack_schema 2"},
-		{"unknown version", "3", "", "", "pack_schema 3 is not a known pack format"},
+		{"version 3 loads", "3", "", "", ""},
+		{"unknown version", "4", "", "", "pack_schema 4 is not a known pack format"},
 		{"guard not first", "2", "      - command: display ospf neighbours\n        template: display_peers.textfsm\n", "      - command: display ospf neighbours\n        template: display_peers.textfsm\n        guard: true\n        nothing_pattern: x\n", "a guard must be the first step"},
 		{"guard with a map", "2", "        guard: true\n", "        guard: true\n        map: { vrf: VRF }\n", "a guard has no map and no empty_lines"},
 		{"guard with empty_lines", "2", "        guard: true\n", "        guard: true\n        empty_lines: ['^$']\n", "a guard has no map and no empty_lines"},
@@ -262,11 +263,13 @@ func TestPackSchema(t *testing.T) {
 		{"join_on without unmatched", "2", "        unmatched: ignore\n", "", "join_on needs unmatched: fail, ignore or report"},
 		{"unmatched with another value", "2", "unmatched: ignore", "unmatched: drop", "join_on needs unmatched: fail, ignore or report"},
 		{"unmatched without join_on", "2", "        join_on: [vrf]\n", "", "unmatched and lists_every are only for a join_on step"},
-		{"unmatched report loads", "2", "unmatched: ignore", "unmatched: report", ""},
-		{"lists_every loads", "2", "unmatched: ignore", "unmatched: report\n        lists_every: state", ""},
-		{"lists_every without report", "2", "unmatched: ignore", "unmatched: ignore\n        lists_every: state", "lists_every needs unmatched: report"},
-		{"lists_every field not in the schema", "2", "unmatched: ignore", "unmatched: report\n        lists_every: colour", `lists_every field "colour" is not a field of ospf_neighbours`},
-		{"lists_every without join_on", "2", "        join_on: [vrf]\n        unmatched: ignore\n", "        lists_every: state\n", "unmatched and lists_every are only for a join_on step"},
+		{"unmatched report loads", "3", "unmatched: ignore", "unmatched: report", ""},
+		{"version 2 refuses unmatched report", "2", "unmatched: ignore", "unmatched: report", "need pack_schema 3"},
+		{"lists_every loads", "3", "unmatched: ignore", "unmatched: report\n        lists_every: state", ""},
+		{"version 2 refuses lists_every", "2", "unmatched: ignore", "unmatched: report\n        lists_every: state", "need pack_schema 3"},
+		{"lists_every without report", "3", "unmatched: ignore", "unmatched: ignore\n        lists_every: state", "lists_every needs unmatched: report"},
+		{"lists_every field not in the schema", "3", "unmatched: ignore", "unmatched: report\n        lists_every: colour", `lists_every field "colour" is not a field of ospf_neighbours`},
+		{"lists_every without join_on", "3", "        join_on: [vrf]\n        unmatched: ignore\n", "        lists_every: state\n", "unmatched and lists_every are only for a join_on step"},
 		{"join_on field not in the schema", "2", "join_on: [vrf]", "join_on: [colour]", `join_on field "colour" is not a field of ospf_neighbours`},
 		{"expect_rows on a step that is not a guard", "2", "        join_on: [vrf]\n", "        join_on: [vrf]\n        expect_rows: PEER\n", "expect_rows is only for a guard"},
 		{"expect_rows on a guard loads", "2", "        guard: true\n", "        guard: true\n        expect_rows: PEER\n", ""},
@@ -288,8 +291,17 @@ func TestPackSchema(t *testing.T) {
 			}
 		})
 	}
-	// covers of feature 010 stays valid in both versions.
-	for _, schema := range []string{"", "pack_schema: 2\n"} {
+	// An unknown format is refused for its number alone, before any recipe is read: a recipe this
+	// collector would refuse for another reason is not what the error names (issue #44).
+	dir := copyPack(t, "", "", "")
+	b, _ := os.ReadFile(filepath.Join(dir, "pack.yaml"))
+	os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte(strings.Replace(string(b), "version: 1\n", "version: 1\npack_schema: 4\n", 1)), 0o644)
+	os.WriteFile(filepath.Join(dir, "recipes", "ospf_neighbours.yaml"), []byte(strings.Replace(ospfRecipe, "unmatched: ignore", "unmatched: someday", 1)), 0o644)
+	if _, err := Load(base, dir); err == nil || !strings.Contains(err.Error(), "pack_schema 4 is not a known pack format") || strings.Contains(err.Error(), "unmatched") {
+		t.Errorf("unknown format: got %v, want the schema number as the only reason", err)
+	}
+	// covers of feature 010 stays valid in every version.
+	for _, schema := range []string{"", "pack_schema: 2\n", "pack_schema: 3\n"} {
 		dir := copyPack(t, "", "", "")
 		b, _ := os.ReadFile(filepath.Join(dir, "pack.yaml"))
 		os.WriteFile(filepath.Join(dir, "pack.yaml"), []byte(strings.Replace(string(b), "version: 1\n", "version: 1\n"+schema, 1)), 0o644)

@@ -306,7 +306,9 @@ Added for [#44](https://github.com/darnodo/NetMapper/issues/44), after the featu
 - **In the engine**: the four later steps are `join_on: [vrf, peer_address]` steps (feature 011)
   with `unmatched: report`, so their rows can no longer create one. `lists_every: peer_group` on the
   peer-group step drops and reports the rows it does not list. A join step now adds up list items
-  like a merge does, so the three summaries still build one configured list.
+  like a merge does, so the three summaries still build one configured list. All three come with
+  pack format 3 (`pack_schema: 3`), so a collector that does not know them refuses the pack for its
+  format number.
 - **Not covered**: a peer that leaves and comes back between two steps looks the same to every
   command and is recorded as seen. A configured peer never vanishes from any view when its
   session goes down, only a dynamic one does, and a dynamic peer always names its listen range's

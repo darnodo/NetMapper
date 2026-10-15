@@ -421,6 +421,33 @@ func TestJoinReport(t *testing.T) {
 	}
 }
 
+// Issue #44: a join step adds up list items only in pack format 3. In format 2 a list already set
+// keeps its value, as it did before, so a format 2 pack reads the same rows as on older collectors.
+func TestJoinListsNeedFormat3(t *testing.T) {
+	r := registry(t)
+	im := pack.Impl{
+		Steps: []pack.Step{
+			{Command: "peers", Template: "display_peers.textfsm", Map: map[string]string{
+				"vrf": "VRF", "peer_address": "PEER", "peer_as": "AS", "state": "STATE",
+				"local_as": "=65000", "router_id": "=9.9.9.9", "type": "=ebgp", "configured_address_families": "=ipv4 unicast"}},
+			{Command: "evpn", Template: "display_family.textfsm", JoinOn: []string{"vrf", "peer_address"}, Unmatched: "fail",
+				Map: map[string]string{"vrf": "VRF", "peer_address": "PEER", "configured_address_families": "=l2vpn evpn"}},
+		},
+		Values:   map[string]map[string]string{"state": {"Idle": "idle"}},
+		MergeOn:  []string{"vrf", "peer_address"},
+		Defaults: map[string]string{"shutdown": "no", "dynamic": "no"},
+	}
+	outs := [][]byte{[]byte("vrf default\npeer 10.1.1.1 as 65001 state Idle\n"), []byte("vrf default\nmember 10.1.1.1\n")}
+	p := r.Pack("fakeos")
+	for schema, want := range map[int][]string{2: {"ipv4 unicast"}, 3: {"ipv4 unicast", "l2vpn evpn"}} {
+		p.PackSchema = schema
+		_, rows, err := Parse(r, "fakeos", "bgp_peers", im, outs)
+		if err != nil || len(rows) != 1 || !reflect.DeepEqual(rows[0]["configured_address_families"], want) {
+			t.Errorf("format %d: %v %v, want configured %v", schema, rows, err, want)
+		}
+	}
+}
+
 // Feature 011, FR-003: an area printed as an integer is stored in dotted form, before the join.
 func TestDottedID(t *testing.T) {
 	r := registry(t)

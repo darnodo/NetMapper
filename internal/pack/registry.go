@@ -27,7 +27,8 @@ type Pack struct {
 	Name    string `yaml:"name"`
 	Version int    `yaml:"version"`
 	// PackSchema is the pack format version; absent means 1. Version 2 adds the guard,
-	// nothing_pattern, expect_rows, join_on and unmatched step keys (feature 011).
+	// nothing_pattern, expect_rows, join_on and unmatched step keys (feature 011). Version 3 adds
+	// unmatched: report and lists_every, and a join step that adds up list items (issue #44).
 	PackSchema int      `yaml:"pack_schema"`
 	ReadOnly   []string `yaml:"read_only"`
 	Probe      *struct {
@@ -219,13 +220,15 @@ func loadPack(dir string) (*Pack, error) {
 	if err := readYAML(filepath.Join(dir, "pack.yaml"), p); err != nil {
 		return nil, err
 	}
+	// A format this collector does not know is refused before any recipe is read: its recipes may
+	// use keys or behaviours this code would ignore or misread.
+	if p.PackSchema < 0 || p.PackSchema > 3 {
+		return nil, fmt.Errorf("pack_schema %d is not a known pack format (1 to 3)", p.PackSchema)
+	}
 	var errs []error
 	fail := func(format string, a ...any) { errs = append(errs, fmt.Errorf(format, a...)) }
 	if p.Name == "" {
 		fail("name is required")
-	}
-	if p.PackSchema < 0 || p.PackSchema > 2 {
-		fail("pack_schema %d is not a known pack format (1 or 2)", p.PackSchema)
 	}
 
 	h := sha256.New()
@@ -312,8 +315,11 @@ func loadPack(dir string) (*Pack, error) {
 					compiles(where+" empty_lines", re)
 				}
 				step := fmt.Sprintf("%s step %d", where, i+1)
-				if p.PackSchema < 2 && (s.Guard || s.NothingPattern != "" || s.ExpectRows != "" || len(s.JoinOn) > 0 || s.Unmatched != "" || s.ListsEvery != "") {
-					fail("%s: guard, nothing_pattern, expect_rows, join_on, unmatched and lists_every need pack_schema 2", step)
+				if p.PackSchema < 2 && (s.Guard || s.NothingPattern != "" || s.ExpectRows != "" || len(s.JoinOn) > 0 || s.Unmatched != "") {
+					fail("%s: guard, nothing_pattern, expect_rows, join_on and unmatched need pack_schema 2", step)
+				}
+				if p.PackSchema < 3 && (s.Unmatched == "report" || s.ListsEvery != "") {
+					fail("%s: unmatched: report and lists_every need pack_schema 3", step)
 				}
 				if s.ExpectRows != "" && !s.Guard {
 					fail("%s: expect_rows is only for a guard", step)

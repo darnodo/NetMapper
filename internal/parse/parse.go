@@ -121,7 +121,7 @@ func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outp
 			mapped = append(mapped, m)
 		}
 		if len(st.JoinOn) > 0 {
-			missed := join(rows, mapped, st.JoinOn)
+			missed := join(rows, mapped, st.JoinOn, p.PackSchema >= 3)
 			switch {
 			case len(missed) > 0 && st.Unmatched == "fail":
 				return ParseFailed, nil, nil, nil, fmt.Errorf("%s: no row for %s", st.Command, missed[0])
@@ -362,7 +362,7 @@ func merge(rows, more []map[string]any, on []string) []map[string]any {
 	}
 	for _, r := range more {
 		if into, ok := index[key(r)]; ok {
-			fill(into, r)
+			fill(into, r, true)
 			continue
 		}
 		rows = append(rows, r)
@@ -371,13 +371,16 @@ func merge(rows, more []map[string]any, on []string) []map[string]any {
 	return rows
 }
 
-// fill adds the fields of r to into: a scalar keeps the value already set, a list adds up the items
-// it does not hold yet.
-func fill(into, r map[string]any) {
+// fill adds the fields of r to into: a scalar keeps the value already set, and with lists a list
+// adds up the items it does not hold yet (without, it keeps its value too).
+func fill(into, r map[string]any, lists bool) {
 	for k, v := range r {
 		old, set := into[k]
 		if !set {
 			into[k] = v
+			continue
+		}
+		if !lists {
 			continue
 		}
 		if l, ok := old.([]string); ok {
@@ -421,9 +424,10 @@ func keyOf(r map[string]any, on []string) string {
 }
 
 // join adds the fields of each joined row to every row holding the same values on the on fields,
-// without overwriting a value already set (a list adds up, as in a merge), and never adds a row
-// (feature 011). It returns the keys, as "field=value, ...", of the joined rows that matched no row.
-func join(rows, more []map[string]any, on []string) (unmatched []string) {
+// without overwriting a value already set, and never adds a row (feature 011). With lists (pack
+// format 3, issue #44), a list adds up as in a merge. It returns the keys, as "field=value, ...",
+// of the joined rows that matched no row.
+func join(rows, more []map[string]any, on []string, lists bool) (unmatched []string) {
 	for _, r := range more {
 		hit := false
 		for _, into := range rows {
@@ -431,7 +435,7 @@ func join(rows, more []map[string]any, on []string) (unmatched []string) {
 				continue
 			}
 			hit = true
-			fill(into, r)
+			fill(into, r, lists)
 		}
 		if !hit {
 			unmatched = append(unmatched, keyText(r, on))
