@@ -154,8 +154,8 @@ check both observations are `empty`, and that a device of another platform gives
    and `ospf_neighbours` are both `empty`.
 2. **Given** a device running OSPF with no adjacency, **When** a crawl runs, **Then**
    `ospf_interfaces` is `collected` and `ospf_neighbours` is `empty`.
-3. **Given** an output the template does not understand, a command the device refuses, or any
-   error line other than the device's exact "OSPF not running" answer, **When** a crawl runs,
+3. **Given** an output the template does not understand, a command the device refuses, any
+   error output, or a blank output on the step that decides "no OSPF here", **When** a crawl runs,
    **Then** the observation is `parse_failed` with a finding, never `empty`.
 4. **Given** a device of another platform, **When** a crawl runs, **Then** both families are
    `unsupported` with detail `no_recipe`, and the snapshot verdict is unchanged.
@@ -193,8 +193,9 @@ check both observations are `empty`, and that a device of another platform gives
   disappeared.
 - A blank output on the step that decides "no OSPF here": `parse_failed`, never `empty`, even with
   no transport error.
-- An area ID the device prints as a number rather than dotted form: recorded in dotted form, so
-  the same area reads the same on every device.
+- An area ID the device prints as a number rather than dotted form: converted to dotted form (1
+  becomes `0.0.0.1`, 256 becomes `0.0.1.0`), so the same area reads the same on every device. A
+  value that is neither a dotted ID nor an integer from 0 to 4294967295 is `parse_failed`.
 - A neighbour that a device stops listing (dead timer expired): it has no row in the next
   observation. If the interface still runs OSPF, the gap is visible from `ospf_interfaces`.
 - A state word the pack has no recording of: `other`, never read as `full` or `down`.
@@ -219,6 +220,8 @@ check both observations are `empty`, and that a device of another platform gives
   neighbour router ID.
 - **FR-003**: Every row of both families MUST carry its VRF (`default` for the global table), the
   instance identifier as the device names it, the instance's router ID, and the area in dotted form.
+  An area the device prints as a plain number is converted to dotted form (1 becomes `0.0.0.1`),
+  not rejected.
 - **FR-004**: Every `ospf_interfaces` row MUST carry the interface (canonical name, as the
   `interfaces` family names it), the area type (`normal`, `stub`, `nssa`), the network type
   (`broadcast`, `point_to_point`, `nbma`, `point_to_multipoint`, `loopback`, or `other`), the
@@ -261,7 +264,7 @@ check both observations are `empty`, and that a device of another platform gives
   MUST be decided by a step whose "nothing here" answer is not blank: the structured form of the
   instance view, which answers a non-empty document listing no VRF (research R14). A blank output
   on that step is never valid and MUST give `parse_failed`. A blank output on another step (such
-  as no adjacency) is accepted only once that step has shown OSPF running. Any blank output means
+  as no adjacency) is accepted only once the guard step has shown OSPF running. Any blank output means
   "nothing here" only when the command completed normally. A blank output after a timeout, a
   dropped session or a failure to detect the prompt MUST keep its failure status (`unreachable` or
   `parse_failed`, or no observation, the task failing), never `empty`, so a diff never reads it as

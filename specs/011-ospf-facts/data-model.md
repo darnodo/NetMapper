@@ -13,6 +13,14 @@ the parser. Only `ospf_interfaces.auth_type` uses it. The registry refuses a rec
 entry on a `Missing` field, so a pack cannot turn a missing value into `none` (spec FR-004,
 research R6).
 
+## New field attribute: `DottedID`
+
+A string field marked `DottedID` holds a 32-bit identifier in dotted form (`0.0.0.1`). The parser
+converts a plain integer from 0 to 4294967295 to that form (1 becomes `0.0.0.1`, 256 becomes
+`0.0.1.0`) and keeps a dotted value as is. `fact.Validate` rejects any other form, so a value
+that is neither is `parse_failed`. Both families' `area` fields use it (spec FR-003). It is
+vendor-neutral: OSPF areas are 32-bit on every platform, and some print them as integers.
+
 ## New recipe key: `join_on` (per step)
 
 ```yaml
@@ -43,13 +51,13 @@ The registry refuses `join_on` with no row-creating step before it, `join_on` wi
 - command: show ip ospf vrf all | json
   template: show_ip_ospf_vrf_all_json.textfsm
   guard: true
-  none: '^\{"vrfs":\{\}\}$'   # matched against the output with all whitespace removed
+  nothing_pattern: '^\{"vrfs":\{\}\}$'   # matched against the output with all whitespace removed
 ```
 
 A guard step decides whether the family has anything on this device, with a "none" answer that is
 not blank (research R14):
 
-- its output, with all whitespace removed, matches its `none` pattern: the observation is
+- its output, with all whitespace removed, matches its `nothing_pattern`: the observation is
   `empty`; every other step must be nothing too, or the observation is `parse_failed`. Whitespace
   and line breaks in the device's answer never change the outcome;
 - its output is blank: `parse_failed`, never nothing;
@@ -57,13 +65,14 @@ not blank (research R14):
   family and create no row.
 
 A guard step has no `map` and no `empty_lines`, and is the first step. The registry refuses a
-guard that is not first, has a `map` or `empty_lines`, has no `none` pattern, or sits in a pack
-below `pack_schema` 2. `none` is refused on a step that is not a guard.
+guard that is not first, has a `map` or `empty_lines`, has no `nothing_pattern`, or sits in a pack
+below `pack_schema` 2. `nothing_pattern` is refused on a step that is not a guard. (The key was
+first drafted as `none`; renamed so it cannot be confused with the `auth_type` value `none`.)
 
 ## New pack key: `pack_schema`
 
 `pack.yaml` gains `pack_schema`, the pack format version. Absent means 1: every existing pack loads
-unchanged. Version 2 adds `join_on`, `unmatched` and `guard`. The `covers` key of feature 010
+unchanged. Version 2 adds `guard`, `nothing_pattern`, `join_on` and `unmatched`. The `covers` key of feature 010
 stays valid in both versions. A pack declaring a version the registry does
 not know is refused. `arista_eos` declares 2.
 
@@ -77,7 +86,7 @@ One row per interface in OSPF, identified by `vrf` and `interface`.
 | instance      | string | required, as the device names it |
 | router_id     | string | required, the instance's router ID (from the join) |
 | interface     | string | required, canonical |
-| area          | string | required, dotted form |
+| area          | string | required, `DottedID`: dotted form, a plain integer converted (1 becomes `0.0.0.1`) |
 | area_type     | string | required: `normal`, `stub`, `nssa` (from the join) |
 | network_type  | string | required: `broadcast`, `point_to_point`, `nbma`, `point_to_multipoint`, `loopback`, `other` |
 | cost          | int    | required |
@@ -104,7 +113,7 @@ One row per adjacency, identified by `vrf`, `interface` and `neighbour_router_id
 | instance            | string | required |
 | router_id           | string | required, the local instance's router ID (from the join) |
 | interface           | string | required, canonical |
-| area                | string | required, dotted form |
+| area                | string | required, `DottedID`: dotted form, a plain integer converted |
 | neighbour_router_id | string | required |
 | neighbour_address   | string | required |
 | state               | string | required: `down`, `attempt`, `init`, `2way`, `exstart`, `exchange`, `loading`, `full`, `other` |

@@ -21,7 +21,9 @@ already there and never creates one, with a mandatory `unmatched: fail | ignore`
 to a join row that lands nowhere, and a new `pack_schema: 2` in `pack.yaml` that enables these keys while
 packs without the key load as version 1 (R2); and a schema attribute, `Missing`, that sets
 `auth_type` to `unknown` when no step gives a value, with a load check that refuses a recipe default
-on such a field (R6). The `unknown` rule is tested on a parsed row with no `auth_type`; no recorded
+on such a field (R6); and a schema attribute, `DottedID`, that converts an area printed as a plain
+integer to dotted form (1 becomes `0.0.0.1`) before the join, and makes `Validate` refuse any other
+form (spec FR-003). The `unknown` rule is tested on a parsed row with no `auth_type`; no recorded
 output is edited (FR-013a).
 
 "No OSPF here" is decided by a guard step, `show ip ospf vrf all | json`, whose "none" answer is the
@@ -53,7 +55,9 @@ here" by the guard step (R14), and documented for the remaining case (R7).
 **Follow-up outside this feature**: a step deadline or a dropped session fails the task and leaves
 no observation for the family. That is inconsistent with the observation status being
 non-nullable (constitution, architectural constraints): the outcome of that family on that device
-is recorded nowhere as a status. To be raised as its own issue.
+is recorded nowhere as a status. Recorded as open in `docs/c4-model/04-data-model.md` ("Still
+open"), with the #15 residual risk of R7; tracked in
+[#48](https://github.com/darnodo/NetMapper/issues/48).
 
 ## Technical Context
 
@@ -97,7 +101,7 @@ the live crawl.
 | II. Observations immutable, rest rebuildable | yes | Rows live in `observation.parsed`. `join_on` and `Missing` run in the parser, so a rule fix is a replay over stored outputs. |
 | III. Credentials stay in the collector | yes | No new credential or grant. Recipes use commands that print no OSPF key (R9); the secret check covers the lab keys and the EOS hash forms. The SNMP walk during planning used the EVPN lab's existing read-only community from inside the lab; nothing ships with it. |
 | IV. Read only, outward | yes | Only `show` commands. |
-| V. Vendor specifics are data | yes | Commands, templates, state and type words, `No authentication` and the `{"vrfs": {}}` "none" answer are in `packs/arista_eos`. `guard`, `join_on`, `unmatched`, `pack_schema` and `Missing` carry no vendor term. |
+| V. Vendor specifics are data | yes | Commands, templates, state and type words, `No authentication` and the `{"vrfs": {}}` "none" answer are in `packs/arista_eos`. `guard`, `join_on`, `unmatched`, `pack_schema`, `Missing` and `DottedID` carry no vendor term. |
 
 Workflow rules: the README, `docs/how-to/write-a-pack.md` (`pack_schema`, `guard`, `join_on` and
 `unmatched`, the `Missing` default rule, the two families in the missing-recipe table) and the Bruno requests are updated (FR-017); the fact
@@ -130,7 +134,7 @@ specs/011-ospf-facts/
 ### Source Code (repository root)
 
 ```text
-internal/fact/fact.go              # ospf_interfaces, ospf_neighbours, Field.Missing
+internal/fact/fact.go              # ospf_interfaces, ospf_neighbours, Field.Missing, Field.DottedID
 internal/parse/parse.go            # join_on steps, unmatched keys returned, Missing in settle
 internal/pack/registry.go          # Pack.PackSchema, Step.JoinOn and Step.Unmatched and their load
                                    # checks, the defaults-on-Missing check, missingCost entries
@@ -167,7 +171,7 @@ README.md, docs/how-to/write-a-pack.md
 2. `internal/fact`: both schemas and `Missing`, with tests.
 3. `internal/pack`: `pack_schema` (absent is 1, above 2 refused, `covers` valid in both), `guard`,
    `join_on` and `unmatched` refused below 2; a guard not first, with a `map` or without
-   `empty_lines`, or without `none`; `join_on` with no row-creating step before it, or without `unmatched`; a default
+   `empty_lines`, or without `nothing_pattern`; `join_on` with no row-creating step before it, or without `unmatched`; a default
    on a `Missing` field. `internal/parse`: `guard` (none document pretty-printed and on one line,
    blank, contradiction, error line), `join_on` with both `unmatched` modes, and `Missing`, with the FR-013a test on
    a parsed row with no `auth_type`. `internal/collector`: the ignored keys logged, and the

@@ -23,13 +23,20 @@ Expected: everything passes, nothing skipped, and in particular:
 | `packs` `TestFamiliesFromLab` | sw1, sw2, core1 and core2 recordings give the rows of `<switch>_ospf_interfaces.facts.yml` and `<switch>_ospf_neighbours.facts.yml`; sw4 and dc-leaf1 give `empty` for both; `sw4noadj` gives `collected` interfaces and `empty` neighbours |
 | `packs` `TestNoSecretInRecordedOutput` | no recording holds the `test/lab` OSPF keys or an `md5 7` / `sha<n> 7` hash |
 | `packs` `TestOSPFErrorsAreNotEmpty` | `% Authorization denied ...`, `% Invalid input` or `% OSPF instance does not exist ...` on any step give `parse_failed`, never `empty`; blank output on every step gives `empty` |
-| `internal/fact` | `Missing`: a row without `auth_type` is refused by `Validate`; `unknown` is accepted |
+| `internal/fact` | `Missing`: a row without `auth_type` is refused by `Validate`; `unknown` is accepted. `DottedID`: `area: 1` and `0.0.0.256` are refused by `Validate`, `0.0.0.1` is accepted |
 | `internal/parse` | a mapped row with no `auth_type` gives `unknown`, never `none` and never absent (FR-013a); a `join_on` step fills matching rows, creates none, does not overwrite, and alone does not make the observation `collected`; an interface whose area has no join row is `parse_failed` |
-| `internal/pack` | a pack without `pack_schema` loads as version 1, `covers` loads in both versions; `join_on`, `unmatched` or `guard` in a version 1 pack, a guard that is not first, has a `map` or `empty_lines`, or has no `none`, `none` on a step that is not a guard, `pack_schema: 3`, `join_on` with no row-creating step before it, `join_on` without `unmatched`, or a `defaults` entry on a `Missing` field is refused at load |
+| `internal/pack` | a pack without `pack_schema` loads as version 1, `covers` loads in both versions; `join_on`, `unmatched` or `guard` in a version 1 pack, a guard that is not first, has a `map` or `empty_lines`, or has no `nothing_pattern`, `nothing_pattern` on a step that is not a guard, `pack_schema: 3`, `join_on` with no row-creating step before it, `join_on` without `unmatched`, or a `defaults` entry on a `Missing` field is refused at load |
 | `internal/parse` (`unmatched`) | a join row that matches no row gives `parse_failed` naming the step and key with `fail`, and the same rows plus the returned key with `ignore` |
 | `internal/parse` (`guard`) | the guard's "none" document gives `empty`, pretty-printed or on one line; a blank guard output gives `parse_failed`; the "none" document with another step holding output gives `parse_failed`; a guard error line gives `parse_failed`; a populated guard with blank row steps gives `empty` |
-| `internal/collector` | on the fake transport, a blank output returned with an idle timeout gives `unreachable`, with a deadline or a dropped session no observation for the family; never `empty` |
 | `internal/graph` | a snapshot with OSPF rows projects the same graph and verdict as one without |
+| `internal/parse` `TestGuard`, `TestJoin` | the guard and join rules listed above, by name |
+| `internal/parse` `TestOSPFAuthUnknown` | FR-013a: a row with no authentication value gives `unknown`; `No authentication` gives `none`; an unknown line gives `other` |
+| `internal/parse` `TestDottedID` | `1` gives `0.0.0.1`, `256` gives `0.0.1.0`, a dotted area is kept, `x` or `4294967296` gives `parse_failed` |
+| `internal/fact` (`OnlyWith` list, if applied) | a DR or BDR router ID on a point-to-point row is refused |
+| `packs` `TestOSPFInterfacesJoinInterfaces` | every OSPF row's interface is in canonical form |
+| `packs` `TestOSPFSteadyState` | the same recordings give the same rows; the VLAN 44 adjacency is not `full` |
+| `internal/collector` `TestBlankOutputWithErrorIsNeverEmpty` | stall, deadline, dropped session and no prompt after login never give `empty` |
+| `internal/api` `TestOSPFUnknownAndAbsent` | a stored row with `auth_type: unknown` and no `dr_router_id` is served exactly as stored |
 
 ## 2. Load warnings
 

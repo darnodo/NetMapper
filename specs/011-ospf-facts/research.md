@@ -56,11 +56,11 @@ implementation step 1.
   Both OSPF recipes use `ignore`: an instance or area with nothing to join onto is information the
   spec chose not to record ("an OSPF instance configured with no interface: no row"). `fail` is
   for a future join whose every row must land.
-- **Pack format version** (approved condition): `join_on`, `unmatched` and `guard` (R14) change
-  the pack format. A
+- **Pack format version** (approved condition): `join_on`, `unmatched`, `guard` and
+  `nothing_pattern` (R14) change the pack format. A
   new top-level key in `pack.yaml`, `pack_schema`, says which format a pack is written in. Absent
   means 1, so every existing pack stays valid unchanged. `arista_eos` declares `pack_schema: 2`. The
-  registry refuses `join_on`, `unmatched` or `guard` in a pack below 2, and a `pack_schema` above
+  registry refuses `join_on`, `unmatched`, `guard` or `nothing_pattern` in a pack below 2, and a `pack_schema` above
   2. The
   `covers` key of feature 010 was added without a version; it stays valid in both.
 - **Alternatives considered for unmatched rows**: always `parse_failed` (fails every device with an
@@ -266,7 +266,7 @@ through it.
 - **Decision**: each recipe starts with a guard step, `show ip ospf vrf all | json`, marked with a
   new per-step key, `guard: true` (pack format 2):
   - it recognises the "no OSPF" document as a `vrfs` key followed by an empty object, whatever the
-    whitespace and line breaks: the step's `none` pattern is matched against the whole output with
+    whitespace and line breaks: the step's `nothing_pattern` is matched against the whole output with
     all whitespace removed (`^\{"vrfs":\{\}\}$`), so the pretty-printed three lines and a
     one-line `{"vrfs": {}}` both match, and nothing else does. When it matches, the observation is
     `empty`, and every other step must be nothing too, or the observation is `parse_failed` (the

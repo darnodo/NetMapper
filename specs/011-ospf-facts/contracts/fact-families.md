@@ -26,6 +26,8 @@ One row per interface in OSPFv2. A device that runs no OSPF, or runs it with no 
 | bdr_router_id | string | no |
 
 - Identity within an observation: `vrf` and `interface`.
+- `area` is always in dotted form; an area the device prints as an integer is converted (1
+  becomes `0.0.0.1`).
 - `area_type` of a stub or NSSA area with summaries suppressed is its base type.
 - `auth_type` is `none` only when the device reports that no authentication is configured.
   `unknown` means the platform or transport did not expose the type; the parser sets it when no
