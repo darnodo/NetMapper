@@ -98,9 +98,16 @@ func (c *Collector) write(ctx context.Context, t *frontier.Task, obs store.Obser
 	return id, err
 }
 
-// raise records the finding an outcome calls for (FR-015, FR-021), citing the observation.
+// raise records the finding an outcome calls for (FR-015, FR-021), citing the observation, and one
+// collection_disagreement per row the steps disagreed about (issue #44).
 func raise(ctx context.Context, tx pgx.Tx, obs store.Observation, id int64, parseErr error) error {
 	subject := "target:" + obs.Target.String()
+	for _, d := range obs.Disagreements {
+		if err := store.RaiseFinding(ctx, tx, obs.SnapshotID, "data_quality", "collection_disagreement", "warning", subject,
+			map[string]any{"family": obs.Family, "row": d.Row, "command": d.Command}, id); err != nil {
+			return err
+		}
+	}
 	detail := map[string]any{"family": obs.Family}
 	switch {
 	case obs.Status == "parse_failed":

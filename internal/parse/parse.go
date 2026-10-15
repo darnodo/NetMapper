@@ -27,29 +27,50 @@ const (
 // Parse maps outputs (one per step of im) into rows of family. Empty output is Empty; a step that
 // yields no row from non-empty output is ParseFailed (research R9), with err saying why.
 func Parse(reg *pack.Registry, platform, family string, im pack.Impl, outputs [][]byte) (status string, rows []map[string]any, err error) {
-	status, rows, _, err = ParseDetail(reg, platform, family, im, outputs)
+	status, rows, _, _, err = ParseDetail(reg, platform, family, im, outputs)
 	return status, rows, err
 }
 
+// Disagreement is a row the steps of one collection disagree about, such as a BGP peer that
+// connected or left between two commands (issue #44). It is kept out of the rows, and the
+// collector raises it as a finding.
+type Disagreement struct {
+	Command string // the step that disagreed with the rows so far
+	Row     string // the row's key, as "field=value, ..."
+}
+
 // ParseDetail is Parse that also returns the keys of join rows that matched no row, for a step
-// with unmatched: ignore, so the caller can log them (feature 011, research R2).
+// with unmatched: ignore, so the caller can log them (feature 011, research R2), and the
+// disagreements of the steps with unmatched: report, so the caller can raise them.
 //
 // A guard step (feature 011, research R14) decides whether there is anything here: a blank output
 // is ParseFailed; an output whose whitespace-free form matches its nothing_pattern makes the
 // observation Empty, and every other step must then be nothing too; any other output must yield a
 // template row, and those rows are dropped. A join_on step adds fields to the rows so far and
-// never creates or counts as a row.
-func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outputs [][]byte) (status string, rows []map[string]any, unmatched []string, err error) {
+// never creates or counts as a row. A join step with lists_every also removes, as disagreements,
+// the rows holding that field that it does not list.
+func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outputs [][]byte) (status string, rows []map[string]any, unmatched []string, disagree []Disagreement, err error) {
 	p := reg.Pack(platform)
 	empty := true
 	guardSaysNothing := false
 	expected := 0 // rows the guard counts, when its step declares expect_rows
+	// report adds a disagreement once per row, under the first step that disagreed: a peer that
+	// connected is listed by every step after the neighbour view, and is still one finding.
+	reported := map[string]bool{}
+	report := func(command string, keys []string) {
+		for _, k := range keys {
+			if !reported[k] {
+				reported[k] = true
+				disagree = append(disagree, Disagreement{command, k})
+			}
+		}
+	}
 	for i, st := range im.Steps {
 		if st.Guard {
 			flat := strings.Join(strings.Fields(string(outputs[i])), "")
 			switch {
 			case flat == "":
-				return ParseFailed, nil, nil, fmt.Errorf("%s: guard step gave a blank output", st.Command)
+				return ParseFailed, nil, nil, nil, fmt.Errorf("%s: guard step gave a blank output", st.Command)
 			case regexp.MustCompile(st.NothingPattern).MatchString(flat):
 				guardSaysNothing = true
 			default:
@@ -58,7 +79,7 @@ func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outp
 					err = fmt.Errorf("%s: template %s yielded no row", st.Command, st.Template)
 				}
 				if err != nil {
-					return ParseFailed, nil, nil, err
+					return ParseFailed, nil, nil, nil, err
 				}
 				if st.ExpectRows != "" {
 					expected = countOf(raw, st.ExpectRows)
@@ -86,35 +107,44 @@ func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outp
 			}
 		}
 		if err != nil {
-			return ParseFailed, nil, nil, err
+			return ParseFailed, nil, nil, nil, err
 		}
-		if len(raw) == 0 {
+		if len(raw) == 0 && st.ListsEvery == "" {
 			continue
 		}
 		var mapped []map[string]any
 		for _, r := range raw {
 			m, err := mapRow(reg, platform, family, im, fields, r)
 			if err != nil {
-				return ParseFailed, nil, nil, err
+				return ParseFailed, nil, nil, nil, err
 			}
 			mapped = append(mapped, m)
 		}
 		if len(st.JoinOn) > 0 {
 			missed := join(rows, mapped, st.JoinOn)
-			if len(missed) > 0 && st.Unmatched == "fail" {
-				return ParseFailed, nil, nil, fmt.Errorf("%s: no row for %s", st.Command, missed[0])
+			switch {
+			case len(missed) > 0 && st.Unmatched == "fail":
+				return ParseFailed, nil, nil, nil, fmt.Errorf("%s: no row for %s", st.Command, missed[0])
+			case st.Unmatched == "report":
+				report(st.Command, missed)
+			default:
+				unmatched = append(unmatched, missed...)
 			}
-			unmatched = append(unmatched, missed...)
+			if st.ListsEvery != "" {
+				var dropped []string
+				rows, dropped = unlisted(rows, mapped, st.JoinOn, st.ListsEvery)
+				report(st.Command, dropped)
+			}
 			continue
 		}
 		empty = false
 		rows = merge(rows, mapped, im.MergeOn)
 	}
 	if empty && expected > 0 {
-		return ParseFailed, nil, nil, fmt.Errorf("the guard counts %d, but no step after it gave a row", expected)
+		return ParseFailed, nil, nil, nil, fmt.Errorf("the guard counts %d, but no step after it gave a row", expected)
 	}
-	if empty || guardSaysNothing {
-		return Empty, nil, unmatched, nil
+	if empty || guardSaysNothing || len(rows) == 0 { // no rows: every one was a disagreement
+		return Empty, nil, unmatched, disagree, nil
 	}
 	for _, row := range rows {
 		for field, v := range im.Defaults {
@@ -125,9 +155,9 @@ func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outp
 	}
 	settle(family, rows)
 	if err := fact.Validate(family, rows); err != nil {
-		return ParseFailed, nil, nil, err
+		return ParseFailed, nil, nil, nil, err
 	}
-	return Collected, rows, unmatched, nil
+	return Collected, rows, unmatched, disagree, nil
 }
 
 // settle applies the schema's row rules once every step is merged (feature 010): an OnlyWith field
@@ -332,29 +362,35 @@ func merge(rows, more []map[string]any, on []string) []map[string]any {
 	}
 	for _, r := range more {
 		if into, ok := index[key(r)]; ok {
-			for k, v := range r {
-				old, set := into[k]
-				if !set {
-					into[k] = v
-					continue
-				}
-				if l, ok := old.([]string); ok {
-					if more, ok := v.([]string); ok {
-						for _, it := range more {
-							if !slices.Contains(l, it) {
-								l = append(l, it)
-							}
-						}
-						into[k] = l
-					}
-				}
-			}
+			fill(into, r)
 			continue
 		}
 		rows = append(rows, r)
 		index[key(r)] = r // rows of one step merge too: a server line and its group line
 	}
 	return rows
+}
+
+// fill adds the fields of r to into: a scalar keeps the value already set, a list adds up the items
+// it does not hold yet.
+func fill(into, r map[string]any) {
+	for k, v := range r {
+		old, set := into[k]
+		if !set {
+			into[k] = v
+			continue
+		}
+		if l, ok := old.([]string); ok {
+			if more, ok := v.([]string); ok {
+				for _, it := range more {
+					if !slices.Contains(l, it) {
+						l = append(l, it)
+					}
+				}
+				into[k] = l
+			}
+		}
+	}
 }
 
 // countOf adds up the integers a template value holds across rows, whether one per row or a list.
@@ -385,8 +421,8 @@ func keyOf(r map[string]any, on []string) string {
 }
 
 // join adds the fields of each joined row to every row holding the same values on the on fields,
-// without overwriting a value already set, and never adds a row (feature 011). It returns the
-// keys, as "field=value, ...", of the joined rows that matched no row.
+// without overwriting a value already set (a list adds up, as in a merge), and never adds a row
+// (feature 011). It returns the keys, as "field=value, ...", of the joined rows that matched no row.
 func join(rows, more []map[string]any, on []string) (unmatched []string) {
 	for _, r := range more {
 		hit := false
@@ -395,19 +431,38 @@ func join(rows, more []map[string]any, on []string) (unmatched []string) {
 				continue
 			}
 			hit = true
-			for k, v := range r {
-				if _, set := into[k]; !set {
-					into[k] = v
-				}
-			}
+			fill(into, r)
 		}
 		if !hit {
-			var parts []string
-			for _, k := range on {
-				parts = append(parts, fmt.Sprintf("%s=%v", k, r[k]))
-			}
-			unmatched = append(unmatched, strings.Join(parts, ", "))
+			unmatched = append(unmatched, keyText(r, on))
 		}
 	}
 	return unmatched
+}
+
+// unlisted removes the rows holding field that no joined row matches on the on fields, and returns
+// the rows left and the keys of those removed (issue #44: a BGP peer that names a peer group the
+// peer-group view no longer lists it in left during the collection).
+func unlisted(rows, joined []map[string]any, on []string, field string) (kept []map[string]any, dropped []string) {
+	listed := map[string]bool{}
+	for _, r := range joined {
+		listed[keyOf(r, on)] = true
+	}
+	for _, r := range rows {
+		if _, ok := r[field]; ok && !listed[keyOf(r, on)] {
+			dropped = append(dropped, keyText(r, on))
+			continue
+		}
+		kept = append(kept, r)
+	}
+	return kept, dropped
+}
+
+// keyText renders a row's key for a log line or a finding, as "field=value, ...".
+func keyText(r map[string]any, on []string) string {
+	var parts []string
+	for _, k := range on {
+		parts = append(parts, fmt.Sprintf("%s=%v", k, r[k]))
+	}
+	return strings.Join(parts, ", ")
 }

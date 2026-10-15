@@ -355,7 +355,7 @@ func TestJoin(t *testing.T) {
 	nbr := []byte("vrf default\npeer Ethernet1 as 1 state FULL id 2.2.2.2\n")
 	extra := []byte("vrf default\nmember 0.0.0.1\nmember 0.0.0.2\n")
 
-	s, _, unmatched, err := ParseDetail(r, "fakeos", "ospf_neighbours", ospfImpl("ignore"), [][]byte{guard, nbr, extra})
+	s, _, unmatched, _, err := ParseDetail(r, "fakeos", "ospf_neighbours", ospfImpl("ignore"), [][]byte{guard, nbr, extra})
 	if s != Collected || !reflect.DeepEqual(unmatched, []string{"vrf=default, instance=1, area=0.0.0.2"}) {
 		t.Errorf("ignore: %s %v %v", s, unmatched, err)
 	}
@@ -381,6 +381,43 @@ func TestJoin(t *testing.T) {
 	if s, _, err := Parse(r, "fakeos", "ospf_neighbours", ospfImpl("ignore"), [][]byte{guard, nbr, other}); s != ParseFailed ||
 		!strings.Contains(err.Error(), `"router_id" missing`) {
 		t.Errorf("row left without router_id: %s %v", s, err)
+	}
+}
+
+// Issue #44: unmatched: report turns a join row that matches no row into a disagreement instead of a
+// log line, and lists_every removes, as a disagreement, a row holding the field that the step does
+// not list. A step with no row at all still removes them, and no row left is empty.
+func TestJoinReport(t *testing.T) {
+	r := registry(t)
+	guard := []byte("vrf default\nmember x\n")
+	nbr := []byte("vrf default\npeer Ethernet1 as 1 state FULL id 2.2.2.2\n")
+	both := []byte("vrf default\nmember 0.0.0.1\nmember 0.0.0.2\n")
+	other := []byte("vrf default\nmember 0.0.0.2\n")
+	listed := Disagreement{"instances", "vrf=default, instance=1, area=0.0.0.2"}
+	gone := Disagreement{"instances", "vrf=default, instance=1, area=0.0.0.1"}
+
+	report := ospfImpl("report")
+	s, rows, unmatched, disagree, err := ParseDetail(r, "fakeos", "ospf_neighbours", report, [][]byte{guard, nbr, both})
+	if s != Collected || len(rows) != 1 || unmatched != nil || !reflect.DeepEqual(disagree, []Disagreement{listed}) {
+		t.Errorf("report: %s %v %v %v %v", s, rows, unmatched, disagree, err)
+	}
+
+	every := ospfImpl("report")
+	every.Steps[2].ListsEvery = "area"
+	for _, c := range []struct {
+		name   string
+		out    []byte
+		status string
+		want   []Disagreement
+	}{
+		{"row listed", both, Collected, []Disagreement{listed}},
+		{"row not listed", other, Empty, []Disagreement{listed, gone}},
+		{"step with no row", nil, Empty, []Disagreement{gone}},
+	} {
+		s, rows, _, disagree, err := ParseDetail(r, "fakeos", "ospf_neighbours", every, [][]byte{guard, nbr, c.out})
+		if s != c.status || (s == Empty && rows != nil) || !reflect.DeepEqual(disagree, c.want) {
+			t.Errorf("lists_every, %s: %s %v %v %v, want %s %v", c.name, s, rows, disagree, err, c.status, c.want)
+		}
 	}
 }
 

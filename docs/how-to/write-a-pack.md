@@ -54,7 +54,7 @@ captured here is what recipes match their `versions` constraint against.
 
 `pack_schema` is the version of the pack format, not of the pack's content. Leave it out and the
 pack is read as format 1, which every pack written before feature 011 is. Format 2 adds the step
-keys `guard`, `nothing_pattern`, `expect_rows`, `join_on` and `unmatched` (section 6); a pack that
+keys `guard`, `nothing_pattern`, `expect_rows`, `join_on`, `unmatched` and `lists_every` (section 6); a pack that
 uses them without `pack_schema: 2` is refused, and so is a format the collector does not know.
 `covers` works in both.
 
@@ -222,8 +222,14 @@ implementations:                     # the first one whose version and transport
   `merge_on`, and never creates a row: the OSPF instance view gives the router ID and area type of
   each area, joined onto interface rows with `join_on: [vrf, instance, area]`. It must say what a
   joined row that matches no row does: `unmatched: fail` makes the observation `parse_failed`,
-  `unmatched: ignore` keeps it out and the collector logs its key. It does not overwrite a value
-  already set, and its rows alone never make an observation `collected`.
+  `unmatched: ignore` keeps it out and the collector logs its key, `unmatched: report` keeps it out
+  and the collector raises a `collection_disagreement` finding naming the device and the key. Use
+  `report` when the two commands should list the same things and only a change between them, such
+  as a BGP peer connecting mid-collection, makes them differ. With `report`, `lists_every: <field>`
+  also removes and reports every row holding that field that the step does not list: `bgp_peers`
+  uses `lists_every: peer_group`, since the peer-group view lists every member of a group, so a
+  peer it no longer lists left during the collection (#44). It does not overwrite a scalar already
+  set, a list adds up as in a merge, and its rows alone never make an observation `collected`.
 - Some fields have a value the parser sets when no step gives one, such as `auth_type: unknown`
   on `ospf_interfaces`. Such a field cannot take a `defaults` entry, so a pack never turns "not
   known" into "none". Area IDs (`area`) are stored in dotted form; an integer is converted.

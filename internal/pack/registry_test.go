@@ -244,7 +244,8 @@ implementations:
     merge_on: [vrf, interface, neighbour_router_id]
 `
 
-// Feature 011: pack_schema 2 enables guard, nothing_pattern, join_on and unmatched; a pack without
+// Feature 011: pack_schema 2 enables guard, nothing_pattern, join_on and unmatched (lists_every and
+// unmatched: report came with issue #44); a pack without
 // pack_schema is version 1 and keeps loading, covers included.
 func TestPackSchema(t *testing.T) {
 	for _, c := range []struct{ name, schema, old, new, want string }{
@@ -258,9 +259,14 @@ func TestPackSchema(t *testing.T) {
 		{"nothing_pattern that does not compile", "2", `'^\{"vrfs":\{\}\}$'`, `'(('`, "nothing_pattern"},
 		{"nothing_pattern on a step that is not a guard", "2", "        join_on: [vrf]\n", "        join_on: [vrf]\n        nothing_pattern: x\n", "nothing_pattern is only for a guard"},
 		{"join_on with no row step before it", "2", "      - command: display ospf neighbours\n        template: display_peers.textfsm\n        map: { vrf: VRF, interface: PEER, neighbour_router_id: PEER_ID, state: STATE }\n", "", "join_on needs a step that creates rows before it"},
-		{"join_on without unmatched", "2", "        unmatched: ignore\n", "", "join_on needs unmatched: fail or ignore"},
-		{"unmatched with another value", "2", "unmatched: ignore", "unmatched: drop", "join_on needs unmatched: fail or ignore"},
-		{"unmatched without join_on", "2", "        join_on: [vrf]\n", "", "unmatched is only for a join_on step"},
+		{"join_on without unmatched", "2", "        unmatched: ignore\n", "", "join_on needs unmatched: fail, ignore or report"},
+		{"unmatched with another value", "2", "unmatched: ignore", "unmatched: drop", "join_on needs unmatched: fail, ignore or report"},
+		{"unmatched without join_on", "2", "        join_on: [vrf]\n", "", "unmatched and lists_every are only for a join_on step"},
+		{"unmatched report loads", "2", "unmatched: ignore", "unmatched: report", ""},
+		{"lists_every loads", "2", "unmatched: ignore", "unmatched: report\n        lists_every: state", ""},
+		{"lists_every without report", "2", "unmatched: ignore", "unmatched: ignore\n        lists_every: state", "lists_every needs unmatched: report"},
+		{"lists_every field not in the schema", "2", "unmatched: ignore", "unmatched: report\n        lists_every: colour", `lists_every field "colour" is not a field of ospf_neighbours`},
+		{"lists_every without join_on", "2", "        join_on: [vrf]\n        unmatched: ignore\n", "        lists_every: state\n", "unmatched and lists_every are only for a join_on step"},
 		{"join_on field not in the schema", "2", "join_on: [vrf]", "join_on: [colour]", `join_on field "colour" is not a field of ospf_neighbours`},
 		{"expect_rows on a step that is not a guard", "2", "        join_on: [vrf]\n", "        join_on: [vrf]\n        expect_rows: PEER\n", "expect_rows is only for a guard"},
 		{"expect_rows on a guard loads", "2", "        guard: true\n", "        guard: true\n        expect_rows: PEER\n", ""},
