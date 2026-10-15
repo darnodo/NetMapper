@@ -112,7 +112,14 @@ func (c *Collector) family(ctx context.Context, d *device, j *job, t *frontier.T
 			}
 			outputs = append(outputs, out.Bytes)
 		}
-		obs.Status, obs.Parsed, parseErr = parse.Parse(c.Registry, platform, family, im, outputs)
+		var unmatched []string
+		obs.Status, obs.Parsed, unmatched, parseErr = parse.ParseDetail(c.Registry, platform, family, im, outputs)
+		if len(unmatched) > 0 {
+			// A join step with unmatched: ignore, such as an OSPF area with no neighbour: kept out of
+			// the rows, never dropped silently (feature 011, research R2).
+			c.Log.Info("join step rows matched no row", "job", j.ID, "task", t.ID, "target", t.Target,
+				"family", family, "recipe", obs.RecipeID, "keys", unmatched)
+		}
 		return obs, parseErr, nil
 	}
 	status, ev, err := verdict(tried...)

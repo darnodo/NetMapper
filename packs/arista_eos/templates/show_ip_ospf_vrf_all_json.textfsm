@@ -1,0 +1,11 @@
+Value Required INSTANCE (\d+)
+Value List NUM_INTF (\d+)
+
+# Guard of the OSPF families (feature 011, research R14): one row per OSPF instance, which only
+# proves OSPF runs, with the interface count of each of its areas. The "no OSPF" document
+# ({"vrfs": {}}) is matched by the recipe's nothing_pattern and yields no row here. The pack has no
+# JSON parser and none is added: keys are matched by name, not by indentation.
+Start
+  ^\s+"instanceId": -> Continue.Record
+  ^\s+"instanceId": ${INSTANCE},?$$
+  ^\s+"numIntf": ${NUM_INTF},?$$

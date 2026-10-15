@@ -48,7 +48,7 @@ The registry refuses `join_on` with no row-creating step before it, `join_on` wi
 ## New recipe key: `guard` (per step)
 
 ```yaml
-- command: show ip ospf vrf all | json
+- command: show ip ospf vrf all | json | no-more
   template: show_ip_ospf_vrf_all_json.textfsm
   guard: true
   nothing_pattern: '^\{"vrfs":\{\}\}$'   # matched against the output with all whitespace removed
@@ -64,6 +64,13 @@ not blank (research R14):
 - otherwise its template must yield a row, as for any step; the rows are not mapped into the
   family and create no row.
 
+A guard may also declare `expect_rows: <template value>`, a value holding counts (on
+`arista_eos`, `NUM_INTF`: the interfaces of each area, from `"numIntf"`). When those counts add up
+to more than zero and no step after the guard gives a row, the observation is `parse_failed`, not
+`empty`: a blank view the device contradicts is a broken read (research R14, task T031).
+`expect_rows` is refused on a step that is not a guard. `ospf_interfaces` uses it;
+`ospf_neighbours` does not, since OSPF running with no adjacency is normal.
+
 A guard step has no `map` and no `empty_lines`, and is the first step. The registry refuses a
 guard that is not first, has a `map` or `empty_lines`, has no `nothing_pattern`, or sits in a pack
 below `pack_schema` 2. `nothing_pattern` is refused on a step that is not a guard. (The key was
@@ -72,7 +79,7 @@ first drafted as `none`; renamed so it cannot be confused with the `auth_type` v
 ## New pack key: `pack_schema`
 
 `pack.yaml` gains `pack_schema`, the pack format version. Absent means 1: every existing pack loads
-unchanged. Version 2 adds `guard`, `nothing_pattern`, `join_on` and `unmatched`. The `covers` key of feature 010
+unchanged. Version 2 adds `guard`, `nothing_pattern`, `expect_rows`, `join_on` and `unmatched`. The `covers` key of feature 010
 stays valid in both versions. A pack declaring a version the registry does
 not know is refused. `arista_eos` declares 2.
 
@@ -92,16 +99,16 @@ One row per interface in OSPF, identified by `vrf` and `interface`.
 | cost          | int    | required |
 | passive       | string | required: `yes`, `no` |
 | state         | string | required: `dr`, `bdr`, `drother`, `point_to_point`, `loopback`, `waiting`, `down`, `other` |
-| auth_type     | string | required, `Missing: unknown`: `none`, `simple`, `md5`, `sha`, `other`, `unknown` |
+| auth_type     | string | required, `Missing: unknown`: `none`, `simple`, `md5`, `sha`, `message_digest`, `other`, `unknown` |
 | dr_router_id  | string | optional, when the device reports a DR on the segment: a router ID, or `unknown` |
 | bdr_router_id | string | optional, when the device reports a BDR on the segment: a router ID, or `unknown` |
 
 `dr_router_id` and `bdr_router_id` are router IDs on every transport, never segment addresses
 (research R5, spec FR-004a). `unknown` means a router holds the role and its router ID could not be
 resolved; absent means no router holds it. The EOS CLI prints router IDs, so the SSH recipe never
-writes `unknown` there. If recordings show EOS printing them on a point-to-point interface, `OnlyWith` is
-extended to a list of values and both fields become `OnlyWith: network_type in (broadcast,
-nbma)`.
+writes `unknown` there. On a point-to-point interface EOS prints `No Designated Router on this
+network` (research R5), so both fields are absent from the output; no schema rule ties them to
+`network_type`, and `OnlyWith` stays single-valued.
 
 ## `ospf_neighbours`
 

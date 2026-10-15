@@ -172,8 +172,9 @@ Tables referencing the partitioned `observation` carry `snapshot_id` and use com
 
 - A blank output returned with no transport error is read as a command that completed (issue #15
   class: a prompt race). Feature 011 closes it for "no OSPF here" with a guard step whose "nothing
-  here" answer is not blank; on a device that runs OSPF, a blank interface or neighbour output
-  still reads as "none". Not seen on EOS 4.36; to revisit if it is
+  here" answer is not blank, and for OSPF interfaces with the guard's interface count; on a device
+  that runs OSPF, a blank neighbour output still reads as "no adjacency". Not seen on EOS 4.36; to
+  revisit if it is
 
 - `PackRegistry` and `Parser` are concrete in the first slice (`pack.Registry`, `parse.Parse`), since each has one implementation. They become interfaces when a second implementation appears, not before
 

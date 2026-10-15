@@ -1,0 +1,3 @@
+# What the ospf_interfaces recipe must produce from the dc-leaf1 recordings. dc-leaf1 of the EVPN lab runs no OSPF: the guard answers {"vrfs": {}}.
+status: empty
+rows: []

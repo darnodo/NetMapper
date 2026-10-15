@@ -1,0 +1,7 @@
+# What the ospf_neighbours recipe must produce from the sw1 recordings. sw1: full on VLANs 41, 42 and 43 (VRF blue), VLAN 44 held in exchange by the MTU mismatch; none on the passive loopback.
+status: collected
+rows:
+  - {"area":"0.0.0.0","instance":"1","interface":"Vlan41","neighbour_address":"10.0.41.2","neighbour_router_id":"10.255.0.2","router_id":"10.255.0.1","state":"full","vrf":"default"}
+  - {"area":"0.0.0.0","instance":"1","interface":"Vlan44","neighbour_address":"10.0.44.2","neighbour_router_id":"10.255.0.2","router_id":"10.255.0.1","state":"exchange","vrf":"default"}
+  - {"area":"0.0.0.1","instance":"1","interface":"Vlan42","neighbour_address":"10.0.42.2","neighbour_router_id":"10.255.0.2","router_id":"10.255.0.1","state":"full","vrf":"default"}
+  - {"area":"0.0.0.0","instance":"2","interface":"Vlan43","neighbour_address":"10.0.43.2","neighbour_router_id":"10.255.2.2","router_id":"10.255.2.1","state":"full","vrf":"blue"}

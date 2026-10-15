@@ -1,0 +1,7 @@
+# What the ospf_neighbours recipe must produce from the sw2 recordings. sw2: the mirror of sw1, VLAN 44 held in exch start.
+status: collected
+rows:
+  - {"area":"0.0.0.0","instance":"1","interface":"Vlan41","neighbour_address":"10.0.41.1","neighbour_router_id":"10.255.0.1","router_id":"10.255.0.2","state":"full","vrf":"default"}
+  - {"area":"0.0.0.0","instance":"1","interface":"Vlan44","neighbour_address":"10.0.44.1","neighbour_router_id":"10.255.0.1","router_id":"10.255.0.2","state":"exstart","vrf":"default"}
+  - {"area":"0.0.0.1","instance":"1","interface":"Vlan42","neighbour_address":"10.0.42.1","neighbour_router_id":"10.255.0.1","router_id":"10.255.0.2","state":"full","vrf":"default"}
+  - {"area":"0.0.0.0","instance":"2","interface":"Vlan43","neighbour_address":"10.0.43.1","neighbour_router_id":"10.255.2.1","router_id":"10.255.2.2","state":"full","vrf":"blue"}

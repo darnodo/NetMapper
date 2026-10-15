@@ -122,3 +122,33 @@ func TestBGPEmptyAndAbsentLists(t *testing.T) {
 		t.Errorf("row not established has a negotiated list: %v", down)
 	}
 }
+
+// Feature 011, FR-016, FR-004, FR-004a: auth_type "unknown" and absent DR and BDR router IDs are
+// served exactly as stored, with no key added.
+func TestOSPFUnknownAndAbsent(t *testing.T) {
+	l := standard(t)
+	c := newClient(t, l)
+	exec(t, l.DB, `UPDATE observation SET status = 'collected', detail = NULL, parsed = '[
+	  {"vrf": "default", "instance": "1", "router_id": "10.255.0.1", "interface": "Vlan42", "area": "0.0.0.1",
+	   "area_type": "stub", "network_type": "point_to_point", "cost": 10, "passive": "no",
+	   "state": "point_to_point", "auth_type": "unknown"}]'
+	  WHERE fact_family = 'ospf_interfaces' AND host(target) = '10.0.0.1'`)
+	out := c.json("/v1/devices/sw1/facts/ospf_interfaces", http.StatusOK)
+	obs := list(out["observations"])
+	if len(obs) != 1 {
+		t.Fatalf("observations: %v", obs)
+	}
+	rows := obs[0]["rows"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("rows: %v", rows)
+	}
+	row := rows[0].(map[string]any)
+	if row["auth_type"] != "unknown" {
+		t.Errorf("auth_type %#v, want \"unknown\"", row["auth_type"])
+	}
+	for _, k := range []string{"dr_router_id", "bdr_router_id"} {
+		if v, ok := row[k]; ok {
+			t.Errorf("%s served as %#v, want no key", k, v)
+		}
+	}
+}

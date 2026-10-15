@@ -1,0 +1,26 @@
+Value Required INTERFACE (\S+)
+Value INSTANCE (\S+)
+Value VRF (\S+)
+Value AREA (\S+)
+Value NETWORK_TYPE (\S+)
+Value COST (\d+)
+Value STATE (\S.*?)
+Value DR (\S+)
+Value BDR (\S+)
+Value PASSIVE (Passive Interface)
+Value AUTH (\S.*[Aa]uthentication)
+
+# One record per interface in OSPF (feature 011, research R1). Timers, transmit delay, priority,
+# speed, the neighbour count, traffic engineering and TI-LFA are not captured (FR-007). The DR and
+# BDR lines name router IDs, not addresses (research R5). EOS prints md5 and sha keys alike, so
+# AUTH stops before ", using key id" (research R6).
+Start
+  ^\S -> Continue.Record
+  ^${INTERFACE} is \S+
+  ^\s+Interface Address \S+, instance ${INSTANCE}, VRF ${VRF}, Area ${AREA}$$
+  ^\s+Network Type ${NETWORK_TYPE}, Cost: ${COST}$$
+  ^\s+Transmit Delay is \d+ sec, State ${STATE}(, Priority \d+)?$$
+  ^\s+Designated Router is ${DR}$$
+  ^\s+Backup Designated Router is ${BDR}$$
+  ^\s+Neighbor Count is \d+ \(${PASSIVE}\)$$
+  ^\s+${AUTH}(, .*)?$$

@@ -35,6 +35,7 @@ packs/cisco_ios/                     # the directory name is the pack name
 ```yaml
 name: cisco_ios                      # must equal the directory name
 version: 1                           # bump on any template or recipe change
+pack_schema: 2                       # pack format; leave it out for 1 (see below)
 read_only: ["show "]                 # every command in the pack must start with one of these
 fingerprint:
   snmp:
@@ -50,6 +51,12 @@ Before a device is identified, the collector asks it for `sysObjectID` and `sysD
 (the `_base` pack) and matches them against every pack's `fingerprint.snmp`. When SNMP does not
 answer, it opens an SSH session and tries each pack's `fingerprint.ssh` command. The `version`
 captured here is what recipes match their `versions` constraint against.
+
+`pack_schema` is the version of the pack format, not of the pack's content. Leave it out and the
+pack is read as format 1, which every pack written before feature 011 is. Format 2 adds the step
+keys `guard`, `nothing_pattern`, `expect_rows`, `join_on` and `unmatched` (section 6); a pack that
+uses them without `pack_schema: 2` is refused, and so is a format the collector does not know.
+`covers` works in both.
 
 `read_only` is a lint, not a suggestion: the collector refuses to start if any command in the pack
 does not start with one of these prefixes. NetMapper never changes a device, and this is where that
@@ -115,8 +122,8 @@ A recipe says how to collect one fact family. The families and their fields are 
 platform-neutral, listed in [fact-families.md](../../specs/001-crawl-loop/contracts/fact-families.md):
 `neighbours` and `interfaces` for the graph, six management families that describe the device
 itself (`snmp`, `aaa_servers`, `local_users`, `management_apis`, `aaa_methods`,
-`management_servers`), two layer 2 families (`vlans`, `interface_vlans`) and one routing family
-(`bgp_peers`). `identity` comes from the fingerprint and identifiers above.
+`management_servers`), two layer 2 families (`vlans`, `interface_vlans`) and three routing families
+(`bgp_peers`, `ospf_interfaces`, `ospf_neighbours`). `identity` comes from the fingerprint and identifiers above.
 
 Every recipe is optional: a pack only has to fingerprint its platform. What a missing recipe costs:
 
@@ -127,6 +134,7 @@ Every recipe is optional: a pack only has to fingerprint its platform. What a mi
 | the six management families | No management inventory for these devices: no SNMP access, AAA servers, accounts, management APIs, method lists or NTP, syslog and DNS servers. The graph is unaffected. |
 | `vlans`, `interface_vlans` | No VLAN data for these devices: no declared VLANs, access ports, trunks or port-channel members. Once L2 domains are built (#37), these devices will join none. |
 | `bgp_peers` | No BGP sessions for these devices: no peers, states or address families. The graph is unaffected. |
+| `ospf_interfaces`, `ospf_neighbours` | No OSPF data for these devices: no OSPF interfaces or adjacencies. The graph is unaffected. |
 
 NetMapper logs a warning when it loads the packs, once for each family a pack has no recipe for,
 and each device gets an observation `unsupported` with detail `no_recipe` for it. A recipe whose
@@ -194,6 +202,31 @@ implementations:                     # the first one whose version and transport
   what the pack reads: `covers: { configured_address_families: [ipv4 unicast, ipv6 unicast, l2vpn evpn] }`
   on `bgp_peers`. It must equal the `=` literals the steps map into that field, or the pack is
   refused. A reader learns from it what an empty list covers.
+- A **guard** step (format 2) decides whether a family has anything on the device, when the
+  commands that give the rows print nothing at all in that case, so a broken read could pass for
+  "nothing". It is the first step, has no `map` and no `empty_lines`, and gives no row:
+
+  ```yaml
+  - command: show ip ospf vrf all | json | no-more
+    template: show_ip_ospf_vrf_all_json.textfsm
+    guard: true
+    nothing_pattern: '^\{"vrfs":\{\}\}$'   # matched against the output with all whitespace removed
+    expect_rows: NUM_INTF                      # optional: counts the next steps must not contradict
+  ```
+
+  An output matching `nothing_pattern` makes the observation `empty`, and the other steps must
+  then print nothing too. A blank output is `parse_failed`. Any other output must give a template
+  row, which proves the family is there. With `expect_rows`, when the template value it names adds
+  up to more than zero and no later step gives a row, the observation is `parse_failed`.
+- A **join** step (format 2) adds fields to rows an earlier step created, on a different key than
+  `merge_on`, and never creates a row: the OSPF instance view gives the router ID and area type of
+  each area, joined onto interface rows with `join_on: [vrf, instance, area]`. It must say what a
+  joined row that matches no row does: `unmatched: fail` makes the observation `parse_failed`,
+  `unmatched: ignore` keeps it out and the collector logs its key. It does not overwrite a value
+  already set, and its rows alone never make an observation `collected`.
+- Some fields have a value the parser sets when no step gives one, such as `auth_type: unknown`
+  on `ospf_interfaces`. Such a field cannot take a `defaults` entry, so a pack never turns "not
+  known" into "none". Area IDs (`area`) are stored in dotted form; an integer is converted.
 - Some list fields follow schema rules the parser applies, so a pack maps only what the device
   prints: the two `bgp_peers` address family lists are stored as `[]` when empty, sorted, and the
   negotiated one (like `peer_router_id`) is kept only when `state` is `established`, even when the

@@ -1,0 +1,15 @@
+meta {
+  name: ospf-interfaces
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/v1/devices/{{device}}/facts/ospf_interfaces
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~snapshot: {{snapshot}}
+}

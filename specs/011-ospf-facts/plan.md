@@ -16,7 +16,9 @@ Neither view prints the local router ID or the area type, so both recipes end wi
 vrf all`, joined onto the rows on VRF, instance and area (R2). No timer, counter or age is mapped
 (R8).
 
-Vendor-neutral additions: the per-step `guard` key above; a per-step recipe key, `join_on`, for a step that fills fields on rows
+Vendor-neutral additions: the per-step `guard` key above, with `expect_rows` so a blank interface
+view is a failure while the guard counts interfaces (R14, added in implementation: the JSON
+carries `numIntf`); a per-step recipe key, `join_on`, for a step that fills fields on rows
 already there and never creates one, with a mandatory `unmatched: fail | ignore` saying what happens
 to a join row that lands nowhere, and a new `pack_schema: 2` in `pack.yaml` that enables these keys while
 packs without the key load as version 1 (R2); and a schema attribute, `Missing`, that sets
@@ -26,7 +28,7 @@ integer to dotted form (1 becomes `0.0.0.1`) before the join, and makes `Validat
 form (spec FR-003). The `unknown` rule is tested on a parsed row with no `auth_type`; no recorded
 output is edited (FR-013a).
 
-"No OSPF here" is decided by a guard step, `show ip ospf vrf all | json`, whose "none" answer is the
+"No OSPF here" is decided by a guard step, `show ip ospf vrf all | json | no-more`, whose "none" answer is the
 non-empty document `{"vrfs": {}}`; a blank output on it is `parse_failed`, so a broken read cannot
 pass for "no OSPF" (R14, new per-step key `guard`). Once the guard shows OSPF running, a blank
 interface or neighbour output means none (R7).
@@ -135,11 +137,15 @@ specs/011-ospf-facts/
 
 ```text
 internal/fact/fact.go              # ospf_interfaces, ospf_neighbours, Field.Missing, Field.DottedID
-internal/parse/parse.go            # join_on steps, unmatched keys returned, Missing in settle
-internal/pack/registry.go          # Pack.PackSchema, Step.JoinOn and Step.Unmatched and their load
-                                   # checks, the defaults-on-Missing check, missingCost entries
-internal/collector/scrape.go       # log ignored join keys; test: blank output with a transport
-                                   # error is never empty
+internal/parse/parse.go            # ParseDetail: guard, expect_rows, join_on steps, unmatched keys
+                                   # returned, DottedID in mapRow, Missing in settle
+internal/pack/registry.go          # Pack.PackSchema, Step.Guard, NothingPattern, ExpectRows, JoinOn
+                                   # and Unmatched and their load checks, the defaults-on-Missing
+                                   # check, missingCost entries
+internal/collector/scrape.go       # calls ParseDetail, logs ignored join keys
+internal/collector/blank_test.go   # new: a blank output with a transport error is never empty
+internal/transport/fake/fake.go    # Drop (session dropped mid-command) and NoPrompt (no prompt after login)
+internal/api/facts_test.go         # TestOSPFUnknownAndAbsent
 internal/graph/                    # test: OSPF rows change no projection
 internal/testutil/lab.go           # both families in NoRecipeFamilies
 packs/arista_eos/pack.yaml         # pack_schema: 2, version bump
@@ -148,15 +154,21 @@ packs/arista_eos/templates/        # show_ip_ospf_vrf_all_json (guard), show_ip_
                                    # show_ip_ospf_neighbor_detail_vrf_all, show_ip_ospf_vrf_all (.textfsm)
 packs/arista_eos/testdata/lab/     # sw1_*, sw2_*, sw4_*_empty, sw4noadj_*, core1_*, core2_*,
                                    # dc-leaf1_*_empty recordings, <switch>_<family>.facts.yml
-packs/packs_test.go                # (md5|sha\d*) 7 pattern, TestOSPFErrorsAreNotEmpty
+packs/arista_eos/README.md         # new: Known gaps (md5 and sha256 print alike: message_digest)
+packs/packs_test.go                # (md5|sha\d*) 7 and authentication-key 7 patterns, secret scan
+                                   # widened to testdata/ntc,
+                                   # TestOSPFErrorsAreNotEmpty, TestOSPFSteadyState,
+                                   # TestOSPFInterfacesJoinInterfaces
 test/lab/sw1.cfg, sw2.cfg          # VLANs 41 to 44, SVIs, VRF blue, router ospf 1 and 2
 test/lab/two-switch.clab.yaml      # topology comment
 specs/001-crawl-loop/contracts/fact-families.md
 bruno/facts/ospf-interfaces.bru, bruno/facts/ospf-neighbours.bru
-README.md, docs/how-to/write-a-pack.md
+docs/how-to/write-a-pack.md, docs/c4-model/04-data-model.md (Still open: #48, the #15 residual)
 ```
 
-**Structure Decision**: the existing layout; no new Go file, everything extends files in place.
+**Structure Decision**: the existing layout. One new Go file, a collector test
+(`blank_test.go`); everything else extends files in place. The README lists no fact family and is
+unchanged.
 
 ## Implementation order
 

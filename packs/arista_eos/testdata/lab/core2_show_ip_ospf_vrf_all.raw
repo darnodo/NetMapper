@@ -1,0 +1,40 @@
+OSPF instance 1 with ID 10.0.200.2 VRF default
+ Supports opaque LSA
+Maximum number of LSA allowed 12000
+  Threshold for warning message 75%
+  Ignore-time 5 minutes, reset-time 5 minutes
+  Ignore-count allowed 5, current 0
+ It is not an autonomous system boundary router and is not an area border router
+ Initial SPF schedule delay 0 msecs
+ Minimum hold time between two consecutive SPFs 5000 msecs
+ Current hold time between two consecutive SPFs 5000 msecs
+ Maximum wait time between two consecutive SPFs 5000 msecs
+ Minimum LSA arrival 1000 msecs
+ Initial LSA throttle delay 1000 msecs
+ Minimum hold time for LSA throttle 5000 msecs
+ Maximum wait time for LSA throttle 5000 msecs
+ Number of external LSA 0, Checksum sum 0
+ Number of opaque AS LSA 0, Checksum sum 0
+ Number of areas in this router is 1. 1 normal, 0 stub, 0 nssa
+ Number of LSA 3
+ Time since last SPF 7530 secs
+ No Scheduled SPF
+ Adjacency exchange-start threshold is 20
+ Maximum number of next-hops supported in ECMP is 128
+ Retransmission threshold for LSA is 10
+ Number of backbone neighbors is 1
+ Routes over tunnel interfaces disabled
+ Graceful-restart is not configured
+ Graceful-restart-helper mode is enabled
+ Area 0.0.0.0
+ Number of interface in this area is 2
+   It is a normal area
+   Traffic engineering is disabled
+   Area has None authentication 
+   SPF algorithm executed 4 times
+   Number of LSA 3. Checksum Sum 88281
+   Number of opaque link LSA 0. Checksum Sum 0
+   Number of opaque area LSA 0. Checksum Sum 0
+   Number of indication LSA 0
+   Number of DC-clear LSA 0
+

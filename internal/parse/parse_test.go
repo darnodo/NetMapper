@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -287,5 +288,181 @@ func TestDefaultAfterMerge(t *testing.T) {
 	s, rows, err := Parse(r, "fakeos", "bgp_peers", im, [][]byte{peers, dyn})
 	if s != Collected || err != nil || len(rows) != 2 || rows[0]["dynamic"] != "no" || rows[1]["dynamic"] != "yes" {
 		t.Errorf("%s %v %v", s, err, rows)
+	}
+}
+
+// ospfImpl is an ospf_neighbours implementation on fakeos templates: a guard, a row step and a
+// join step (feature 011). display_peers gives the rows (PEER as interface, AS as area), and
+// display_family the guard's rows and the joined router ID per area.
+func ospfImpl(unmatched string) pack.Impl {
+	return pack.Impl{
+		Steps: []pack.Step{
+			{Command: "guard", Template: "display_family.textfsm", Guard: true, NothingPattern: `^\{"vrfs":\{\}\}$`},
+			{Command: "neighbours", Template: "display_peers.textfsm", Map: map[string]string{
+				"vrf": "VRF", "interface": "PEER", "area": "AS", "state": "STATE", "neighbour_router_id": "PEER_ID",
+				"neighbour_address": "=10.0.0.9", "instance": "=1"}},
+			{Command: "instances", Template: "display_family.textfsm", JoinOn: []string{"vrf", "instance", "area"}, Unmatched: unmatched,
+				Map: map[string]string{"vrf": "VRF", "area": "PEER", "instance": "=1", "router_id": "=9.9.9.9"}},
+		},
+		Values:  map[string]map[string]string{"state": {"FULL": "full", "*": "other"}},
+		MergeOn: []string{"vrf", "interface", "neighbour_router_id"},
+	}
+}
+
+// Feature 011, research R14: the guard decides "nothing here" with an answer that is not blank.
+func TestGuard(t *testing.T) {
+	r := registry(t)
+	none3 := "{\n    \"vrfs\": {}\n}\n"
+	populated := "vrf default\nmember x\n"
+	nbr := "vrf default\npeer Ethernet1 as 1 state FULL id 2.2.2.2\n"
+	inst := "vrf default\nmember 0.0.0.1\n"
+	for _, c := range []struct {
+		name, guard, nbr, inst, want string
+	}{
+		{"none, pretty-printed", none3, "", "", Empty},
+		{"none, on one line", `{"vrfs": {}}`, "", "", Empty},
+		{"blank guard", "", nbr, inst, ParseFailed},
+		{"blank guard, blank steps", "\n  \n", "", "", ParseFailed},
+		{"none but a step has output", none3, nbr, inst, ParseFailed},
+		{"guard error line", "% Invalid input\n", nbr, inst, ParseFailed},
+		{"running, no neighbour", populated, "", inst, Empty},
+		{"running, one neighbour", populated, nbr, inst, Collected},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s, rows, err := Parse(r, "fakeos", "ospf_neighbours", ospfImpl("ignore"), [][]byte{[]byte(c.guard), []byte(c.nbr), []byte(c.inst)})
+			if s != c.want {
+				t.Fatalf("status %s (%v), want %s", s, err, c.want)
+			}
+			if s != Collected && rows != nil {
+				t.Errorf("rows on %s: %v", s, rows)
+			}
+			if s == Collected {
+				want := []map[string]any{{"vrf": "default", "instance": "1", "router_id": "9.9.9.9", "interface": "Ethernet1",
+					"area": "0.0.0.1", "neighbour_router_id": "2.2.2.2", "neighbour_address": "10.0.0.9", "state": "full"}}
+				if !reflect.DeepEqual(rows, want) {
+					t.Errorf("rows %v, want %v", rows, want)
+				}
+			}
+		})
+	}
+}
+
+// Feature 011, research R2: a join step fills rows, never creates or overwrites, and says what it
+// could not place.
+func TestJoin(t *testing.T) {
+	r := registry(t)
+	guard := []byte("vrf default\nmember x\n")
+	nbr := []byte("vrf default\npeer Ethernet1 as 1 state FULL id 2.2.2.2\n")
+	extra := []byte("vrf default\nmember 0.0.0.1\nmember 0.0.0.2\n")
+
+	s, _, unmatched, err := ParseDetail(r, "fakeos", "ospf_neighbours", ospfImpl("ignore"), [][]byte{guard, nbr, extra})
+	if s != Collected || !reflect.DeepEqual(unmatched, []string{"vrf=default, instance=1, area=0.0.0.2"}) {
+		t.Errorf("ignore: %s %v %v", s, unmatched, err)
+	}
+	if s, _, err := Parse(r, "fakeos", "ospf_neighbours", ospfImpl("fail"), [][]byte{guard, nbr, extra}); s != ParseFailed ||
+		!strings.Contains(err.Error(), "instances: no row for vrf=default, instance=1, area=0.0.0.2") {
+		t.Errorf("fail: %s %v", s, err)
+	}
+
+	keep := ospfImpl("ignore")
+	keep.Steps[1].Map = maps.Clone(keep.Steps[1].Map)
+	keep.Steps[1].Map["router_id"] = "=1.1.1.1"
+	if _, rows, err := Parse(r, "fakeos", "ospf_neighbours", keep, [][]byte{guard, nbr, extra}); err != nil || rows[0]["router_id"] != "1.1.1.1" {
+		t.Errorf("overwrote a set value: %v %v", rows, err)
+	}
+
+	noGuard := ospfImpl("ignore")
+	noGuard.Steps = noGuard.Steps[1:]
+	if s, rows, err := Parse(r, "fakeos", "ospf_neighbours", noGuard, [][]byte{nil, extra}); s != Empty || rows != nil {
+		t.Errorf("join output alone: %s %v %v", s, rows, err)
+	}
+
+	other := []byte("vrf default\nmember 0.0.0.2\n") // the neighbour's area has no instance row
+	if s, _, err := Parse(r, "fakeos", "ospf_neighbours", ospfImpl("ignore"), [][]byte{guard, nbr, other}); s != ParseFailed ||
+		!strings.Contains(err.Error(), `"router_id" missing`) {
+		t.Errorf("row left without router_id: %s %v", s, err)
+	}
+}
+
+// Feature 011, FR-003: an area printed as an integer is stored in dotted form, before the join.
+func TestDottedID(t *testing.T) {
+	r := registry(t)
+	guard := []byte("vrf default\nmember x\n")
+	for _, c := range []struct{ area, inst, want string }{
+		{"1", "0.0.0.1", "0.0.0.1"},
+		{"256", "0.0.1.0", "0.0.1.0"},
+		{"4294967296", "0.0.0.1", ""}, // out of range: parse_failed
+	} {
+		nbr := []byte("vrf default\npeer Ethernet1 as " + c.area + " state FULL id 2.2.2.2\n")
+		s, rows, err := Parse(r, "fakeos", "ospf_neighbours", ospfImpl("ignore"), [][]byte{guard, nbr, []byte("vrf default\nmember " + c.inst + "\n")})
+		if c.want == "" {
+			if s != ParseFailed {
+				t.Errorf("area %s: %s, want parse_failed", c.area, s)
+			}
+			continue
+		}
+		if s != Collected || rows[0]["area"] != c.want || rows[0]["router_id"] != "9.9.9.9" {
+			t.Errorf("area %s: %s %v %v", c.area, s, rows, err)
+		}
+	}
+}
+
+// Feature 011, T031: a guard that counts interfaces makes a blank row step a failure, not "none".
+// display_family gives one guard row per member; PEER is the count.
+func TestGuardExpectRows(t *testing.T) {
+	r := registry(t)
+	im := ospfImpl("ignore")
+	im.Steps[0].ExpectRows = "PEER"
+	inst := []byte("vrf default\nmember 0.0.0.1\n")
+	for _, c := range []struct{ name, guard, want string }{
+		{"count 0, blank step", "vrf default\nmember 0\n", Empty},
+		{"count 2, blank step", "vrf default\nmember 2\n", ParseFailed},
+		{"counts 0 and 1, blank step", "vrf default\nmember 0\nmember 1\n", ParseFailed},
+	} {
+		if s, _, err := Parse(r, "fakeos", "ospf_neighbours", im, [][]byte{[]byte(c.guard), nil, inst}); s != c.want {
+			t.Errorf("%s: %s (%v), want %s", c.name, s, err, c.want)
+		}
+	}
+	nbr := []byte("vrf default\npeer Ethernet1 as 1 state FULL id 2.2.2.2\n")
+	if s, _, err := Parse(r, "fakeos", "ospf_neighbours", im, [][]byte{[]byte("vrf default\nmember 2\n"), nbr, inst}); s != Collected {
+		t.Errorf("count 2 with a row: %s %v", s, err)
+	}
+}
+
+// FR-013a, spec story 2 scenario 5: a row whose steps give no authentication type reads "unknown",
+// never "none" and never absent. Vendor-independent: an inline recipe, no recorded output.
+func TestOSPFAuthUnknown(t *testing.T) {
+	r := registry(t)
+	out := []byte("vrf default\npeer Vlan41 as 10 state DR\n")
+	for _, c := range []struct {
+		name, auth, want string
+	}{
+		{"no step gives it", "", "unknown"},
+		{"the device says there is none", "=No authentication", "none"},
+		{"a line the pack does not know", "=Weird authentication", "other"},
+	} {
+		m := map[string]string{"vrf": "VRF", "interface": "PEER", "cost": "AS", "state": "STATE",
+			"instance": "=1", "router_id": "=9.9.9.9", "area": "=0", "area_type": "=normal",
+			"network_type": "=broadcast", "passive": "=no"}
+		if c.auth != "" {
+			m["auth_type"] = c.auth
+		}
+		im := pack.Impl{
+			Steps: []pack.Step{{Template: "display_peers.textfsm", Map: m}},
+			Values: map[string]map[string]string{
+				"state":     {"DR": "dr"},
+				"auth_type": {"No authentication": "none", "*": "other"},
+			},
+		}
+		s, rows, err := Parse(r, "fakeos", "ospf_interfaces", im, [][]byte{out})
+		if s != Collected || len(rows) != 1 {
+			t.Fatalf("%s: %s %v %v", c.name, s, rows, err)
+		}
+		if got, ok := rows[0]["auth_type"]; !ok || got != c.want {
+			t.Errorf("%s: auth_type %v (present %v), want %q", c.name, got, ok, c.want)
+		}
+		if rows[0]["area"] != "0.0.0.0" {
+			t.Errorf("%s: area %v, want 0.0.0.0", c.name, rows[0]["area"])
+		}
 	}
 }

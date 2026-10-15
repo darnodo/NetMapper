@@ -1,0 +1,55 @@
+Loopback0 is up
+  Interface Address 10.255.0.1/32, instance 1, VRF default, Area 0.0.0.0
+  Network Type Broadcast, Cost: 10
+  Transmit Delay is 1 sec, State DR, Priority 1
+  Designated Router is 10.255.0.1
+  No Backup Designated Router on this network
+  Timer intervals configured, Hello 10, Dead 40, Retransmit 5
+  Neighbor Count is 0 (Passive Interface)
+  No authentication
+  Traffic engineering is disabled
+  TI-LFA protection is disabled
+Vlan41 is up
+  Interface Address 10.0.41.1/30, instance 1, VRF default, Area 0.0.0.0
+  Network Type Broadcast, Cost: 10
+  Transmit Delay is 1 sec, State Backup DR, Priority 1
+  Designated Router is 10.255.0.2
+  Backup Designated Router is 10.255.0.1
+  Timer intervals configured, Hello 10, Dead 40, Retransmit 5
+  Neighbor Count is 1
+  Message-digest authentication, using key id 1
+  Traffic engineering is disabled
+  TI-LFA protection is disabled
+Vlan44 is up
+  Interface Address 10.0.44.1/30, instance 1, VRF default, Area 0.0.0.0
+  Network Type Broadcast, Cost: 10
+  Transmit Delay is 1 sec, State Backup DR, Priority 1
+  Designated Router is 10.255.0.2
+  Backup Designated Router is 10.255.0.1
+  Timer intervals configured, Hello 10, Dead 40, Retransmit 5
+  Neighbor Count is 1
+  No authentication
+  Traffic engineering is disabled
+  TI-LFA protection is disabled
+Vlan42 is up
+  Interface Address 10.0.42.1/30, instance 1, VRF default, Area 0.0.0.1
+  Network Type Point-To-Point, Cost: 10
+  Transmit Delay is 1 sec, State P2P
+  No Designated Router on this network
+  No Backup Designated Router on this network
+  Timer intervals configured, Hello 10, Dead 40, Retransmit 5
+  Neighbor Count is 1
+  No authentication
+  Traffic engineering is disabled
+  TI-LFA protection is disabled
+Vlan43 is up
+  Interface Address 10.0.43.1/30, instance 2, VRF blue, Area 0.0.0.0
+  Network Type Broadcast, Cost: 10
+  Transmit Delay is 1 sec, State Backup DR, Priority 1
+  Designated Router is 10.255.2.2
+  Backup Designated Router is 10.255.2.1
+  Timer intervals configured, Hello 10, Dead 40, Retransmit 5
+  Neighbor Count is 1
+  Message-digest authentication, using key id 1
+  Traffic engineering is disabled
+  TI-LFA protection is disabled

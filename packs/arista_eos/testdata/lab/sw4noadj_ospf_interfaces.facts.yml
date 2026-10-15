@@ -1,0 +1,4 @@
+# What the ospf_interfaces recipe must produce from the sw4noadj recordings. sw4 with OSPF on its loopback only, recorded before the wait timer ran out: state waiting.
+status: collected
+rows:
+  - {"area":"0.0.0.0","area_type":"normal","auth_type":"none","cost":10,"instance":"1","interface":"Loopback0","network_type":"broadcast","passive":"no","router_id":"10.255.0.4","state":"waiting","vrf":"default"}

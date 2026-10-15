@@ -21,7 +21,7 @@ One row per interface in OSPFv2. A device that runs no OSPF, or runs it with no 
 | cost          | int    | yes |
 | passive       | string | yes: `yes`, `no` |
 | state         | string | yes: `dr`, `bdr`, `drother`, `point_to_point`, `loopback`, `waiting`, `down`, `other` |
-| auth_type     | string | yes: `none`, `simple`, `md5`, `sha`, `other`, `unknown` |
+| auth_type     | string | yes: `none`, `simple`, `md5`, `sha`, `message_digest`, `other`, `unknown` |
 | dr_router_id  | string | no |
 | bdr_router_id | string | no |
 
@@ -31,7 +31,10 @@ One row per interface in OSPFv2. A device that runs no OSPF, or runs it with no 
 - `area_type` of a stub or NSSA area with summaries suppressed is its base type.
 - `auth_type` is `none` only when the device reports that no authentication is configured.
   `unknown` means the platform or transport did not expose the type; the parser sets it when no
-  step gives a value, and a recipe cannot default it. No field holds a key or key ID.
+  step gives a value, and a recipe cannot default it. `message_digest` is a keyed-hash
+  authentication whose algorithm the platform does not expose (`arista_eos`: md5 and sha256 print
+  the same); `md5` and `sha` are only recorded where the device names the algorithm. No field holds
+  a key or key ID.
 - `dr_router_id` and `bdr_router_id` are the router IDs of the segment's DR and BDR, on every
   transport, never their interface addresses. Each is absent when the device reports no router in
   that role. An implementation whose source gives an address (SNMP `ospfIfDesignatedRouter`,
@@ -64,11 +67,13 @@ One row per OSPFv2 adjacency. A device with no adjacency is `empty`, whatever it
 ### Rules common to both
 
 - `empty` means the device said it has nothing, each step having completed normally. On
-  `arista_eos`, "no OSPF here" is the guard step's answer to `show ip ospf vrf all | json`: a `vrfs`
-  key holding an empty object, whatever its whitespace and line breaks; a blank answer there is `parse_failed`. Once the guard shows OSPF running, a blank
-  interface or neighbour output means no interface or no adjacency. A blank output after a timeout,
-  a dropped session or a missing prompt is never `empty`: the observation is `unreachable`, or the
-  task fails with no observation for the family. Any error output is `parse_failed`.
+  `arista_eos`, "no OSPF here" is the guard step's answer to `show ip ospf vrf all | json |
+  no-more`: a `vrfs` key holding an empty object, whatever its whitespace and line breaks; a blank
+  answer there is `parse_failed`. Once the guard shows OSPF running, a blank neighbour output means
+  no adjacency. A blank interface output means no interface only if the guard counts none
+  (`numIntf`); otherwise it is `parse_failed`. A blank output after a timeout, a dropped session
+  or a missing prompt is never `empty`: the observation is `unreachable`, or the task fails with no
+  observation for the family. Any error output is `parse_failed`.
 - `router_id` and `area_type` come from a joined step (`join_on`, `unmatched: ignore` on
   `arista_eos`): an instance or area with no row to join onto is not recorded.
 - No timer, counter, age or LSA/SPF statistic is recorded. Two collections of an unchanged

@@ -1,0 +1,11 @@
+Loopback0 is up
+  Interface Address 10.255.0.4/32, instance 1, VRF default, Area 0.0.0.0
+  Network Type Broadcast, Cost: 10
+  Transmit Delay is 1 sec, State Waiting, Priority 1
+  No Designated Router on this network
+  No Backup Designated Router on this network
+  Timer intervals configured, Hello 10, Dead 40, Retransmit 5
+  Neighbor Count is 0
+  No authentication
+  Traffic engineering is disabled
+  TI-LFA protection is disabled

@@ -1,0 +1,16 @@
+Value Required NEIGHBOR_ID (\S+)
+Value INSTANCE (\S+)
+Value VRF (\S+)
+Value ADDRESS (\S+)
+Value AREA (\S+)
+Value INTERFACE (\S+)
+Value STATE (\S.*?)
+
+# One record per adjacency (feature 011, research R3). Priority, state change count, ages, the
+# neighbour's view of the DR and BDR, options, dead and inactivity timers, retransmissions and
+# graceful restart are not captured (FR-007).
+Start
+  ^Neighbor -> Continue.Record
+  ^Neighbor ${NEIGHBOR_ID}, instance ${INSTANCE}, VRF ${VRF}, interface address ${ADDRESS}$$
+  ^\s+In area ${AREA} interface ${INTERFACE}$$
+  ^\s+Neighbor priority is \d+, State is ${STATE}, \d+ state changes?$$

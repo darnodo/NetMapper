@@ -3,8 +3,8 @@
 Sources: read-only `show` commands and an SNMP walk run on the EVPN lab on 2026-10-15 (cEOS
 4.36.0F, NetLab VM): core1, core2 and dc-leaf1. The parser, pack and test code. What only
 `test/lab` can show (a non-backbone area, a point-to-point interface, authentication, a non-full
-adjacency, a non-default VRF) is marked "to confirm when recording" and is settled in
-implementation step 1.
+adjacency, a non-default VRF) was settled from `test/lab` recordings on the same day
+(implementation step 1, tasks T004 to T008); each item says what was recorded.
 
 ## R1. Interface rows come from `show ip ospf interface vrf all`
 
@@ -32,8 +32,12 @@ implementation step 1.
 
 - **Finding**: neither the interface view nor the neighbour view prints the local router ID or the
   area type. `show ip ospf vrf all` prints, per instance, `OSPF instance <id> with ID <router-id>
-  VRF <vrf>`, and per area `Area <area>` followed by `It is a normal area`. Stub and NSSA wording:
-  to confirm when recording (`test/lab` area 1).
+  VRF <vrf>`, and per area `Area <area>`, `Number of interface in this area is <n>` and `It is a
+  normal area`. Recorded on `test/lab`: `It is a stub area` for area 1. NSSA wording is not in any
+  lab; the recipe maps `NSSA`, and any other wording leaves `area_type` missing (`parse_failed`).
+- **Area display** (recorded): area 1, configured as the integer `1`, is printed `0.0.0.1` in the
+  three views and rewritten `0.0.0.1` in the running-config. EOS never prints the integer form, so
+  `DottedID`'s conversion is exercised by unit tests only (FR-003).
 - **Problem**: the parser's merge appends every row whose key matches no row so far. An area row
   keyed on `(vrf, instance, area)` would become a row of its own, with no interface, and fail
   validation.
@@ -91,13 +95,15 @@ implementation step 1.
 
 ## R4. State and type words
 
-- **Interface state**: `DR`, `Backup DR`, `DR Other` (to confirm), `P2P` (to confirm), `Waiting`,
-  `Down`, `Loopback` map to `dr`, `bdr`, `drother`, `point_to_point`, `waiting`, `down`,
+- **Interface state**: `DR`, `Backup DR`, `DR Other` (no lab has a third router on a segment;
+  mapped by its documented spelling, `'*': other` otherwise), `P2P` (recorded on `test/lab` VLAN 42),
+  `Waiting` (recorded on sw4noadj), `Waiting`, `Down`, `Loopback` map to `dr`, `bdr`, `drother`, `point_to_point`, `waiting`, `down`,
   `loopback`; `'*': other`. Seen: `DR`, `Backup DR`.
-- **Network type**: `Broadcast`, `Point-To-Point` (to confirm), `NBMA`, `Point-To-Multipoint` map
+- **Network type**: `Broadcast`, `Point-To-Point` (recorded), `NBMA`, `Point-To-Multipoint` map
   to `broadcast`, `point_to_point`, `nbma`, `point_to_multipoint`; `'*': other`.
-- **Adjacency state**: `DOWN`, `ATTEMPT`, `INIT`, `2WAYS` or `2-WAY` (EOS spelling to confirm),
-  `EXSTART`, `EXCHANGE`, `LOADING`, `FULL` map to the spec's words; `'*': other`. Seen: `FULL`.
+- **Adjacency state**: EOS spells them `DOWN`, `ATTEMPT`, `INIT`, `2 WAYS`, `EXCH START`,
+  `EXCHANGE`, `LOADING`, `FULL` (recorded on `test/lab`: `2 WAYS` during the election, `EXCH START`
+  and `EXCHANGE` on the VLAN 44 MTU mismatch, `FULL`). They map to the spec's words; `'*': other`.
 - **Area type**: `normal`, `stub`, `nssa` from the `It is a ... area` line; a `no-summary` variant
   maps to its base type (spec decision). `'*'` maps to nothing, so an unknown wording leaves the
   required field empty and the observation is `parse_failed` rather than a guess.
@@ -119,9 +125,9 @@ implementation step 1.
   the neighbour view would leave them missing exactly on interfaces with no adjacency, and a third
   join for two fields is not worth it. SNMP would mean a second transport for one family.
 - **Absent cases**: `No Backup Designated Router on this network` gives no BDR field. On a
-  point-to-point interface, whether EOS prints DR lines: to confirm when recording. If it does, the
-  pack maps them on that network type anyway and the contract says the fields are absent there, so
-  `OnlyWith` is extended to a list of values (`broadcast`, `nbma`) in the same change.
+  point-to-point interface EOS prints `No Designated Router on this network` and `No Backup
+  Designated Router on this network` (recorded, VLAN 42): both fields are absent, so FR-004a holds
+  from the output, `OnlyWith` stays single-valued, and task T027 did not apply.
 - **Approved** (2026-10-15), with a condition: both fields mean router ID on every transport. An
   SNMP implementation would read `ospfIfDesignatedRouter` and `ospfIfBackupDesignatedRouter`,
   which hold the DR's and BDR's interface addresses (seen on core1: 10.0.200.128 and 10.0.200.129).
@@ -137,11 +143,22 @@ implementation step 1.
 ## R6. Authentication type, and `unknown`
 
 - **CLI** (seen on core1): an interface with no authentication prints `No authentication`. That
-  line maps to `none`. The md5 and sha forms: to confirm when recording on `test/lab`; each maps to
-  `md5` or `sha`, and any other authentication line to `other`.
+  line maps to `none`.
+- **Recorded on `test/lab`** (2026-10-15): an md5 key and an sha256 key both print `Message-digest
+  authentication, using key id 1`, and both give `"authentication": "md5"` in `show ip ospf
+  interface vrf all | json`. EOS does not expose the algorithm in either view. Only `show
+  running-config sanitized` shows it (`message-digest-key 1 sha256 7 <removed>`). Decision (user,
+  2026-10-15): a new enum value, `message_digest`, for a keyed hash whose algorithm is not exposed;
+  the line maps to it. A sanitized-config step, `unknown` and `md5` were the alternatives. Any other
+  authentication line maps to `other`.
+- **Keys**: EOS refuses an OSPF key over 16 characters (`% Invalid input`); the lab keys are
+  `nm-lab-secret-m5` and `nm-lab-secret-sh`. EOS stores keys as `7 <base64>`
+  (`message-digest-key 1 md5 7 PqOpW+IjfAs=`, `authentication-key 7 63n+tc7WeO4=`).
 - **SNMP** (seen on core1, walked from core2 with the lab's read-only community): EOS answers
-  OSPF-MIB `ospfIfAuthType`, `none(0)` on both interfaces. The MIB defines only `none`,
-  `simplePassword` and `md5`, so what EOS answers for a SHA interface is to confirm on `test/lab`.
+  OSPF-MIB `ospfIfAuthType` (column 20 of `ospfIfTable`, `1.3.6.1.2.1.14.7.1.20`), `none(0)` on both
+  interfaces. On `test/lab` sw1 it answers `md5(2)` for the md5 interface and `none(0)` for the
+  others, and lists nothing for VLAN 43: a v2c walk sees the default VRF only. Over SNMP the sha
+  interface has no answer at all, a real `unknown`; SNMP is out of scope, so it is not a fixture.
   The walk also shows `ospfIfAuthKey`, empty as the MIB requires. The recipes use SSH only; SNMP
   was checked because the spec asks whether it gives a real `unknown` case.
 - **`unknown`** (spec FR-004, FR-013a): a vendor-neutral schema attribute, `Field.Missing`. When a
@@ -183,11 +200,12 @@ implementation step 1.
   observation, the task failing"). The collector is not changed in this feature. A follow-up is
   noted in `plan.md`: a failed task leaving no observation sits badly with a non-nullable status.
 - **Prompt race** (issue #15 class): a blank output returned with no error would read as completed.
-  The guard step (R14) closes it for "no OSPF here": a blank on the guard is `parse_failed`. What
-  remains: on a device that runs OSPF, a blank on the neighbour or interface step still reads as
-  "no adjacency" or "no interface", since those steps print a blank when they have nothing. That
-  needs a race on a session that has just answered the guard; no such case has been seen, and it
-  stays documented, not mitigated.
+  The guard step (R14) closes it for "no OSPF here": a blank on the guard is `parse_failed`. The
+  guard's interface count (`expect_rows`, task T031) closes it for `ospf_interfaces`: a blank
+  interface view while the guard counts interfaces is `parse_failed`. What remains: on a device
+  that runs OSPF, a blank neighbour view still reads as "no adjacency", which is a normal state
+  with no count to contradict it. No such race has been seen; it stays documented, not
+  mitigated.
 - **Errors**: `% Invalid input`, `% Authorization denied ...` and a VRF-specific `% OSPF instance
   does not exist in vrf <vrf>` (seen on core1 for `vrf gold`) match no empty line, reach the
   template, yield no row, and the observation is `parse_failed`. A refusal is recorded on sw2 with
@@ -205,12 +223,13 @@ state are statuses (spec decisions). Two recordings of core1 a few minutes apart
 ## R9. Secrets
 
 - **Seen**: no command of R1 to R3 prints a configuration line. The authentication line names a
-  type, not a key (to confirm on the `test/lab` md5 and sha interfaces).
+  type, not a key: recorded, `Message-digest authentication, using key id 1` (R6); the key ID is
+  not mapped.
 - **Secret check**: the `test/lab` keys start with `nm-lab-secret-`, which
   `TestNoSecretInRecordedOutput` already looks for. EOS stores OSPF keys as `ip ospf
-  authentication-key 7 <hash>` (already caught by `key 7 [0-9A-Fa-f]{6,}`) and `ip ospf
-  message-digest-key <id> md5 7 <hash>` or `... sha<n> 7 <hash>`: one pattern,
-  `(md5|sha\d*) 7 \S+`, is added.
+  authentication-key 7 <base64>` and `ip ospf message-digest-key <id> md5 7 <base64>` or `...
+  sha<n> 7 <base64>` (R6). The existing `key 7 [0-9A-Fa-f]{6,}` misses base64, so two patterns are
+  added: `authentication-key 7 \S+` and `(md5|sha\d*) 7 \S+`.
 
 ## R10. The `test/lab` OSPF configuration
 
@@ -224,14 +243,15 @@ state are statuses (spec decisions). Two recordings of core1 a few minutes apart
      non-backbone area, a point-to-point interface, auth type `none`.
   3. VLAN 43 in VRF `blue`, instance 2, area 0, sha256 authentication on both ends: the
      non-default VRF case (clarification), auth type `sha`.
-  4. VLAN 44, instance 1, area 0, a different MTU on each end: the adjacency stays in `EXSTART` or
-     `EXCHANGE` while hellos keep it alive, so two crawls see the same state. To confirm when
-     recording; if EOS does not hold it, `ip ospf mtu-ignore` absence or a mismatched network type
-     on one end is tried next.
+  4. VLAN 44, instance 1, area 0, `mtu 1400` on sw2 only: recorded on 2026-10-15, sw1 holds
+     `EXCHANGE` and sw2 `EXCH START`, unchanged after more than five minutes.
   5. `Loopback0` of each switch (10.255.0.1, 10.255.0.2, already there for BGP) in area 0,
      `passive-interface`: the passive case.
-- **sw4**: no OSPF, the `empty` case (`_empty` recordings). Then, temporarily, `router ospf 1` with
-  its loopback only, for the `sw4noadj_*` recordings (R7), reverted after.
+- **sw4**: no OSPF, the `empty` case (`_empty` recordings). Then, temporarily, `ip routing`,
+  `Loopback0` 10.255.0.4/32 and `router ospf 1` with that loopback only, for the `sw4noadj_*`
+  recordings (R7), reverted after. They were taken a few seconds after configuration, so
+  Loopback0 reads `State Waiting` (the election wait timer): a real fixture for `waiting`.
+- **Keys and syntax** (recorded): see R6, keys are 16 characters at most.
 - **Side effects**: the new SVIs and VRF `blue` appear in a live crawl's `interfaces` rows; `vlans`
   and `interface_vlans` are unchanged. The recordings of features 007 to 010 are not re-recorded and their tests are
   unaffected, as in feature 010 R10. The BGP sessions of feature 010 use VLAN 10 and are untouched.
@@ -257,13 +277,14 @@ through it.
 
 ## R14. A guard step decides "no OSPF here"
 
-- **Checked** (2026-10-15, cEOS 4.36.0F; `test/lab` was not deployed, so on the EVPN lab, same
-  image; to repeat on sw4 in implementation step 1): `show ip ospf vrf all | json` on dc-leaf1,
+- **Checked** (2026-10-15, cEOS 4.36.0F, on the EVPN lab first, then repeated on `test/lab` sw4
+  through an interactive session as the netmapper user: same three lines; the guard command is
+  `show ip ospf vrf all | json | no-more`, which EOS accepts): `show ip ospf vrf all | json | no-more` on dc-leaf1,
   which runs no OSPF, answers three lines, `{`, `"vrfs": {}`, `}`, through `Cli -c` and through an
   interactive session alike. On core1 it answers a document whose `vrfs` object holds `"default":
   {` with the instance under it. The two other commands with `| json` also answer `{"vrfs": {}}` on
   dc-leaf1.
-- **Decision**: each recipe starts with a guard step, `show ip ospf vrf all | json`, marked with a
+- **Decision**: each recipe starts with a guard step, `show ip ospf vrf all | json | no-more`, marked with a
   new per-step key, `guard: true` (pack format 2):
   - it recognises the "no OSPF" document as a `vrfs` key followed by an empty object, whatever the
     whitespace and line breaks: the step's `nothing_pattern` is matched against the whole output with
@@ -274,18 +295,19 @@ through it.
     tell `{"vrfs": {}}` on one line from other content;
   - a blank output on a guard step is `parse_failed` ("guard step gave a blank output"), never
     nothing;
-  - otherwise its template must yield at least one row, one per VRF key under `vrfs` (a TextFSM
-    match on the pretty-printed lines, not a JSON parser), or the observation is `parse_failed` as
-    for any step. An error line such as `% Invalid input` yields no row, so it fails there;
+  - otherwise its template must yield at least one row, or the observation is `parse_failed` as
+    for any step. `show_ip_ospf_vrf_all_json.textfsm` records one row per OSPF instance
+    (`"instanceId"`), with `NUM_INTF` listing the `"numIntf"` of each of its areas; keys are matched
+    by name, not by indentation, and no JSON parser is added. An error line such as `% Invalid
+    input` yields no row, so it fails there;
   - its rows prove OSPF runs and are not mapped into the family: a guard step has no `map`.
-- **To check in step 1 on sw4** (and sw4noadj): whether the guard's JSON exposes an interface
-  count per area or per instance (the text view prints `Number of interface in this area is <n>`).
-  - If it does: an interface step that is blank while that count is above zero is `parse_failed`,
-    which closes the #15 residual risk for `ospf_interfaces`. A task is added for it (the guard
-    template captures the count; the parser compares).
-  - If it does not: the residual risk of R7 stays documented as it is.
-  - A blank neighbour step stays valid in every case: OSPF running with no adjacency is normal, and
-    no count in that output says otherwise.
+- **Interface count** (recorded on sw1 and sw4noadj): the guard's JSON carries `"numIntf": <n>`
+  under each area (`"areaId": "0.0.0.1", "numIntf": 1`). So the rule of task T031 applies: the
+  `ospf_interfaces` guard declares `expect_rows: NUM_INTF`, and an interface step that is blank
+  while the counts add up to more than zero is `parse_failed`, which closes the #15 residual risk
+  for `ospf_interfaces`.
+  - A blank neighbour step stays valid: OSPF running with no adjacency is normal, and no count in
+    that output says otherwise.
 - **Rationale**: a non-empty "none" answer is something a broken read cannot produce by accident.
   The pack format has no JSON parser, and none is added: matching two fixed shapes of text is
   enough to decide presence. The rows still come from the text views (R1 to R3).

@@ -285,10 +285,17 @@ func TestNoSecretInRecordedOutput(t *testing.T) {
 		regexp.MustCompile(`sha512 \$`),
 		regexp.MustCompile(`key 7 [0-9A-Fa-f]{6,}`),
 		regexp.MustCompile(`password 7 \S+`), // a BGP neighbour password as EOS stores it (feature 010)
+		// OSPF keys as EOS stores them, base64 after 7, which the hex pattern above misses (feature 011).
+		regexp.MustCompile(`(md5|sha\d*) 7 \S+`),
+		regexp.MustCompile(`authentication-key 7 \S+`),
 	}
-	raws, _ := filepath.Glob(filepath.Join("*", "testdata", "lab", "*.raw"))
+	// Every recorded output: the lab recordings and the ntc-templates samples (testdata/ntc).
+	raws, _ := filepath.Glob(filepath.Join("*", "testdata", "*", "*.raw"))
 	if len(raws) == 0 {
-		t.Fatal("no recorded lab output found")
+		t.Fatal("no recorded output found")
+	}
+	if ntc, _ := filepath.Glob(filepath.Join("*", "testdata", "ntc", "*.raw")); len(ntc) == 0 {
+		t.Fatal("no ntc sample found: the scan no longer covers testdata/ntc")
 	}
 	for _, raw := range raws {
 		b, err := os.ReadFile(raw)
@@ -638,4 +645,111 @@ func TestBGPDefaultActivation(t *testing.T) {
 		}
 	}
 	t.Error("no row for 10.0.10.1")
+}
+
+func ospfImpl(t *testing.T, family string) (*pack.Registry, pack.Impl) {
+	t.Helper()
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("arista_eos", family, "4.36.0F")
+	if len(im) != 1 {
+		t.Fatalf("%s: %d implementations", family, len(im))
+	}
+	return reg, im[0]
+}
+
+var ospfFamilies = []string{"ospf_interfaces", "ospf_neighbours"}
+
+// SC-005 (offline part): every OSPF row names its interface in canonical form, the form the
+// interfaces family uses. The interfaces recordings of 007 predate the subinterface, so the join
+// itself is checked live (quickstart section 4).
+func TestOSPFInterfacesJoinInterfaces(t *testing.T) {
+	for _, family := range ospfFamilies {
+		reg, im := ospfImpl(t, family)
+		for _, sw := range []string{"core1", "sw1"} {
+			_, rows, err := parse.Parse(reg, "arista_eos", family, im, bgpOutputs(t, im, sw))
+			if err != nil || len(rows) == 0 {
+				t.Fatalf("%s %s: %v %v", sw, family, rows, err)
+			}
+			for _, r := range rows {
+				name := r["interface"].(string)
+				if reg.Normalise("arista_eos", name) != name || strings.HasPrefix(name, "Et") && !strings.HasPrefix(name, "Ethernet") {
+					t.Errorf("%s %s: interface %q is not canonical", sw, family, name)
+				}
+			}
+		}
+	}
+}
+
+// Spec story 2 scenario 2, FR-007: the same recordings give the same rows, and the adjacency held
+// by the MTU mismatch has a fixture that is not full.
+func TestOSPFSteadyState(t *testing.T) {
+	for _, family := range ospfFamilies {
+		reg, im := ospfImpl(t, family)
+		_, first, err := parse.Parse(reg, "arista_eos", family, im, bgpOutputs(t, im, "sw1"))
+		_, second, _ := parse.Parse(reg, "arista_eos", family, im, bgpOutputs(t, im, "sw1"))
+		if err != nil || !reflect.DeepEqual(canonical(t, first), canonical(t, second)) {
+			t.Errorf("%s: two parses differ or fail: %v", family, err)
+		}
+		if family != "ospf_neighbours" {
+			continue
+		}
+		for _, r := range first {
+			if r["interface"] == "Vlan44" && r["state"] == "full" {
+				t.Errorf("the MTU mismatch adjacency reads full: %v", r)
+			}
+		}
+	}
+}
+
+// FR-009, research R7 and R14: an error is never empty, a blank guard is a failure, the guard's
+// "none" decides empty, and a blank interface view while the guard counts interfaces is a failure.
+func TestOSPFErrorsAreNotEmpty(t *testing.T) {
+	lab := filepath.Join("arista_eos", "testdata", "lab")
+	denied, _ := os.ReadFile(filepath.Join(lab, "sw2_show_ip_ospf_interface_vrf_all_denied_empty.raw"))
+	invalid, _ := os.ReadFile(filepath.Join(lab, "sw1_show_ip_ospf_neighbor_detail_vrf_all_invalid_empty.raw"))
+	if len(denied) == 0 || len(invalid) == 0 {
+		t.Fatal("error recordings missing")
+	}
+	for _, family := range ospfFamilies {
+		reg, im := ospfImpl(t, family)
+		for _, bad := range [][]byte{denied, invalid} {
+			for i := range im.Steps {
+				outs := bgpOutputs(t, im, "sw1")
+				outs[i] = bad
+				if s, rows, _ := parse.Parse(reg, "arista_eos", family, im, outs); s != parse.ParseFailed || rows != nil {
+					t.Errorf("%s step %d given %q: %s with %d rows, want parse_failed", family, i+1, bad, s, len(rows))
+				}
+			}
+		}
+		outs := bgpOutputs(t, im, "sw1")
+		outs[0] = []byte("\n")
+		if s, _, _ := parse.Parse(reg, "arista_eos", family, im, outs); s != parse.ParseFailed {
+			t.Errorf("%s: blank guard gave %s, want parse_failed", family, s)
+		}
+		if s, rows, err := parse.Parse(reg, "arista_eos", family, im, bgpOutputs(t, im, "sw4")); s != parse.Empty || rows != nil {
+			t.Errorf("%s sw4: %s %v %v, want empty", family, s, err, rows)
+		}
+		outs = bgpOutputs(t, im, "sw1")
+		outs[0] = bgpOutputs(t, im, "sw4")[0] // the guard says no OSPF, the other steps disagree
+		if s, _, _ := parse.Parse(reg, "arista_eos", family, im, outs); s != parse.ParseFailed {
+			t.Errorf("%s: sw4's guard with sw1's views gave %s, want parse_failed", family, s)
+		}
+	}
+	// sw1's guard counts interfaces: a blank interface view is a broken read (T031). A blank
+	// neighbour view stays "no adjacency".
+	reg, im := ospfImpl(t, "ospf_interfaces")
+	outs := bgpOutputs(t, im, "sw1")
+	outs[1] = nil
+	if s, _, err := parse.Parse(reg, "arista_eos", "ospf_interfaces", im, outs); s != parse.ParseFailed || !strings.Contains(err.Error(), "the guard counts 5") {
+		t.Errorf("blank interface view with a count: %s %v", s, err)
+	}
+	reg, im = ospfImpl(t, "ospf_neighbours")
+	outs = bgpOutputs(t, im, "sw1")
+	outs[1] = nil
+	if s, _, err := parse.Parse(reg, "arista_eos", "ospf_neighbours", im, outs); s != parse.Empty {
+		t.Errorf("blank neighbour view: %s %v, want empty", s, err)
+	}
 }

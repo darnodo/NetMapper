@@ -39,7 +39,7 @@ with counters and timers), following feature 010 (BGP).
 - **No secret reaches recorded output; the authentication type is recorded.** The families are
   read from commands that do not print a key, and the secret check covers the lab's OSPF key. Each
   interface row records the authentication type in effect on it (`none`, `simple`, `md5`, `sha`,
-  `other`, `unknown`), never the key: a type mismatch between the two ends of a link is a common
+  `message_digest`, `other`, `unknown`), never the key: a type mismatch between the two ends of a link is a common
   reason an adjacency never forms, and it is readable by comparing both ends. This differs from
   `bgp_peers`, which records nothing about its password.
 - **Nothing configured is `empty`, per family.** A device with no OSPF gives `empty` for both. A
@@ -60,6 +60,11 @@ with counters and timers), following feature 010 (BGP).
   per interface: `none`, `simple`, `md5`, `sha`, `other`, `unknown`. The key is never recorded.
   (Amended 2026-10-15: `unknown` added. It means the platform or transport did not expose the
   type, and stays distinct from `none`, which means the device reported no authentication.)
+- Q: (implementation, 2026-10-15) EOS 4.36 prints md5 and sha256 interfaces the same way
+  ("Message-digest authentication" in the text view, `"authentication": "md5"` in JSON). How is
+  such an interface recorded? → A: a new value, `message_digest`: a keyed-hash authentication whose
+  algorithm the platform does not expose. `md5` and `sha` stay for platforms that print the
+  algorithm.
 - Q: Should each adjacency row record the neighbour's DR/BDR role? → A: No. Each interface row
   records the DR and BDR of its segment instead. (Amended during planning, research R5, approved:
   they are recorded as router IDs, `dr_router_id` and `bdr_router_id`, because the interface view
@@ -206,7 +211,8 @@ check both observations are `empty`, and that a device of another platform gives
 - A platform or transport that does not expose the authentication type: the row reads `unknown`,
   never `none`. Comparing `unknown` with any other type says nothing about a mismatch.
 - Two ends of a link with different authentication types: no adjacency row on either end, and the
-  two interface rows show different types.
+  two interface rows show different types. Between two EOS devices an md5 end and a sha end both
+  read `message_digest`: that mismatch is not visible from the rows.
 - OSPFv3 (IPv6) configured on a device: not collected, and does not make OSPFv2 `parse_failed`.
 
 ## Requirements *(mandatory)*
@@ -228,7 +234,9 @@ check both observations are `empty`, and that a device of another platform gives
   cost, whether the interface is passive, the interface state (`dr`, `bdr`, `drother`,
   `point_to_point`, `loopback`, `waiting`, `down`, or `other`), and the authentication type in
   effect on the interface, whether set on the interface or inherited from its area (`none`,
-  `simple`, `md5`, `sha` for any HMAC-SHA variant, `other`, or `unknown`). `none` MUST be
+  `simple`, `md5`, `sha` for any HMAC-SHA variant, `message_digest` for a keyed-hash authentication
+  whose algorithm the device does not expose, `other`, or `unknown`). A platform that does not tell
+  md5 from sha MUST record `message_digest`, never guess one of them. `none` MUST be
   recorded only when the device reports that no authentication is configured. `unknown` means the
   platform or the transport used did not expose the type. A row MUST NOT read `none` when the
   information is missing. The field is always present: this is an exception to FR-006, and

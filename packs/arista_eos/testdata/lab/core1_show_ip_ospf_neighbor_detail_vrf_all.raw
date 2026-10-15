@@ -1,0 +1,12 @@
+Neighbor 10.0.200.2, instance 1, VRF default, interface address 10.0.200.129
+  In area 0.0.0.0 interface Ethernet5.100
+  Neighbor priority is 1, State is FULL, 7 state changes
+  Adjacency was established 02:05:57 ago
+  Current state was established 02:05:57 ago
+  DR IP Address 10.0.200.128 BDR IP Address 10.0.200.129
+  Options is E
+  Dead timer is due in 00:00:33
+  Inactivity timer deferred 0 times
+  LSAs retransmitted 0 times to this neighbor
+  Graceful-restart-helper mode is Inactive
+  Graceful-restart attempts: 0

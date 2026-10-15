@@ -16,6 +16,11 @@
 # 10, with no new link: a session with a password and a description where sw1 alone activates ipv6
 # unicast, a wrong-AS peer and a shut peer on sw1, and a dynamic peer on sw2 from a listen range sw1
 # connects into from its Loopback1. sw4 has no BGP and is the `empty` case of the bgp_peers family.
+# sw1 and sw2 carry the OSPF configuration of feature 011 on SVIs of VLANs 41 to 44 (already
+# trunked, no new link or VLAN): area 0 with md5 on VLAN 41, a point-to-point stub area 1 on VLAN 42,
+# instance 2 in VRF blue with sha on VLAN 43, an MTU mismatch on VLAN 44 that holds the adjacency
+# below full, and passive Loopback0 in area 0. sw4 has no OSPF and is the `empty` case of the
+# ospf_interfaces and ospf_neighbours families.
 # Record outputs with: docker exec clab-netmapper-sw2 Cli -p 15 -c '<command> | no-more'
 # sw3 answers SSH but has no netmapper user and no SNMP community: it
 # rejects every lab credential set (denied). 172.20.20.9 is inside the perimeter and unused
