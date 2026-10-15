@@ -284,6 +284,7 @@ func TestNoSecretInRecordedOutput(t *testing.T) {
 		regexp.MustCompile(`\$[156]\$`),
 		regexp.MustCompile(`sha512 \$`),
 		regexp.MustCompile(`key 7 [0-9A-Fa-f]{6,}`),
+		regexp.MustCompile(`password 7 \S+`), // a BGP neighbour password as EOS stores it (feature 010)
 	}
 	raws, _ := filepath.Glob(filepath.Join("*", "testdata", "lab", "*.raw"))
 	if len(raws) == 0 {
@@ -498,4 +499,143 @@ Ma0                            connected    routed   a-full a-1G   10/100/1000
 	if !reflect.DeepEqual(rows, want) {
 		t.Errorf("got %v\nwant %v", rows, want)
 	}
+}
+
+// bgpOutputs reads one recording per step of the bgp_peers recipe for sw, with the files named in
+// override replacing the step whose template they name (feature 010).
+func bgpOutputs(t *testing.T, im pack.Impl, sw string, override ...string) [][]byte {
+	t.Helper()
+	var outs [][]byte
+	for _, st := range im.Steps {
+		tmpl := strings.TrimSuffix(st.Template, ".textfsm")
+		base := filepath.Join("arista_eos", "testdata", "lab", sw+"_"+tmpl)
+		paths := []string{base + ".raw", base + "_empty.raw"}
+		for _, o := range override {
+			if strings.Contains(o, tmpl+"_") || strings.HasSuffix(o, tmpl+".raw") {
+				paths = []string{filepath.Join("arista_eos", "testdata", "lab", o)}
+			}
+		}
+		var b []byte
+		var err error
+		for _, p := range paths {
+			if b, err = os.ReadFile(p); err == nil {
+				break
+			}
+		}
+		if err != nil {
+			t.Fatalf("%s step %q: %v", sw, st.Command, err)
+		}
+		outs = append(outs, b)
+	}
+	return outs
+}
+
+func bgpImpl(t *testing.T) (*pack.Registry, pack.Impl) {
+	t.Helper()
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return reg, reg.Implementations("arista_eos", "bgp_peers", "4.36.0F")[0]
+}
+
+// FR-005d: the summary steps in another order give the same rows (feature 010).
+func TestBGPStepOrder(t *testing.T) {
+	reg, im := bgpImpl(t)
+	outs := bgpOutputs(t, im, "dc-leaf1")
+	_, want, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, outs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev := im
+	rev.Steps = slices.Clone(im.Steps)
+	revOuts := slices.Clone(outs)
+	slices.Reverse(rev.Steps[1:4])
+	slices.Reverse(revOuts[1:4])
+	_, got, err := parse.Parse(reg, "arista_eos", "bgp_peers", rev, revOuts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g, w := canonical(t, got), canonical(t, want); !slices.Equal(g, w) {
+		t.Errorf("reversed summaries\n got %s\nwant %s", strings.Join(g, "\n     "), strings.Join(w, "\n     "))
+	}
+}
+
+// Research R4: sw1 with its password session shut after it was up. EOS still prints the last
+// remote router ID; the row keeps neither it nor a negotiated list, and keeps its configured list.
+func TestBGPSessionThatWentDown(t *testing.T) {
+	reg, im := bgpImpl(t)
+	b, _ := os.ReadFile(filepath.Join("arista_eos", "testdata", "lab", "sw1_show_bgp_neighbors_vrf_all_down.raw"))
+	if !strings.Contains(string(b), "remote router ID 10.255.0.2") {
+		t.Fatal("the recording no longer shows the stale router ID, so this test proves nothing")
+	}
+	s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw1", "sw1_show_bgp_neighbors_vrf_all_down.raw"))
+	if s != parse.Collected {
+		t.Fatalf("%s %v", s, err)
+	}
+	for _, r := range rows {
+		if r["peer_address"] != "10.0.10.2" {
+			continue
+		}
+		_, neg := r["negotiated_address_families"]
+		_, id := r["peer_router_id"]
+		if r["shutdown"] != "yes" || r["state"] == "established" || neg || id ||
+			!reflect.DeepEqual(r["configured_address_families"], []string{"ipv4 unicast", "ipv6 unicast"}) {
+			t.Errorf("row %v", r)
+		}
+		return
+	}
+	t.Error("no row for 10.0.10.2")
+}
+
+// FR-009: only the exact "nothing here" answers are empty. A refusal, an invalid command or
+// "% BGP inactive" next to anything else is parse_failed, so a diff never reads an error as
+// sessions that disappeared (feature 010, research R8).
+func TestBGPErrorsAreNotEmpty(t *testing.T) {
+	reg, im := bgpImpl(t)
+	lab := filepath.Join("arista_eos", "testdata", "lab")
+	denied, _ := os.ReadFile(filepath.Join(lab, "sw2_show_bgp_neighbors_vrf_all_denied_empty.raw"))
+	invalid, _ := os.ReadFile(filepath.Join(lab, "sw1_show_bgp_evpn_summary_invalid_empty.raw"))
+	for _, bad := range [][]byte{denied, invalid, []byte("% BGP inactive\nsomething else\n")} {
+		for i := range im.Steps {
+			outs := bgpOutputs(t, im, "sw1")
+			outs[i] = bad
+			if s, rows, _ := parse.Parse(reg, "arista_eos", "bgp_peers", im, outs); s != parse.ParseFailed || rows != nil {
+				t.Errorf("step %d given %q: %s with %d rows, want parse_failed", i+1, bad, s, len(rows))
+			}
+		}
+	}
+	if s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw4")); s != parse.Empty || rows != nil {
+		t.Errorf("sw4: %s %v %v, want empty", s, err, rows)
+	}
+	// sw2 after its dynamic peer left: the peer group lists no member, which is nothing to report.
+	s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw2", "sw2_show_bgp_peer_group_nomembers_empty.raw"))
+	if s != parse.Collected {
+		t.Fatalf("sw2 with no member: %s %v", s, err)
+	}
+	for _, r := range rows {
+		if r["dynamic"] == "yes" {
+			t.Errorf("dynamic row with no member listed: %v", r)
+		}
+	}
+}
+
+// Edge case "a peer relying on the device's default" (convergence T039): sw2 with the explicit
+// activate removed still lists 10.0.10.1 in its ipv4 summary, so the configured list holds ipv4
+// unicast.
+func TestBGPDefaultActivation(t *testing.T) {
+	reg, im := bgpImpl(t)
+	s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw2", "sw2_show_ip_bgp_summary_vrf_all_defaultactive.raw"))
+	if s != parse.Collected {
+		t.Fatalf("%s %v", s, err)
+	}
+	for _, r := range rows {
+		if r["peer_address"] == "10.0.10.1" {
+			if !reflect.DeepEqual(r["configured_address_families"], []string{"ipv4 unicast"}) {
+				t.Errorf("row %v", r)
+			}
+			return
+		}
+	}
+	t.Error("no row for 10.0.10.1")
 }

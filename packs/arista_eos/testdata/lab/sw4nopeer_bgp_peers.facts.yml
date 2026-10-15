@@ -1,0 +1,5 @@
+# What the bgp_peers recipe must produce from the sw4nopeer recordings: sw4 with `ip routing` and
+# `router bgp 65104` but no neighbour (convergence T038): blank neighbour view, header-only
+# summaries, no peer group.
+status: empty
+rows: []

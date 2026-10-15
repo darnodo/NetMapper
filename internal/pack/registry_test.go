@@ -138,10 +138,10 @@ func TestLoadWarnsMissingFamily(t *testing.T) {
 	if _, err := Load(base, dir); err != nil {
 		t.Fatal(err)
 	}
-	// fakeos also has no recipe for the six management families (feature 007) and the two layer 2
-	// families (feature 008): one line each.
+	// fakeos also has no recipe for the six management families (feature 007), the two layer 2
+	// families (feature 008) and bgp_peers (feature 010): one line each.
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	if len(lines) != 9 || !strings.Contains(buf.String(), "family=vlans effect=\"no VLAN data") || !strings.Contains(buf.String(), "pack=fakeos family=neighbours") {
+	if len(lines) != 10 || !strings.Contains(buf.String(), "family=vlans effect=\"no VLAN data") || !strings.Contains(buf.String(), "pack=fakeos family=neighbours") {
 		t.Errorf("warnings = %q", buf.String())
 	}
 	for _, l := range lines {
@@ -171,5 +171,51 @@ func TestNormaliseVLANs(t *testing.T) {
 		if got, err := NormaliseVLANs(bad); err == nil {
 			t.Errorf("NormaliseVLANs(%q) = %q, want an error", bad, got)
 		}
+	}
+}
+
+// bgpRecipe is a bgp_peers recipe for fakeos, written only into a test's own copy of the pack so
+// the collector tests that crawl fakeos never run it.
+const bgpRecipe = `family: bgp_peers
+implementations:
+  - id: bgp-cli
+    versions: '>=1.0'
+    transport: ssh
+    steps:
+      - command: display peers
+        template: display_peers.textfsm
+        map: { vrf: VRF, peer_address: PEER, peer_as: AS, state: STATE, peer_router_id: PEER_ID, negotiated_address_families: NEGOTIATED }
+      - command: display family ipv4
+        template: display_family.textfsm
+        map: { vrf: VRF, peer_address: PEER, configured_address_families: '=ipv4 unicast' }
+      - command: display family evpn
+        template: display_family.textfsm
+        map: { vrf: VRF, peer_address: PEER, configured_address_families: '=l2vpn evpn' }
+    merge_on: [vrf, peer_address]
+    covers:
+      configured_address_families: [ipv4 unicast, l2vpn evpn]
+`
+
+// Feature 010, FR-005c: covers must equal the literal values the steps map into the field, both
+// ways, and name a list field.
+func TestCovers(t *testing.T) {
+	for _, c := range []struct{ name, old, new, want string }{
+		{"matching", "", "", ""},
+		{"covers a value no step maps", "[ipv4 unicast, l2vpn evpn]", "[ipv4 unicast, l2vpn evpn, ipv6 unicast]", "covers configured_address_families [ipv4 unicast ipv6 unicast l2vpn evpn], but the steps map [ipv4 unicast l2vpn evpn]"},
+		{"a step maps a value covers lacks", "[ipv4 unicast, l2vpn evpn]", "[ipv4 unicast]", "but the steps map [ipv4 unicast l2vpn evpn]"},
+		{"covers a field that is not a list", "configured_address_families: [ipv4", "peer_group: [ipv4", `covers field "peer_group" is not a list field`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := copyPack(t, "", "", "")
+			os.WriteFile(filepath.Join(dir, "recipes", "bgp_peers.yaml"), []byte(strings.Replace(bgpRecipe, c.old, c.new, 1)), 0o644)
+			_, err := Load(base, dir)
+			if c.want == "" {
+				if err != nil {
+					t.Errorf("matching covers refused: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), c.want) || !strings.Contains(err.Error(), "bgp_peers/bgp-cli") {
+				t.Errorf("got %v, want %q", err, c.want)
+			}
+		})
 	}
 }

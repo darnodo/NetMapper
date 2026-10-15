@@ -1,0 +1,7 @@
+BGP peer-group is DYN
+  BGP version 4
+  Listen-range subnets:
+    VRF default:
+      10.255.1.0/24, remote AS 65101
+Empty peer-groups:
+  DYN

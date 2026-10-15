@@ -1,0 +1,8 @@
+# What the bgp_peers recipe must produce from the sw1 recordings (test/lab/sw1.cfg): the password session with ipv6 unicast configured and
+# not negotiated, the wrong-AS peer, the shut peer, and the peer into sw2's listen range.
+status: collected
+rows:
+  - {"configured_address_families":["ipv4 unicast","ipv6 unicast"],"description":"TO-SW2","dynamic":"no","local_as":65101,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.0.10.2","peer_as":65102,"peer_router_id":"10.255.0.2","router_id":"10.255.0.1","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["ipv4 unicast"],"dynamic":"no","local_as":65101,"peer_address":"10.0.10.99","peer_as":65102,"router_id":"10.255.0.1","shutdown":"yes","state":"idle","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["ipv4 unicast"],"dynamic":"no","local_as":65101,"peer_address":"10.255.0.2","peer_as":65199,"router_id":"10.255.0.1","shutdown":"no","state":"connect","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["ipv4 unicast"],"dynamic":"no","local_as":65101,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.255.0.12","peer_as":65102,"peer_router_id":"10.255.0.2","router_id":"10.255.0.1","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}

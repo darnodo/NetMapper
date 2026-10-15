@@ -1,0 +1,13 @@
+Value Filldown VRF (\S+)
+Value Required PEER (\S+)
+Value AS (\d+)
+Value STATE (\S+)
+Value PEER_ID (\S+)
+Value List NEGOTIATED (\S+)
+
+Start
+  ^vrf -> Continue.Record
+  ^vrf ${VRF}$$
+  ^peer -> Continue.Record
+  ^peer ${PEER} as ${AS} state ${STATE}( id ${PEER_ID})?$$
+  ^\s+negotiated ${NEGOTIATED}$$

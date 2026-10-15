@@ -455,3 +455,34 @@ func TestEntityWithoutClaimsIsStillProjected(t *testing.T) {
 		t.Errorf("projection counts %v, want them to match the rows written", got)
 	}
 }
+
+// Feature 010, FR-015: bgp_peers rows are read by no projection. A snapshot whose devices carry
+// sessions, one of them towards the other device's address, projects exactly what it did without.
+func TestBGPPeersAreNotRead(t *testing.T) {
+	l := lab(t, map[netip.Addr]*fake.Device{
+		Addr("10.0.0.1"): FakeOS("sw1", "S001", "p1 sw2 10.0.0.2 p1 "+MAC("S002")),
+		Addr("10.0.0.2"): FakeOS("sw2", "S002", "p1 sw1 10.0.0.1 p1 "+MAC("S001")),
+	})
+	want := dump(l)
+	if _, err := l.DB.Exec(context.Background(), `
+		UPDATE observation SET status = 'collected', detail = NULL, parsed = '[
+		  {"vrf": "default", "peer_address": "10.0.0.2", "peer_as": 65102, "type": "ebgp",
+		   "state": "established", "shutdown": "no", "dynamic": "no", "local_as": 65101,
+		   "router_id": "10.0.0.1", "configured_address_families": ["ipv4 unicast"],
+		   "negotiated_address_families": ["ipv4 unicast"], "peer_router_id": "10.0.0.2"},
+		  {"vrf": "default", "peer_address": "192.0.2.1", "peer_as": 65199, "type": "ebgp",
+		   "state": "active", "shutdown": "no", "dynamic": "no", "local_as": 65101,
+		   "router_id": "10.0.0.1", "configured_address_families": []}]'
+		WHERE fact_family = 'bgp_peers'`); err != nil {
+		t.Fatal(err)
+	}
+	if n := l.Int(`SELECT count(*) FROM observation WHERE fact_family = 'bgp_peers' AND status = 'collected'`); n != 2 {
+		t.Fatalf("%d bgp_peers observations set to collected, want 2", n)
+	}
+	if _, err := graph.Project(context.Background(), l.DB, l.Registry, snap(l)); err != nil {
+		t.Fatal(err)
+	}
+	if got := dump(l); !slices.Equal(got, want) {
+		t.Errorf("bgp_peers changed the projection:\n got %v\nwant %v", got, want)
+	}
+}

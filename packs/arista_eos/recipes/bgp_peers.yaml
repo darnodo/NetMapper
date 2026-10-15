@@ -1,0 +1,72 @@
+family: bgp_peers
+implementations:
+  - id: bgp-peers-cli
+    versions: '>=4.36'   # only 4.36 recorded and scanned for secrets (feature 010, research R13)
+    transport: ssh
+    # The neighbour view gives one record per peer in every VRF, whatever its families and state.
+    # EOS does not print per peer which families are configured, so each family summary lists the
+    # peers activated for it, down ones included (research R2). EVPN exists in the default VRF only:
+    # `show bgp evpn summary vrf all` is refused. The neighbour view has no dynamic marker, so the
+    # peer-group view gives it (R3). No counter, timer or uptime is mapped (FR-007).
+    # The only "nothing here" answers are exactly `% BGP inactive` and, for peer groups, groups with
+    # no member; a refusal or any other `%` line reaches the template and fails (R8, FR-009).
+    steps:
+      - command: show bgp neighbors vrf all | no-more
+        template: show_bgp_neighbors_vrf_all.textfsm
+        empty_lines: ['^% BGP inactive$']
+        map:
+          vrf: VRF
+          peer_address: PEER_ADDRESS
+          peer_as: PEER_AS
+          type: LINK
+          state: STATE
+          shutdown: SHUTDOWN
+          peer_router_id: PEER_ROUTER_ID
+          peer_group: PEER_GROUP
+          description: DESCRIPTION
+          negotiated_address_families: NEGOTIATED
+          local_as: LOCAL_AS
+          router_id: ROUTER_ID
+      - command: show ip bgp summary vrf all | no-more
+        template: show_ip_bgp_summary_vrf_all.textfsm
+        empty_lines: &summary_empty
+          - '^% BGP inactive$'
+          - '^BGP summary information for VRF \S+$'
+          - '^Router identifier \S+, local AS number \d+$'
+          - '^Neighbor Status Codes: .*$'
+          - '^(Description\s+)?Neighbor\s+V\s+AS\s+MsgRcvd\s+MsgSent\s+InQ\s+OutQ\s+Up/Down\s+State\s+PfxRcd\s+PfxAcc\s+PfxAdv$'
+        map: { vrf: VRF, peer_address: NEIGHBOR, configured_address_families: '=ipv4 unicast' }
+      - command: show ipv6 bgp summary vrf all | no-more
+        template: show_ipv6_bgp_summary_vrf_all.textfsm
+        empty_lines: *summary_empty
+        map: { vrf: VRF, peer_address: NEIGHBOR, configured_address_families: '=ipv6 unicast' }
+      - command: show bgp evpn summary | no-more
+        template: show_bgp_evpn_summary.textfsm
+        empty_lines: *summary_empty
+        map: { vrf: VRF, peer_address: NEIGHBOR, configured_address_families: '=l2vpn evpn' }
+      - command: show bgp peer-group | no-more
+        template: show_bgp_peer_group.textfsm
+        # No group at all, or groups whose lines list no member (a listen range nobody uses yet).
+        # The last pattern is a group name under "Empty peer-groups:".
+        empty_lines:
+          - '^% BGP inactive$'
+          - '^No such peer group exists$'
+          - '^BGP peer-group is \S+(, .*)?$'
+          - '^BGP version \d+$'
+          - '^Listen-range subnets:$'
+          - '^VRF \S+:$'
+          - '^\S+/\d+, remote AS \d+$'
+          - '^Empty peer-groups:$'
+          - '^[\w.-]+$'
+        map: { vrf: VRF, peer_address: NEIGHBOR, dynamic: KIND }
+    merge_on: [vrf, peer_address]
+    covers:
+      configured_address_families: [ipv4 unicast, ipv6 unicast, l2vpn evpn]
+    values:
+      type: { external: ebgp, internal: ibgp }
+      state: { Idle: idle, Connect: connect, Active: active, OpenSent: opensent, OpenConfirm: openconfirm, Established: established, '*': other }
+      shutdown: { Administratively shut down: 'yes' }
+      dynamic: { Dynamic: 'yes', Static: 'no' }
+      negotiated_address_families: { IPv4 Unicast: ipv4 unicast, IPv6 Unicast: ipv6 unicast, L2VPN EVPN: l2vpn evpn }
+      peer_router_id: { 0.0.0.0: '' }
+    defaults: { shutdown: 'no', dynamic: 'no' }

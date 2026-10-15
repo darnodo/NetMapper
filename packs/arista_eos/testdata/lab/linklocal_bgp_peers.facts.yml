@@ -1,0 +1,8 @@
+# What the bgp_peers recipe must produce from the linklocal recordings. Hand-written, not recorded:
+# neither lab has an IPv6 or a link-local session. Written in the format of sw1's recordings, with
+# an IPv6 peer and a link-local one (an unnumbered session), both ipv6 unicast only. The link-local
+# summary line used to be skipped without error, which left that peer with an empty configured list.
+status: collected
+rows:
+  - {"configured_address_families":["ipv6 unicast"],"dynamic":"no","local_as":65101,"negotiated_address_families":["ipv6 unicast"],"peer_address":"2001:db8::2","peer_as":65102,"peer_router_id":"10.255.0.2","router_id":"10.255.0.1","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}
+  - {"configured_address_families":["ipv6 unicast"],"dynamic":"no","local_as":65101,"negotiated_address_families":["ipv6 unicast"],"peer_address":"fe80::1%Et1","peer_as":65103,"peer_router_id":"10.255.0.3","router_id":"10.255.0.1","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}

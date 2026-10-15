@@ -1,0 +1,6 @@
+Value Filldown VRF (\S+)
+Value Required PEER (\S+)
+
+Start
+  ^vrf ${VRF}$$
+  ^member ${PEER}$$ -> Record

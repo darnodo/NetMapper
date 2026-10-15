@@ -1,0 +1,3 @@
+# What the bgp_peers recipe must produce from the dc-access1 recordings (EVPN lab): no BGP.
+status: empty
+rows: []
