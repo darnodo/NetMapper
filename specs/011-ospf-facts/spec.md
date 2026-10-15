@@ -29,9 +29,9 @@ with counters and timers), following feature 010 (BGP).
   identical runs and are left out, as for BGP. That data belongs to telemetry.
 - **The neighbour's own DR/BDR role is not recorded on the adjacency row.** It is the neighbour's
   interface state, recorded on the neighbour's own `ospf_interfaces` row when that device is
-  crawled. Instead, each interface row on a segment with an election records the addresses of the
+  crawled. Instead, each interface row on a segment with an election records the router IDs of the
   segment's DR and BDR, so who holds those roles is readable from one device even when the
-  neighbour is not crawled.
+  neighbour is not crawled. They are router IDs on every transport, never interface addresses.
 - **Cost, network type, passive and area are configuration, and are collected.** They are what an
   operator checks first when a path is not the expected one.
 - **Area types are `normal`, `stub`, `nssa`.** A stub or NSSA area with summaries suppressed
@@ -61,7 +61,9 @@ with counters and timers), following feature 010 (BGP).
   (Amended 2026-10-15: `unknown` added. It means the platform or transport did not expose the
   type, and stays distinct from `none`, which means the device reported no authentication.)
 - Q: Should each adjacency row record the neighbour's DR/BDR role? → A: No. Each interface row
-  records the DR and BDR addresses of its segment instead.
+  records the DR and BDR of its segment instead. (Amended during planning, research R5, approved:
+  they are recorded as router IDs, `dr_router_id` and `bdr_router_id`, because the interface view
+  prints router IDs, not segment addresses. The field means router ID on every transport.)
 - Q: Should `test/lab` get an OSPF instance in a non-default VRF, beyond what #32 lists? → A: Yes,
   one instance in a non-default VRF between sw1 and sw2, with an adjacency, so the VRF rule of #30
   is tested on recorded output.
@@ -90,7 +92,7 @@ alone.
    has one row per interface, each with VRF `default`, instance, router ID, area `0.0.0.0`, area
    type `normal`, network type, cost, passive `yes` for the loopback and `no` for `Ethernet5.100`,
    and the interface state the device reports. The `Ethernet5.100` row also carries the DR
-   address `10.0.200.128` and the BDR address `10.0.200.129`.
+   router ID `10.0.200.1` and the BDR router ID `10.0.200.2`.
 2. **Given** the same device, **When** a crawl runs, **Then** `ospf_neighbours` has one row for
    core2: router ID `10.0.200.2`, address `10.0.200.129`, interface `Ethernet5.100`, area
    `0.0.0.0`, state `full`.
@@ -176,11 +178,21 @@ check both observations are `empty`, and that a device of another platform gives
 - An adjacency that flaps between two crawls: each observation records the state seen at collection
   time.
 - A DR/BDR state that changes after a lab redeploy (election order): a change between snapshots,
-  not between two crawls of an unchanged network. The same holds for the DR and BDR addresses.
-- A broadcast segment with only one OSPF router: the row has a DR address (its own) and no BDR
-  address.
+  not between two crawls of an unchanged network. The same holds for the DR and BDR router IDs.
+- A broadcast segment with only one OSPF router: the row has a DR router ID (its own) and no BDR
+  router ID.
 - A neighbour on a broadcast segment that is not crawled: its role is read from the local row's DR
-  and BDR addresses, compared with the adjacency row's neighbour address.
+  and BDR router IDs, compared with the adjacency row's neighbour router ID.
+- A transport that reports the DR or BDR by interface address rather than router ID (SNMP: the
+  OSPF-MIB DR and BDR columns hold addresses): the address is resolved to a router ID through the
+  device's neighbour table, or to the device's own router ID when the DR or BDR is the device
+  itself. When it cannot be resolved, the field reads `unknown`, never the raw address.
+- A command that returns an empty output after a timeout, a dropped session or a failure to detect
+  the prompt: the observation keeps its failure status (`unreachable` or `parse_failed`, or no
+  observation, the task failing), never `empty`, so a later diff does not read it as OSPF that
+  disappeared.
+- A blank output on the step that decides "no OSPF here": `parse_failed`, never `empty`, even with
+  no transport error.
 - An area ID the device prints as a number rather than dotted form: recorded in dotted form, so
   the same area reads the same on every device.
 - A neighbour that a device stops listing (dead timer expired): it has no row in the next
@@ -219,10 +231,16 @@ check both observations are `empty`, and that a device of another platform gives
   information is missing. The field is always present: this is an exception to FR-006, and
   `unknown` takes the place of an absent field.
 - **FR-004a**: An `ospf_interfaces` row on a network type with a DR election (`broadcast`, `nbma`)
-  MUST carry the address of the segment's DR and the address of its BDR, each when the device
-  reports one. Both are absent on other network types, and each is absent when no router holds
-  that role (no BDR elected, or the election not finished). They are statuses like the interface
-  state: they change with an election, not with traffic.
+  MUST carry the router ID of the segment's DR (`dr_router_id`) and of its BDR (`bdr_router_id`),
+  each when the device reports one. Both are absent on other network types, and each is absent
+  when no router holds that role (no BDR elected, or the election not finished). They are statuses
+  like the interface state: they change with an election, not with traffic. Both fields mean
+  router ID on every transport. An implementation whose source gives the DR or BDR as an interface
+  address (SNMP `ospfIfDesignatedRouter` and `ospfIfBackupDesignatedRouter`) MUST resolve it
+  through the device's neighbour table (`ospfNbrIpAddr` to `ospfNbrRtrId`), or to the device's own
+  router ID (`ospfRouterId`) when the address is the device's own. When it cannot be resolved, the
+  field MUST read `unknown`, never the raw address. Absent means no router holds the role;
+  `unknown` means one does and its router ID could not be established.
 - **FR-005**: Every `ospf_neighbours` row MUST carry the interface (canonical name), the neighbour
   router ID, the neighbour address, and the adjacency state (`down`, `attempt`, `init`, `2way`,
   `exstart`, `exchange`, `loading`, `full`, or `other`).
@@ -238,9 +256,18 @@ check both observations are `empty`, and that a device of another platform gives
 - **FR-009**: A device with no OSPF interface MUST produce an `empty` `ospf_interfaces`
   observation, and a device with no adjacency an `empty` `ospf_neighbours` observation, not a
   `collected` one with no row. `empty` MUST come only from outputs the pack declares as "nothing
-  here" (the device's exact "OSPF not running" answer, or a list with no entry). A refused command,
-  an invalid command or any other error output MUST produce `parse_failed`, so a later diff never
-  reads an error as adjacencies that disappeared.
+  here". On Arista EOS, the text commands print nothing at all when OSPF is not running, and have
+  no "OSPF not running" answer (amended during planning, research R7, approved). So "no OSPF here"
+  MUST be decided by a step whose "nothing here" answer is not blank: the structured form of the
+  instance view, which answers a non-empty document listing no VRF (research R14). A blank output
+  on that step is never valid and MUST give `parse_failed`. A blank output on another step (such
+  as no adjacency) is accepted only once that step has shown OSPF running. Any blank output means
+  "nothing here" only when the command completed normally. A blank output after a timeout, a
+  dropped session or a failure to detect the prompt MUST keep its failure status (`unreachable` or
+  `parse_failed`, or no observation, the task failing), never `empty`, so a diff never reads it as
+  a disappearance. A refused command, an invalid command or any other error output
+  MUST produce `parse_failed`, so a later diff never reads an error as adjacencies that
+  disappeared.
 - **FR-010**: The Arista EOS pack MUST provide a recipe for each new family; no other pack changes.
   Commands MUST be read only (constitution IV).
 - **FR-011**: The schema of both families MUST be published in the fact families contract in the
@@ -279,7 +306,7 @@ check both observations are `empty`, and that a device of another platform gives
   its ID on each adjacency row.
 - **OSPF interface**: an interface of one device taking part in one instance, with its area, cost,
   network type, passive flag, state, authentication type and, on a segment with an election, the
-  DR and BDR addresses.
+  DR and BDR router IDs.
 - **OSPF adjacency**: a relation from one device to one neighbour router ID over one interface in
   one VRF, with the neighbour's address and the adjacency state. The same adjacency seen from both
   ends is two rows on two devices; joining them is not this feature's job.

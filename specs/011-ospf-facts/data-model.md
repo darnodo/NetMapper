@@ -23,10 +23,49 @@ research R6).
 ```
 
 A step with `join_on` adds its fields to every row so far that holds the same values on those
-fields, without overwriting a value already set. It never creates a row: a join row that matches
-nothing is ignored. Its rows do not make the observation non-empty, so a device whose only output
-is the instance view is `empty`. The registry refuses `join_on` on the first step. Steps without
-`join_on` behave as before (research R2).
+fields, without overwriting a value already set. It never creates a row. Its rows do not make the
+observation non-empty, so a device whose only output is the instance view is `empty`. Steps
+without `join_on` behave as before (research R2).
+
+A step with `join_on` must also declare `unmatched`, with no default:
+
+- `fail`: a join row that matches no row makes the observation `parse_failed`, naming the step and
+  the key;
+- `ignore`: such rows stay out of the observation; the parser returns their keys and the collector
+  logs them, one `info` line per observation. The raw output is stored as for any step.
+
+The registry refuses `join_on` with no row-creating step before it, `join_on` without
+`unmatched`, and either key in a pack whose `pack_schema` is below 2.
+
+## New recipe key: `guard` (per step)
+
+```yaml
+- command: show ip ospf vrf all | json
+  template: show_ip_ospf_vrf_all_json.textfsm
+  guard: true
+  none: '^\{"vrfs":\{\}\}$'   # matched against the output with all whitespace removed
+```
+
+A guard step decides whether the family has anything on this device, with a "none" answer that is
+not blank (research R14):
+
+- its output, with all whitespace removed, matches its `none` pattern: the observation is
+  `empty`; every other step must be nothing too, or the observation is `parse_failed`. Whitespace
+  and line breaks in the device's answer never change the outcome;
+- its output is blank: `parse_failed`, never nothing;
+- otherwise its template must yield a row, as for any step; the rows are not mapped into the
+  family and create no row.
+
+A guard step has no `map` and no `empty_lines`, and is the first step. The registry refuses a
+guard that is not first, has a `map` or `empty_lines`, has no `none` pattern, or sits in a pack
+below `pack_schema` 2. `none` is refused on a step that is not a guard.
+
+## New pack key: `pack_schema`
+
+`pack.yaml` gains `pack_schema`, the pack format version. Absent means 1: every existing pack loads
+unchanged. Version 2 adds `join_on`, `unmatched` and `guard`. The `covers` key of feature 010
+stays valid in both versions. A pack declaring a version the registry does
+not know is refused. `arista_eos` declares 2.
 
 ## `ospf_interfaces`
 
@@ -45,11 +84,13 @@ One row per interface in OSPF, identified by `vrf` and `interface`.
 | passive       | string | required: `yes`, `no` |
 | state         | string | required: `dr`, `bdr`, `drother`, `point_to_point`, `loopback`, `waiting`, `down`, `other` |
 | auth_type     | string | required, `Missing: unknown`: `none`, `simple`, `md5`, `sha`, `other`, `unknown` |
-| dr_router_id  | string | optional, when the device reports a DR on the segment |
-| bdr_router_id | string | optional, when the device reports a BDR on the segment |
+| dr_router_id  | string | optional, when the device reports a DR on the segment: a router ID, or `unknown` |
+| bdr_router_id | string | optional, when the device reports a BDR on the segment: a router ID, or `unknown` |
 
-`dr_router_id` and `bdr_router_id` are router IDs, not segment addresses (research R5, spec
-amendment). If recordings show EOS printing them on a point-to-point interface, `OnlyWith` is
+`dr_router_id` and `bdr_router_id` are router IDs on every transport, never segment addresses
+(research R5, spec FR-004a). `unknown` means a router holds the role and its router ID could not be
+resolved; absent means no router holds it. The EOS CLI prints router IDs, so the SSH recipe never
+writes `unknown` there. If recordings show EOS printing them on a point-to-point interface, `OnlyWith` is
 extended to a list of values and both fields become `OnlyWith: network_type in (broadcast,
 nbma)`.
 

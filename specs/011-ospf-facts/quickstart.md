@@ -25,7 +25,10 @@ Expected: everything passes, nothing skipped, and in particular:
 | `packs` `TestOSPFErrorsAreNotEmpty` | `% Authorization denied ...`, `% Invalid input` or `% OSPF instance does not exist ...` on any step give `parse_failed`, never `empty`; blank output on every step gives `empty` |
 | `internal/fact` | `Missing`: a row without `auth_type` is refused by `Validate`; `unknown` is accepted |
 | `internal/parse` | a mapped row with no `auth_type` gives `unknown`, never `none` and never absent (FR-013a); a `join_on` step fills matching rows, creates none, does not overwrite, and alone does not make the observation `collected`; an interface whose area has no join row is `parse_failed` |
-| `internal/pack` | a recipe with `join_on` on its first step, or a `defaults` entry on a `Missing` field, is refused at load |
+| `internal/pack` | a pack without `pack_schema` loads as version 1, `covers` loads in both versions; `join_on`, `unmatched` or `guard` in a version 1 pack, a guard that is not first, has a `map` or `empty_lines`, or has no `none`, `none` on a step that is not a guard, `pack_schema: 3`, `join_on` with no row-creating step before it, `join_on` without `unmatched`, or a `defaults` entry on a `Missing` field is refused at load |
+| `internal/parse` (`unmatched`) | a join row that matches no row gives `parse_failed` naming the step and key with `fail`, and the same rows plus the returned key with `ignore` |
+| `internal/parse` (`guard`) | the guard's "none" document gives `empty`, pretty-printed or on one line; a blank guard output gives `parse_failed`; the "none" document with another step holding output gives `parse_failed`; a guard error line gives `parse_failed`; a populated guard with blank row steps gives `empty` |
+| `internal/collector` | on the fake transport, a blank output returned with an idle timeout gives `unreachable`, with a deadline or a dropped session no observation for the family; never `empty` |
 | `internal/graph` | a snapshot with OSPF rows projects the same graph and verdict as one without |
 
 ## 2. Load warnings
@@ -60,14 +63,15 @@ Then settle the "to confirm" items of research R2, R4, R5 and R6 from the output
 If an interface with authentication prints no authentication line, or SNMP answers nothing usable
 for SHA, record that output as a real `unknown` fixture (spec FR-013a). Never edit a recording.
 
-Record the three step commands through an interactive SSH session, which is how the collector runs
+Record the four step commands (the guard `show ip ospf vrf all | json`, the interface, neighbour
+and instance views) through an interactive SSH session, which is how the collector runs
 them, named `<switch>_<template name>.raw`. Strip the `> <command>` first line if `Cli -c` was used
 (feature 007). Also:
 
 | Fixture | Change on the lab | Command |
 | ------- | ----------------- | ------- |
-| `sw4_show_ip_ospf_*_empty.raw` | none (sw4 has no OSPF) | the three steps, interactive SSH |
-| `sw4noadj_show_ip_ospf_*.raw` | sw4: `router ospf 1`, Loopback0 in area 0, reverted after | the three steps |
+| `sw4_show_ip_ospf_*_empty.raw` | none (sw4 has no OSPF) | the four step commands, interactive SSH; check the guard answers `{"vrfs": {}}` as on dc-leaf1, and whether the guard JSON on sw4noadj carries an interface count per area or instance (research R14) |
+| `sw4noadj_show_ip_ospf_*.raw` | sw4: `router ospf 1`, Loopback0 in area 0, reverted after | the four step commands |
 | `sw2_show_ip_ospf_interface_vrf_all_denied_empty.raw` | sw2: the temporary role of feature 010 denying `show ip ospf.*`, removed after | step 1 as that user |
 | `sw1_show_ip_ospf_neighbor_detail_vrf_all_invalid_empty.raw` | none | `show ip ospf neighbor detail vrf nosuch`, interactive SSH |
 
@@ -114,5 +118,5 @@ Crawl arista-evpn-vxlan-clab with the setup of
   10.0.200.2 on `Ethernet5.100`; one `full` adjacency to each other;
 - every other switch `empty` for both.
 
-Record core1's, core2's and dc-leaf1's three outputs as fixtures, as in section 3. Then crawl again
+Record core1's, core2's and dc-leaf1's four outputs as fixtures, as in section 3. Then crawl again
 with the lab's traffic running and check that every device's rows are identical to the first crawl.

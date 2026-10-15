@@ -8,7 +8,7 @@ implementation step 1.
 
 ## R1. Interface rows come from `show ip ospf interface vrf all`
 
-- **Decision**: the first step of `ospf_interfaces`, `show ip ospf interface vrf all | no-more`,
+- **Decision**: the first row-creating step of `ospf_interfaces` (after the guard, R14), `show ip ospf interface vrf all | no-more`,
   gives one record per interface in OSPF, in every VRF:
   - `<Interface> is up`: interface, already in canonical form (`Ethernet5.100`, `Loopback0`);
   - `Interface Address <ip>/<len>, instance <id>, VRF <vrf>, Area <area>`: instance, VRF, area;
@@ -39,10 +39,34 @@ implementation step 1.
   validation.
 - **Decision**: one vendor-neutral pack format addition, a per-step `join_on` list. A step with
   `join_on` only adds fields to rows already there that hold the same values on those fields; it
-  never creates a row, and its rows do not make the observation non-empty. An area row that matches
-  no interface (an area with no interface in it) is ignored. An interface whose area row is missing
-  keeps no `area_type`, which is required, so the observation is `parse_failed` (R12). The registry
-  refuses `join_on` on a first step (there is nothing to join onto).
+  never creates a row, and its rows do not make the observation non-empty. An interface whose area
+  row is missing keeps no `area_type`, which is required, so the observation is `parse_failed`
+  (R12). The registry refuses `join_on` on a step with no row-creating step before it (there is
+  nothing to join onto); the guard step of R14 does not create rows.
+- **A join row that matches no row** (approved condition: never dropped silently). Such rows are
+  normal here: an area whose interfaces have no neighbour gives an instance row that matches no
+  adjacency, on every crawl. So the outcome is declared, not implied: a step with `join_on` must
+  also set `unmatched`, with no default, and the registry refuses the pack without it.
+  - `unmatched: fail`: the observation is `parse_failed`, with an error naming the step and the
+    unmatched key, and the usual finding.
+  - `unmatched: ignore`: the rows are kept out of the observation, which is still `collected` or
+    `empty`. The parser returns the unmatched keys, and the collector logs one `info` line per
+    observation (family, recipe, step, keys). The raw output stays stored with the observation, so
+    nothing is lost and a replay sees the same rows.
+  Both OSPF recipes use `ignore`: an instance or area with nothing to join onto is information the
+  spec chose not to record ("an OSPF instance configured with no interface: no row"). `fail` is
+  for a future join whose every row must land.
+- **Pack format version** (approved condition): `join_on`, `unmatched` and `guard` (R14) change
+  the pack format. A
+  new top-level key in `pack.yaml`, `pack_schema`, says which format a pack is written in. Absent
+  means 1, so every existing pack stays valid unchanged. `arista_eos` declares `pack_schema: 2`. The
+  registry refuses `join_on`, `unmatched` or `guard` in a pack below 2, and a `pack_schema` above
+  2. The
+  `covers` key of feature 010 was added without a version; it stays valid in both.
+- **Alternatives considered for unmatched rows**: always `parse_failed` (fails every device with an
+  area that has no neighbour); a `data_quality` finding per observation (one per such device on
+  every crawl, for a normal state); storing them in the observation detail (detail is a status
+  qualifier, and it would show up in diffs).
 - **The same step serves both families**: neighbour rows carry VRF, instance and area too (R3), so
   `ospf_neighbours` joins the same output on the same key for the router ID. Both recipes name the
   same template, so `TestFamiliesFromLab` reads the same recording for both.
@@ -98,8 +122,17 @@ implementation step 1.
   point-to-point interface, whether EOS prints DR lines: to confirm when recording. If it does, the
   pack maps them on that network type anyway and the contract says the fields are absent there, so
   `OnlyWith` is extended to a list of values (`broadcast`, `nbma`) in the same change.
-- **To agree at review**: this is a change to what the user clarified ("DR/BDR IPs"). Same
-  treatment as feature 010 R6.
+- **Approved** (2026-10-15), with a condition: both fields mean router ID on every transport. An
+  SNMP implementation would read `ospfIfDesignatedRouter` and `ospfIfBackupDesignatedRouter`,
+  which hold the DR's and BDR's interface addresses (seen on core1: 10.0.200.128 and 10.0.200.129).
+  It must resolve each address through `ospfNbrTable` (`ospfNbrIpAddr` to `ospfNbrRtrId`), or to
+  `ospfRouterId` when the address is the device's own, and write `unknown` when neither resolves,
+  never the raw address. Absent keeps meaning "no router in that role".
+- **Scope** (decided 2026-10-15: SNMP out of scope): this feature ships SSH recipes only, so no
+  implementation does that resolution yet.
+  The rule is in the contract and binds any later SNMP implementation. No schema check can tell a
+  router ID from an address (both are dotted quads), so it is enforced at that implementation's
+  review and by its fixtures, not by `fact.Validate`.
 
 ## R6. Authentication type, and `unknown`
 
@@ -125,9 +158,10 @@ implementation step 1.
 ## R7. A device with no OSPF is `empty`
 
 - **Seen**: dc-leaf1 prints nothing at all to the three commands (blank output through `Cli -c`).
-  The parser already treats a blank output as nothing. No "OSPF not running" line exists on EOS 4.36
-  for the `vrf all` forms. FR-009's wording is amended to say the exact "nothing here" answer is a
-  blank output on this platform.
+  The parser treats a blank output as nothing. No "OSPF not running" line exists on EOS 4.36 for
+  the `vrf all` forms. Because a blank can also come from a broken read (below), "no OSPF here" is
+  decided by a guard step whose "nothing here" answer is not blank (R14), and FR-009 is amended to
+  say so.
 - **Recorded in step 1**: the same three commands on sw4 through an interactive SSH session, which
   is how the collector runs them (feature 010 R8: `Cli -c` and SSH exec add ` at line 1` to error
   lines, the collector's session does not).
@@ -136,6 +170,24 @@ implementation step 1.
   `ospf_interfaces` is `collected`, `ospf_neighbours` is `empty`. Since a `join_on` step does not
   count towards non-empty (R2), the neighbour family is `empty` even though the instance step has
   output.
+- **A blank output after a failure is not `empty`** (approved condition, FR-009). Read in the
+  code: `parse.Parse` only sees outputs of steps that returned without error. The SSH transport
+  turns an idle timeout and a missing prompt after login into `ErrIdleTimeout`, recorded as
+  `unreachable` with detail `timeout`; a step deadline (`ErrDeadline`) and any other session error,
+  such as a dropped channel, fail the task with no observation for the family
+  (`internal/collector/scrape.go`, `stepErr`). None of these paths can produce `empty`. Tests are
+  added on the fake transport: a blank output returned with each of those errors gives no `empty`
+  observation.
+- **Decided** (2026-10-15): for a deadline or a dropped session the collector keeps writing no
+  observation for the family and failing the task; FR-009 is amended to name that case ("or no
+  observation, the task failing"). The collector is not changed in this feature. A follow-up is
+  noted in `plan.md`: a failed task leaving no observation sits badly with a non-nullable status.
+- **Prompt race** (issue #15 class): a blank output returned with no error would read as completed.
+  The guard step (R14) closes it for "no OSPF here": a blank on the guard is `parse_failed`. What
+  remains: on a device that runs OSPF, a blank on the neighbour or interface step still reads as
+  "no adjacency" or "no interface", since those steps print a blank when they have nothing. That
+  needs a race on a session that has just answered the guard; no such case has been seen, and it
+  stays documented, not mitigated.
 - **Errors**: `% Invalid input`, `% Authorization denied ...` and a VRF-specific `% OSPF instance
   does not exist in vrf <vrf>` (seen on core1 for `vrf gold`) match no empty line, reach the
   template, yield no row, and the observation is `parse_failed`. A refusal is recorded on sw2 with
@@ -200,3 +252,45 @@ through it.
 ## R13. Versions
 
 `versions: '>=4.36'`, the only version recorded and scanned for secrets, like feature 010.
+
+## R14. A guard step decides "no OSPF here"
+
+- **Checked** (2026-10-15, cEOS 4.36.0F; `test/lab` was not deployed, so on the EVPN lab, same
+  image; to repeat on sw4 in implementation step 1): `show ip ospf vrf all | json` on dc-leaf1,
+  which runs no OSPF, answers three lines, `{`, `"vrfs": {}`, `}`, through `Cli -c` and through an
+  interactive session alike. On core1 it answers a document whose `vrfs` object holds `"default":
+  {` with the instance under it. The two other commands with `| json` also answer `{"vrfs": {}}` on
+  dc-leaf1.
+- **Decision**: each recipe starts with a guard step, `show ip ospf vrf all | json`, marked with a
+  new per-step key, `guard: true` (pack format 2):
+  - it recognises the "no OSPF" document as a `vrfs` key followed by an empty object, whatever the
+    whitespace and line breaks: the step's `none` pattern is matched against the whole output with
+    all whitespace removed (`^\{"vrfs":\{\}\}$`), so the pretty-printed three lines and a
+    one-line `{"vrfs": {}}` both match, and nothing else does. When it matches, the observation is
+    `empty`, and every other step must be nothing too, or the observation is `parse_failed` (the
+    device contradicts itself). Line-by-line `empty_lines` are not used on a guard: they cannot
+    tell `{"vrfs": {}}` on one line from other content;
+  - a blank output on a guard step is `parse_failed` ("guard step gave a blank output"), never
+    nothing;
+  - otherwise its template must yield at least one row, one per VRF key under `vrfs` (a TextFSM
+    match on the pretty-printed lines, not a JSON parser), or the observation is `parse_failed` as
+    for any step. An error line such as `% Invalid input` yields no row, so it fails there;
+  - its rows prove OSPF runs and are not mapped into the family: a guard step has no `map`.
+- **To check in step 1 on sw4** (and sw4noadj): whether the guard's JSON exposes an interface
+  count per area or per instance (the text view prints `Number of interface in this area is <n>`).
+  - If it does: an interface step that is blank while that count is above zero is `parse_failed`,
+    which closes the #15 residual risk for `ospf_interfaces`. A task is added for it (the guard
+    template captures the count; the parser compares).
+  - If it does not: the residual risk of R7 stays documented as it is.
+  - A blank neighbour step stays valid in every case: OSPF running with no adjacency is normal, and
+    no count in that output says otherwise.
+- **Rationale**: a non-empty "none" answer is something a broken read cannot produce by accident.
+  The pack format has no JSON parser, and none is added: matching two fixed shapes of text is
+  enough to decide presence. The rows still come from the text views (R1 to R3).
+- **Cost**: one more command per family per device, about 3 lines on a device without OSPF and 50
+  per instance with it. The JSON holds LSA counts and SPF times; it is raw output only, not rows.
+- **Alternatives considered**: a blank output as the "none" answer (open to the race); parsing
+  the JSON views for the rows (a new parser for one family, and the text views are already
+  recorded and understood); a guard per family using the `| json` form of that family's own
+  command (would also cover "no adjacency", but the shape of a JSON answer with OSPF and no
+  neighbour is not recorded yet, and the user's condition is about "no OSPF here").
