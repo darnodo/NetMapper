@@ -27,7 +27,8 @@ type Pack struct {
 	Name    string `yaml:"name"`
 	Version int    `yaml:"version"`
 	// PackSchema is the pack format version; absent means 1. Version 2 adds the guard,
-	// nothing_pattern, expect_rows, join_on and unmatched step keys (feature 011).
+	// nothing_pattern, expect_rows, join_on and unmatched step keys (feature 011). Version 3 adds
+	// unmatched: report and lists_every, and a join step that adds up list items (issue #44).
 	PackSchema int      `yaml:"pack_schema"`
 	ReadOnly   []string `yaml:"read_only"`
 	Probe      *struct {
@@ -119,8 +120,12 @@ type Step struct {
 	// JoinOn: the step only adds fields to rows already there holding the same values on these
 	// fields; it never creates a row.
 	JoinOn []string `yaml:"join_on"`
-	// Unmatched: what a join row that matches no row does, "fail" or "ignore".
+	// Unmatched: what a join row that matches no row does: "fail", "ignore", or "report", which
+	// raises it as a disagreement between the steps (issue #44).
 	Unmatched string `yaml:"unmatched"`
+	// ListsEvery: a field this join step must list every row holding it for. A row it does not
+	// list is removed and reported, as with unmatched: report (issue #44).
+	ListsEvery string `yaml:"lists_every"`
 }
 
 // Registry is the set of loaded packs, in load order.
@@ -215,13 +220,15 @@ func loadPack(dir string) (*Pack, error) {
 	if err := readYAML(filepath.Join(dir, "pack.yaml"), p); err != nil {
 		return nil, err
 	}
+	// A format this collector does not know is refused before any recipe is read: its recipes may
+	// use keys or behaviours this code would ignore or misread.
+	if p.PackSchema < 0 || p.PackSchema > 3 {
+		return nil, fmt.Errorf("pack_schema %d is not a known pack format (1 to 3)", p.PackSchema)
+	}
 	var errs []error
 	fail := func(format string, a ...any) { errs = append(errs, fmt.Errorf(format, a...)) }
 	if p.Name == "" {
 		fail("name is required")
-	}
-	if p.PackSchema < 0 || p.PackSchema > 2 {
-		fail("pack_schema %d is not a known pack format (1 or 2)", p.PackSchema)
 	}
 
 	h := sha256.New()
@@ -311,6 +318,9 @@ func loadPack(dir string) (*Pack, error) {
 				if p.PackSchema < 2 && (s.Guard || s.NothingPattern != "" || s.ExpectRows != "" || len(s.JoinOn) > 0 || s.Unmatched != "") {
 					fail("%s: guard, nothing_pattern, expect_rows, join_on and unmatched need pack_schema 2", step)
 				}
+				if p.PackSchema < 3 && (s.Unmatched == "report" || s.ListsEvery != "") {
+					fail("%s: unmatched: report and lists_every need pack_schema 3", step)
+				}
 				if s.ExpectRows != "" && !s.Guard {
 					fail("%s: expect_rows is only for a guard", step)
 				}
@@ -333,16 +343,24 @@ func loadPack(dir string) (*Pack, error) {
 					if !createsRows {
 						fail("%s: join_on needs a step that creates rows before it", step)
 					}
-					if s.Unmatched != "fail" && s.Unmatched != "ignore" {
-						fail("%s: join_on needs unmatched: fail or ignore", step)
+					if s.Unmatched != "fail" && s.Unmatched != "ignore" && s.Unmatched != "report" {
+						fail("%s: join_on needs unmatched: fail, ignore or report", step)
+					}
+					if s.ListsEvery != "" {
+						if s.Unmatched != "report" {
+							fail("%s: lists_every needs unmatched: report", step)
+						}
+						if _, ok := fact.Lookup(family, s.ListsEvery); !ok {
+							fail("%s: lists_every field %q is not a field of %s", step, s.ListsEvery, family)
+						}
 					}
 					for _, field := range s.JoinOn {
 						if _, ok := fact.Lookup(family, field); !ok {
 							fail("%s: join_on field %q is not a field of %s", step, field, family)
 						}
 					}
-				} else if s.Unmatched != "" {
-					fail("%s: unmatched is only for a join_on step", step)
+				} else if s.Unmatched != "" || s.ListsEvery != "" {
+					fail("%s: unmatched and lists_every are only for a join_on step", step)
 				}
 				if !s.Guard && len(s.JoinOn) == 0 {
 					createsRows = true

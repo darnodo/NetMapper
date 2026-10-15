@@ -18,6 +18,8 @@ var findingConfidence = map[string]string{
 	"identity_conflict": "derived",
 	"link_disagreement": "derived",
 	"vlan_mismatch":     "derived",
+	// Raised from the outputs of one observation that disagree with each other (issue #44).
+	"collection_disagreement": "direct",
 }
 
 type finding struct {

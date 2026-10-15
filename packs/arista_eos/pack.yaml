@@ -1,6 +1,6 @@
 name: arista_eos
-version: 5                      # bump on any template or recipe change
-pack_schema: 2                  # guard, nothing_pattern, join_on, unmatched (feature 011)
+version: 6                      # bump on any template or recipe change
+pack_schema: 3                  # guard, nothing_pattern, join_on, unmatched (feature 011); report, lists_every (#44)
 read_only: ["show "]            # every CLI command in the pack must start with one of these
 fingerprint:
   snmp:

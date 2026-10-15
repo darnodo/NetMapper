@@ -113,7 +113,11 @@ func (c *Collector) family(ctx context.Context, d *device, j *job, t *frontier.T
 			outputs = append(outputs, out.Bytes)
 		}
 		var unmatched []string
-		obs.Status, obs.Parsed, unmatched, parseErr = parse.ParseDetail(c.Registry, platform, family, im, outputs)
+		var disagree []parse.Disagreement
+		obs.Status, obs.Parsed, unmatched, disagree, parseErr = parse.ParseDetail(c.Registry, platform, family, im, outputs)
+		for _, d := range disagree {
+			obs.Disagreements = append(obs.Disagreements, store.Disagreement(d))
+		}
 		if len(unmatched) > 0 {
 			// A join step with unmatched: ignore, such as an OSPF area with no neighbour: kept out of
 			// the rows, never dropped silently (feature 011, research R2).

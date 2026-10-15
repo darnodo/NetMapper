@@ -10,6 +10,9 @@ implementations:
     # peer-group view gives it (R3). No counter, timer or uptime is mapped (FR-007).
     # The only "nothing here" answers are exactly `% BGP inactive` and, for peer groups, groups with
     # no member; a refusal or any other `%` line reaches the template and fails (R8, FR-009).
+    # The neighbour view decides which peers there are; the other steps only add to its rows. A peer
+    # one of them lists and it does not connected during the collection, and a peer it puts in a
+    # group the peer-group view does not list it in left: either is reported, with no row (#44, R14).
     steps:
       - command: show bgp neighbors vrf all | no-more
         template: show_bgp_neighbors_vrf_all.textfsm
@@ -35,14 +38,20 @@ implementations:
           - '^Router identifier \S+, local AS number \d+$'
           - '^Neighbor Status Codes: .*$'
           - '^(Description\s+)?Neighbor\s+V\s+AS\s+MsgRcvd\s+MsgSent\s+InQ\s+OutQ\s+Up/Down\s+State\s+PfxRcd\s+PfxAcc\s+PfxAdv$'
+        join_on: [vrf, peer_address]
+        unmatched: report
         map: { vrf: VRF, peer_address: NEIGHBOR, configured_address_families: '=ipv4 unicast' }
       - command: show ipv6 bgp summary vrf all | no-more
         template: show_ipv6_bgp_summary_vrf_all.textfsm
         empty_lines: *summary_empty
+        join_on: [vrf, peer_address]
+        unmatched: report
         map: { vrf: VRF, peer_address: NEIGHBOR, configured_address_families: '=ipv6 unicast' }
       - command: show bgp evpn summary | no-more
         template: show_bgp_evpn_summary.textfsm
         empty_lines: *summary_empty
+        join_on: [vrf, peer_address]
+        unmatched: report
         map: { vrf: VRF, peer_address: NEIGHBOR, configured_address_families: '=l2vpn evpn' }
       - command: show bgp peer-group | no-more
         template: show_bgp_peer_group.textfsm
@@ -58,6 +67,9 @@ implementations:
           - '^\S+/\d+, remote AS \d+$'
           - '^Empty peer-groups:$'
           - '^[\w.-]+$'
+        join_on: [vrf, peer_address]
+        unmatched: report
+        lists_every: peer_group
         map: { vrf: VRF, peer_address: NEIGHBOR, dynamic: KIND }
     merge_on: [vrf, peer_address]
     covers:

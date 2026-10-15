@@ -615,7 +615,10 @@ func TestBGPErrorsAreNotEmpty(t *testing.T) {
 	if s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw4")); s != parse.Empty || rows != nil {
 		t.Errorf("sw4: %s %v %v, want empty", s, err, rows)
 	}
-	// sw2 after its dynamic peer left: the peer group lists no member, which is nothing to report.
+	// sw2 after its dynamic peer left: the peer group lists no member, which is nothing to report,
+	// not an error. Paired with sw2's neighbour view, which still lists the peer in group DYN, this
+	// is the leave case of #44: the peer's row is now dropped and reported as a disagreement
+	// (lists_every: peer_group, research R14). Before, it was kept with the default dynamic: no.
 	s, rows, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, "sw2", "sw2_show_bgp_peer_group_nomembers_empty.raw"))
 	if s != parse.Collected {
 		t.Fatalf("sw2 with no member: %s %v", s, err)
@@ -645,6 +648,32 @@ func TestBGPDefaultActivation(t *testing.T) {
 		}
 	}
 	t.Error("no row for 10.0.10.1")
+}
+
+// Issue #44, research R14: sw2 recorded while its dynamic peer connected, then while it left, during
+// the collection. The peer gets no row and is reported once, under the first command that
+// disagreed with the neighbour view; the other session is kept (sw2connect and sw2leave facts.yml).
+func TestBGPPeerChurn(t *testing.T) {
+	reg, im := bgpImpl(t)
+	for sw, cmd := range map[string]string{
+		"sw2connect": "show ip bgp summary vrf all | no-more",
+		"sw2leave":   "show bgp peer-group | no-more",
+	} {
+		s, rows, _, disagree, err := parse.ParseDetail(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, sw))
+		if s != parse.Collected || len(rows) != 1 {
+			t.Errorf("%s: %s with %d rows (%v), want collected with 1", sw, s, len(rows), err)
+		}
+		want := []parse.Disagreement{{Command: cmd, Row: "vrf=default, peer_address=10.255.1.1"}}
+		if !reflect.DeepEqual(disagree, want) {
+			t.Errorf("%s: disagreements %v, want %v", sw, disagree, want)
+		}
+	}
+	// The steady recordings disagree about nothing.
+	for _, sw := range []string{"sw1", "sw2", "dc-leaf1", "core1"} {
+		if _, _, _, disagree, _ := parse.ParseDetail(reg, "arista_eos", "bgp_peers", im, bgpOutputs(t, im, sw)); len(disagree) > 0 {
+			t.Errorf("%s: disagreements %v, want none", sw, disagree)
+		}
+	}
 }
 
 func ospfImpl(t *testing.T, family string) (*pack.Registry, pack.Impl) {

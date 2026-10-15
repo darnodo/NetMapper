@@ -36,6 +36,15 @@ type Observation struct {
 	Parsed            []map[string]any // nil unless Status is collected
 	Raw               []Raw
 	Claims            []Claim
+	// Disagreements are rows the steps of this collection disagreed about (issue #44): left out
+	// of Parsed and raised as findings by the collector, never stored with the observation.
+	Disagreements []Disagreement
+}
+
+// Disagreement is one row the steps disagreed about: the step and the row's key.
+type Disagreement struct {
+	Command string
+	Row     string
 }
 
 // Raw links one step's output, already stored in the object store, to the observation.

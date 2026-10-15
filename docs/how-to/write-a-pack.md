@@ -35,7 +35,7 @@ packs/cisco_ios/                     # the directory name is the pack name
 ```yaml
 name: cisco_ios                      # must equal the directory name
 version: 1                           # bump on any template or recipe change
-pack_schema: 2                       # pack format; leave it out for 1 (see below)
+pack_schema: 3                       # pack format; leave it out for 1 (see below)
 read_only: ["show "]                 # every command in the pack must start with one of these
 fingerprint:
   snmp:
@@ -54,9 +54,12 @@ captured here is what recipes match their `versions` constraint against.
 
 `pack_schema` is the version of the pack format, not of the pack's content. Leave it out and the
 pack is read as format 1, which every pack written before feature 011 is. Format 2 adds the step
-keys `guard`, `nothing_pattern`, `expect_rows`, `join_on` and `unmatched` (section 6); a pack that
-uses them without `pack_schema: 2` is refused, and so is a format the collector does not know.
-`covers` works in both.
+keys `guard`, `nothing_pattern`, `expect_rows`, `join_on` and `unmatched: fail|ignore` (section 6).
+Format 3 adds `unmatched: report` and `lists_every`, and changes one behaviour: a join step adds up
+list items like a merge, where in format 2 a list already set keeps its value (#44). A pack that
+uses a key without the format that brings it is refused. A format the collector does not know is
+refused before any recipe is read, so an older collector rejects a newer pack for its
+`pack_schema` and never runs it with keys it would ignore. `covers` works in every format.
 
 `read_only` is a lint, not a suggestion: the collector refuses to start if any command in the pack
 does not start with one of these prefixes. NetMapper never changes a device, and this is where that
@@ -218,12 +221,19 @@ implementations:                     # the first one whose version and transport
   then print nothing too. A blank output is `parse_failed`. Any other output must give a template
   row, which proves the family is there. With `expect_rows`, when the template value it names adds
   up to more than zero and no later step gives a row, the observation is `parse_failed`.
-- A **join** step (format 2) adds fields to rows an earlier step created, on a different key than
+- A **join** step (format 2, `report` and `lists_every` format 3) adds fields to rows an earlier step created, on a different key than
   `merge_on`, and never creates a row: the OSPF instance view gives the router ID and area type of
   each area, joined onto interface rows with `join_on: [vrf, instance, area]`. It must say what a
   joined row that matches no row does: `unmatched: fail` makes the observation `parse_failed`,
-  `unmatched: ignore` keeps it out and the collector logs its key. It does not overwrite a value
-  already set, and its rows alone never make an observation `collected`.
+  `unmatched: ignore` keeps it out and the collector logs its key, `unmatched: report` keeps it out
+  and the collector raises a `collection_disagreement` finding naming the device and the key. Use
+  `report` when the two commands should list the same things and only a change between them, such
+  as a BGP peer connecting mid-collection, makes them differ. With `report`, `lists_every: <field>`
+  also removes and reports every row holding that field that the step does not list: `bgp_peers`
+  uses `lists_every: peer_group`, since the peer-group view lists every member of a group, so a
+  peer it no longer lists left during the collection (#44). It does not overwrite a scalar already
+  set, a list adds up as in a merge (format 3; in format 2 it keeps its value), and its rows alone
+  never make an observation `collected`.
 - Some fields have a value the parser sets when no step gives one, such as `auth_type: unknown`
   on `ospf_interfaces`. Such a field cannot take a `defaults` entry, so a pack never turns "not
   known" into "none". Area IDs (`area`) are stored in dotted form; an integer is converted.

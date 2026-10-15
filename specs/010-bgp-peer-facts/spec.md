@@ -89,6 +89,13 @@ changes, but it is a status, not volatile data, so it is collected."
   `parse_failed` and a finding records why.
 - Update source is removed from FR-006 and story 1 (agreed).
 
+### Session 2026-10-15 (issue #44)
+
+- Q: A peer that connects or leaves between the commands of one collection? → A: A peer the
+  commands of one collection disagree about gets no row in this observation and raises a
+  data-quality finding naming the device and the peer; the device's other sessions are recorded as
+  usual and the observation does not fail. How the disagreement is detected: research R14.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - See the BGP sessions of a device (Priority: P1)

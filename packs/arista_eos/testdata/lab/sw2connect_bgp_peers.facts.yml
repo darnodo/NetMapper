@@ -1,0 +1,8 @@
+# sw2 while its dynamic peer 10.255.1.1 connected during the collection (issue #44, research R14).
+# Recorded on test/lab (cEOS 4.36.0F, 2026-10-15) by running the recipe's five commands in order with
+# docker exec while sw1 flapped its session into the listen range: the neighbour view does not list
+# the peer yet, the ipv4 summary and the peer-group view do. The peer gets no row (a finding names
+# it); the other session is recorded as usual.
+status: collected
+rows:
+  - {"configured_address_families":["ipv4 unicast"],"description":"TO-SW1","dynamic":"no","local_as":65102,"negotiated_address_families":["ipv4 unicast"],"peer_address":"10.0.10.1","peer_as":65101,"peer_router_id":"10.255.0.1","router_id":"10.255.0.2","shutdown":"no","state":"established","type":"ebgp","vrf":"default"}
