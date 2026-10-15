@@ -145,7 +145,7 @@ packs/arista_eos/templates/        # show_ip_ospf_vrf_all_json (guard), show_ip_
 packs/arista_eos/testdata/lab/     # sw1_*, sw2_*, sw4_*_empty, sw4noadj_*, core1_*, core2_*,
                                    # dc-leaf1_*_empty recordings, <switch>_<family>.facts.yml
 packs/packs_test.go                # (md5|sha\d*) 7 pattern, TestOSPFErrorsAreNotEmpty
-test/lab/sw1.cfg, sw2.cfg          # VLANs 20 to 23, SVIs, VRF blue, router ospf 1 and 2
+test/lab/sw1.cfg, sw2.cfg          # VLANs 41 to 44, SVIs, VRF blue, router ospf 1 and 2
 test/lab/two-switch.clab.yaml      # topology comment
 specs/001-crawl-loop/contracts/fact-families.md
 bruno/facts/ospf-interfaces.bru, bruno/facts/ospf-neighbours.bru
@@ -157,7 +157,7 @@ README.md, docs/how-to/write-a-pack.md
 ## Implementation order
 
 1. `test/lab` configuration (R10). On the `NetLab` VM: deploy, check each adjacency reaches its
-   intended state and the VLAN 23 one stays below `full`, confirm the guard's `{"vrfs": {}}` on
+   intended state and the VLAN 44 one stays below `full`, confirm the guard's `{"vrfs": {}}` on
    sw4, check whether the guard's JSON exposes an interface count per area or instance (R14: if
    so, a blank interface step with a count above zero becomes `parse_failed`, as an added task;
    if not, the R7 residual stays documented), record the four step commands on sw1,

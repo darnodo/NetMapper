@@ -48,9 +48,9 @@ sudo containerlab deploy -t two-switch.clab.yaml --reconfigure
 
 Check the lab before recording, on sw1 and sw2 with `show ip ospf neighbor vrf all`:
 
-- VLAN 20 (area 0, md5) and VLAN 21 (area 1 stub, point-to-point) are `FULL` on both ends;
-- VLAN 22 in VRF `blue` (instance 2, sha) is `FULL` on both ends;
-- VLAN 23 (MTU mismatch) is held in `EXSTART` or `EXCHANGE`, and still is a few minutes later.
+- VLAN 41 (area 0, md5) and VLAN 42 (area 1 stub, point-to-point) are `FULL` on both ends;
+- VLAN 43 in VRF `blue` (instance 2, sha) is `FULL` on both ends;
+- VLAN 44 (MTU mismatch) is held in `EXSTART` or `EXCHANGE`, and still is a few minutes later.
 
 Then settle the "to confirm" items of research R2, R4, R5 and R6 from the outputs:
 
@@ -95,10 +95,10 @@ curl -s -H "Authorization: Bearer $TOKEN" localhost:8080/v1/devices/sw1/facts/os
 Expected (SC-002, SC-005):
 
 - sw1 and sw2 `ospf_interfaces` `collected`: the four VLAN SVIs and Loopback0, each with its VRF,
-  instance, router ID, area and area type; Loopback0 `passive: yes`; VLAN 20 `auth_type: md5`,
-  VLAN 22 `sha`, VLAN 21 `none`; DR and BDR router IDs on the broadcast segments;
-- `ospf_neighbours` `collected`: `full` on VLANs 20, 21 and 22, the VLAN 22 row in VRF `blue`; the
-  VLAN 23 row in the state seen in section 3; no row on Loopback0;
+  instance, router ID, area and area type; Loopback0 `passive: yes`; VLAN 41 `auth_type: md5`,
+  VLAN 43 `sha`, VLAN 42 `none`; DR and BDR router IDs on the broadcast segments;
+- `ospf_neighbours` `collected`: `full` on VLANs 20, 21 and 22, the VLAN 43 row in VRF `blue`; the
+  VLAN 44 row in the state seen in section 3; no row on Loopback0;
 - every `interface` value is also in the same switch's `interfaces` rows;
 - no stored output and no `observation.parsed` holds `nm-lab-secret-`;
 - the graph and verdict are those of the same lab without OSPF: no edge from an adjacency, no

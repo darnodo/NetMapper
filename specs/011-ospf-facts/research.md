@@ -214,15 +214,17 @@ state are statuses (spec decisions). Two recordings of core1 a few minutes apart
 
 ## R10. The `test/lab` OSPF configuration
 
-- **Decision**: no new link. New VLANs on the Port-Channel10 trunk (it allows every VLAN), one SVI
-  per case on sw1 and sw2, `/30` addresses (exact values chosen in step 1):
-  1. VLAN 20, OSPF instance 1, area 0, broadcast, md5 authentication on both ends: a full adjacency
+- **Decision**: no new link and no new VLAN. VLANs 41 to 44 are already declared on sw1 and sw2
+  (`vlan 40-49`, feature 008) and carried by Port-Channel10 and Ethernet1, so only SVIs are added,
+  one per case, `10.0.<vlan>.1/30` on sw1 and `.2/30` on sw2. VLANs 20 to 23, first considered,
+  were dropped: VLAN 20 is SERVERS and 21 to 23 do not exist, so they would change `vlans`:
+  1. VLAN 41, OSPF instance 1, area 0, broadcast, md5 authentication on both ends: a full adjacency
      with DR and BDR, auth type `md5`.
-  2. VLAN 21, instance 1, area 1 as stub, `ip ospf network point-to-point`, no authentication: a
+  2. VLAN 42, instance 1, area 1 as stub, `ip ospf network point-to-point`, no authentication: a
      non-backbone area, a point-to-point interface, auth type `none`.
-  3. VLAN 22 in VRF `blue`, instance 2, area 0, sha256 authentication on both ends: the
+  3. VLAN 43 in VRF `blue`, instance 2, area 0, sha256 authentication on both ends: the
      non-default VRF case (clarification), auth type `sha`.
-  4. VLAN 23, instance 1, area 0, a different MTU on each end: the adjacency stays in `EXSTART` or
+  4. VLAN 44, instance 1, area 0, a different MTU on each end: the adjacency stays in `EXSTART` or
      `EXCHANGE` while hellos keep it alive, so two crawls see the same state. To confirm when
      recording; if EOS does not hold it, `ip ospf mtu-ignore` absence or a mismatched network type
      on one end is tried next.
@@ -230,8 +232,8 @@ state are statuses (spec decisions). Two recordings of core1 a few minutes apart
      `passive-interface`: the passive case.
 - **sw4**: no OSPF, the `empty` case (`_empty` recordings). Then, temporarily, `router ospf 1` with
   its loopback only, for the `sw4noadj_*` recordings (R7), reverted after.
-- **Side effects**: new VLANs and SVIs appear in a live crawl's `vlans`, `interface_vlans` and
-  `interfaces` rows. The recordings of features 007 to 010 are not re-recorded and their tests are
+- **Side effects**: the new SVIs and VRF `blue` appear in a live crawl's `interfaces` rows; `vlans`
+  and `interface_vlans` are unchanged. The recordings of features 007 to 010 are not re-recorded and their tests are
   unaffected, as in feature 010 R10. The BGP sessions of feature 010 use VLAN 10 and are untouched.
 - **sw3**: denied, cannot serve.
 
