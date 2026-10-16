@@ -708,10 +708,18 @@ func TestBGPUnreadableNeighbor(t *testing.T) {
 
 // Issue #53: a member line the peer-group template cannot read, next to one it can, is
 // parse_failed. Before, the line was skipped, and the peer it named was dropped and raised as one
-// that left its group during the collection (#44).
+// that left its group during the collection (#44). The neighbour view lists that peer in group
+// DYN, as on a device, so the old template gives that disagreement.
 func TestBGPUnreadablePeerGroupMember(t *testing.T) {
 	reg, im := bgpImpl(t)
 	outs := bgpOutputs(t, im, "sw2")
+	header := "BGP neighbor is 10.255.1.1, remote AS 65101, external link"
+	i := strings.Index(string(outs[0]), header)
+	if i < 0 || !strings.Contains(string(outs[0][i:]), "member of peer-group DYN") {
+		t.Fatal("sw2's neighbour view no longer lists 10.255.1.1 in group DYN")
+	}
+	second := strings.Replace(string(outs[0][i:]), header, "BGP neighbor is 10.255.1.2, remote AS 65101, external link", 1)
+	outs[0] = append(slices.Clone(outs[0]), second...)
 	last := len(outs) - 1
 	member := "      10.255.1.1, state: Established\n"
 	if !strings.HasSuffix(im.Steps[last].Template, "peer_group.textfsm") || !strings.Contains(string(outs[last]), member) {
