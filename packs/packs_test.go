@@ -689,6 +689,23 @@ func TestBGPUnreadableSummaryLine(t *testing.T) {
 	}
 }
 
+// Issue #52: a peer whose "BGP neighbor is" line the template cannot read, here a remote AS in
+// asdot, is parse_failed. Before, the peer got no row, the step was still collected, and the family
+// summaries that list it raised it as a peer that connected during the collection (#44).
+func TestBGPUnreadableNeighbor(t *testing.T) {
+	reg, im := bgpImpl(t)
+	outs := bgpOutputs(t, im, "sw1")
+	header := "BGP neighbor is 10.255.0.2, remote AS 65199, external link"
+	if !strings.Contains(string(outs[0]), header) {
+		t.Fatal("the recording no longer lists 10.255.0.2, so the summaries do not list the peer either")
+	}
+	outs[0] = []byte(strings.Replace(string(outs[0]), header, "BGP neighbor is 10.255.0.2, remote AS 1.10, external link", 1))
+	s, rows, _, disagree, _ := parse.ParseDetail(reg, "arista_eos", "bgp_peers", im, outs)
+	if s != parse.ParseFailed || rows != nil || len(disagree) > 0 {
+		t.Errorf("%s with %d rows and disagreements %v, want parse_failed", s, len(rows), disagree)
+	}
+}
+
 // Edge case "a peer relying on the device's default" (convergence T039): sw2 with the explicit
 // activate removed still lists 10.0.10.1 in its ipv4 summary, so the configured list holds ipv4
 // unicast.

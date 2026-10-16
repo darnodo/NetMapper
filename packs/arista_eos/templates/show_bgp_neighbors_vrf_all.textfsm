@@ -14,9 +14,12 @@ Value ROUTER_ID (\S+)
 # One record per peer, every VRF (feature 010, research R1). The Local AS line comes after the
 # statistics blocks, so a record ends at the next "BGP neighbor is" or at the end of the output.
 # Timers, counters, prefix statistics and TCP socket lines are never captured (FR-007).
+# A "BGP neighbor is" line this template cannot read fails the step, so the peer is never dropped
+# and then reported as one that connected during the collection (issue #52).
 Start
   ^BGP neighbor is -> Continue.Record
   ^BGP neighbor is ${PEER_ADDRESS}, remote AS ${PEER_AS}, ${LINK} link
+  ^BGP neighbor is -> Error
   ^\s+Description: ${DESCRIPTION}$$
   ^\s+BGP version \d+, remote router ID ${PEER_ROUTER_ID}, VRF ${VRF}$$
   ^\s+Inherits configuration from and member of peer-group ${PEER_GROUP}$$
