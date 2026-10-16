@@ -65,6 +65,12 @@ func TestPacks(t *testing.T) {
 
 // parseRecorded parses a recorded output with the template whose name it contains, and compares
 // with the .yml next to it when there is one (ntc-templates fixture format).
+//
+// A recording named _empty is a device with nothing to report (feature 007). When the empty_lines
+// of a step using the template cover all of it, the pipeline never runs the template, so neither
+// does this test; a recording not named _empty must never be covered that way, or a too-broad
+// empty_lines pattern would hide its rows. A recording also named _invalid_ or _denied_ is the
+// device refusing the command: the template may raise an error on it instead of giving no row.
 func parseRecorded(t *testing.T, p *pack.Pack, raw string) {
 	var tmpl string
 	for name := range p.Templates {
@@ -75,17 +81,34 @@ func parseRecorded(t *testing.T, p *pack.Pack, raw string) {
 	if tmpl == "" {
 		t.Fatalf("no template for %s", raw)
 	}
+	out, _ := os.ReadFile(raw)
+	empty := strings.Contains(filepath.Base(raw), "_empty")
+	for _, r := range p.Recipes {
+		for _, im := range r.Implementations {
+			for _, st := range im.Steps {
+				if st.Template != tmpl || !parse.Nothing(st.EmptyLines, out) {
+					continue
+				}
+				if !empty {
+					t.Fatalf("the empty_lines of %q cover all of %s, which is not named _empty", st.Command, raw)
+				}
+				return
+			}
+		}
+	}
 	fsm := gotextfsm.TextFSM{}
 	if err := fsm.ParseString(p.Templates[tmpl]); err != nil {
 		t.Fatal(err)
 	}
-	out, _ := os.ReadFile(raw)
 	po := gotextfsm.ParserOutput{}
 	if err := po.ParseTextString(string(out), fsm, true); err != nil {
-		t.Fatal(err)
+		refused := strings.Contains(raw, "_invalid_") || strings.Contains(raw, "_denied_")
+		if !empty || !refused {
+			t.Fatal(err)
+		}
+		return
 	}
-	// A recording named _empty is a device with nothing to report (feature 007): no row is right.
-	if empty := strings.Contains(filepath.Base(raw), "_empty"); empty != (len(po.Dict) == 0) {
+	if empty != (len(po.Dict) == 0) {
 		t.Fatalf("%s yielded %d rows (recording named _empty: %v)", tmpl, len(po.Dict), empty)
 	}
 	b, err := os.ReadFile(strings.TrimSuffix(raw, ".raw") + ".yml")
@@ -626,6 +649,42 @@ func TestBGPErrorsAreNotEmpty(t *testing.T) {
 	for _, r := range rows {
 		if r["dynamic"] == "yes" {
 			t.Errorf("dynamic row with no member listed: %v", r)
+		}
+	}
+}
+
+// Issue #45: a summary line the template cannot read, next to peers it can, is parse_failed in every
+// family summary. Before, the line was skipped, the step still gave rows, and the peer came out with
+// that family missing from its configured list, as the link-local peer of #31 did. A "%" line
+// between readable peers, such as a warning, fails the same way.
+func TestBGPUnreadableSummaryLine(t *testing.T) {
+	reg, im := bgpImpl(t)
+	ipv4, err := os.ReadFile(filepath.Join("arista_eos", "testdata", "lab", "sw1_show_ip_bgp_summary_vrf_all.raw"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer := "                           10.255.0.2  4 65199"
+	if !strings.Contains(string(ipv4), peer) {
+		t.Fatal("the recording no longer lists 10.255.0.2, so the warning is not between two peers")
+	}
+	bad := map[string][]byte{
+		"an unreadable peer line": append(slices.Clone(ipv4), "                           10.0.10.98  4 1.10                 0         0    0    0 00:01:26 Connect\n"...),
+		"a % line between peers":  []byte(strings.Replace(string(ipv4), peer, "% Some warning\n"+peer, 1)),
+	}
+	for i, st := range im.Steps {
+		if !strings.Contains(st.Template, "summary") {
+			continue
+		}
+		outs := bgpOutputs(t, im, "sw1")
+		outs[i] = ipv4
+		if s, _, err := parse.Parse(reg, "arista_eos", "bgp_peers", im, outs); s != parse.Collected {
+			t.Fatalf("%s given the readable summary: %s %v", st.Command, s, err)
+		}
+		for what, b := range bad {
+			outs[i] = b
+			if s, rows, _ := parse.Parse(reg, "arista_eos", "bgp_peers", im, outs); s != parse.ParseFailed || rows != nil {
+				t.Errorf("%s given %s: %s with %d rows, want parse_failed", st.Command, what, s, len(rows))
+			}
 		}
 	}
 }
