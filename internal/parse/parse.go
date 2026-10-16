@@ -97,7 +97,7 @@ func ParseDetail(reg *pack.Registry, platform, family string, im pack.Impl, outp
 		switch {
 		case st.Walk != "":
 			raw, err = walkRows(outputs[i], fields)
-		case nothing(st.EmptyLines, outputs[i]):
+		case Nothing(st.EmptyLines, outputs[i]):
 		case guardSaysNothing:
 			err = fmt.Errorf("%s: the guard says there is nothing here, but this step has output", st.Command)
 		default:
@@ -189,10 +189,11 @@ func settle(family string, rows []map[string]any) {
 	}
 }
 
-// nothing reports whether out says there is nothing to report: it is blank, or every non-blank
+// Nothing reports whether out says there is nothing to report: it is blank, or every non-blank
 // line is one of the step's empty lines. Every line must match, so drift, such as a new header or
 // a reworded message, still reaches the template and fails there.
-func nothing(emptyLines []string, out []byte) bool {
+// Exported for TestPacks (packs/packs_test.go), which skips the template where the pipeline does.
+func Nothing(emptyLines []string, out []byte) bool {
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {

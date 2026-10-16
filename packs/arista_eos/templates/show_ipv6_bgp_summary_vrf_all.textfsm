@@ -5,6 +5,14 @@ Value Required NEIGHBOR (\d+\.\d+\.\d+\.\d+|[0-9a-fA-F]*:[0-9a-fA-F:.]+(?:%\S+)?
 # research R2). When a peer of the device has a description, a Description column comes first, so
 # the neighbour is found as the address before the BGP version and the AS. Only the address is read.
 # A link-local peer keeps its zone (fe80::1%Et1), as the neighbour view prints it.
+# Any other line fails the step, a "%" line included, so a line this template cannot read never
+# passes for a peer not activated for this family (issue #45). "% BGP inactive" alone never reaches
+# the template: the step's empty_lines take it.
 Start
   ^BGP summary information for VRF ${VRF}$$
   ^\s+(.*\s)?${NEIGHBOR}\s+4\s+\d+\s+\d+\s+\d+ -> Record
+  ^Router identifier \S+, local AS number \d+$$
+  ^Neighbor Status Codes: .*$$
+  ^\s+(Description\s+)?Neighbor\s+V\s+AS\s+MsgRcvd\s+MsgSent\s+InQ\s+OutQ\s+Up/Down\s+State\s+PfxRcd\s+PfxAcc\s+PfxAdv\s*$$
+  ^\s*$$
+  ^. -> Error
