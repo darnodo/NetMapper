@@ -5,8 +5,19 @@ Value Required NEIGHBOR (\S+)
 # Static and dynamic members of each peer group (feature 010, research R3): the neighbour view has
 # no dynamic marker. Static members are recorded too, so a device whose groups have only static
 # members still yields rows.
+# In a members section any other line fails the step, so a member line this template cannot read
+# never drops its peer as one that left its group during the collection (issue #53).
 Start
   ^BGP peer-group is -> Clearall
+  ^\s+${KIND} peer-group members:$$ -> Members
+
+Members
+  ^BGP peer-group is -> Clearall Start
+  ^Empty peer-groups:$$ -> Start
   ^\s+${KIND} peer-group members:$$
   ^\s+VRF ${VRF}:$$
   ^\s+${NEIGHBOR}, state: \S+$$ -> Record
+  ^\s+Negotiated MP Capabilities:$$
+  ^\s+[\w -]+: (Yes|No)$$
+  ^\s*$$
+  ^. -> Error
