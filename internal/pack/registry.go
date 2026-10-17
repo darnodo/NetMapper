@@ -613,6 +613,30 @@ func NormaliseMAC(s string) string {
 	return b.String()
 }
 
+var speedToken = regexp.MustCompile(`^(\d+)(?:\.(\d+))?([MG])$`)
+
+// SpeedBPS reads a speed token, a number of megabits or gigabits such as 100M, 2.5G or 25G, as bits
+// per second. ok is false for anything else, a zero speed included, so a caller never stores 0.
+func SpeedBPS(s string) (int64, bool) {
+	m := speedToken.FindStringSubmatch(s)
+	if m == nil {
+		return 0, false
+	}
+	digits := 6 // M
+	if m[3] == "G" {
+		digits = 9
+	}
+	if len(m[2]) > digits {
+		return 0, false
+	}
+	// Integer arithmetic on the digits, so 2.5G is exactly 2500000000.
+	n, err := strconv.ParseInt(m[1]+m[2]+strings.Repeat("0", digits-len(m[2])), 10, 64)
+	if err != nil || n == 0 {
+		return 0, false
+	}
+	return n, true
+}
+
 // NormaliseVLANs turns a device's VLAN list into its one normal form (feature 008, FR-006): the
 // items are joined with commas, so a list a device wraps over several lines comes back whole, then
 // read as IDs or lo-hi ranges, sorted and merged. A token that is neither, or an ID outside 1 to

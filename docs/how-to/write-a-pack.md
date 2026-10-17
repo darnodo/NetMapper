@@ -201,6 +201,10 @@ implementations:                     # the first one whose version and transport
   per item. Use `values` for the device's words: `{ All: 1-4094, None: '' }` on EOS. A token that is
   not a VLAN ID or range makes the observation `parse_failed`. VLAN IDs (`vlan_id`, `access_vlan`,
   `native_vlan`) must be 1 to 4094.
+- `speed_bps` takes a speed token, megabits or gigabits such as `100M`, `2.5G` or `25G`, and the
+  parser converts it to bits per second. Map it only when the port is up, with the speed it runs
+  at; strip any prefix the device adds (EOS prints `a-1G` for a negotiated speed) in the template.
+  A token that is not a speed leaves the field absent, never 0.
 - `covers` declares, per list field, the values the steps can put there, when a list holds only
   what the pack reads: `covers: { configured_address_families: [ipv4 unicast, ipv6 unicast, l2vpn evpn] }`
   on `bgp_peers`. It must equal the `=` literals the steps map into that field, or the pack is

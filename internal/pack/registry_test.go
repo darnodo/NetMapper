@@ -47,6 +47,27 @@ func TestLoadFakeOS(t *testing.T) {
 	}
 }
 
+// A speed token reads as bits per second; anything else is not a speed, so the field stays absent
+// and is never 0 (#57). 2G is an EOS port-channel: the sum of its two 1G members.
+func TestSpeedBPS(t *testing.T) {
+	for in, want := range map[string]int64{
+		"10M": 10_000_000, "100M": 100_000_000, "1G": 1_000_000_000, "2.5G": 2_500_000_000,
+		"25G": 25_000_000_000, "400G": 400_000_000_000, "2G": 2_000_000_000, "0.1G": 100_000_000,
+	} {
+		if got, ok := SpeedBPS(in); !ok || got != want {
+			t.Errorf("SpeedBPS(%s) = %d, %v, want %d", in, got, ok, want)
+		}
+	}
+	for _, in := range []string{
+		"", "auto", "unconf", "a-1G", "1", "1g", "1T", "1Gb/s", " 1G", "1.G", ".5G", "-1G", "0G", "0.0M",
+		"1.0000000001G", "99999999999999999999G",
+	} {
+		if got, ok := SpeedBPS(in); ok {
+			t.Errorf("SpeedBPS(%q) = %d, want no speed", in, got)
+		}
+	}
+}
+
 func TestHelpers(t *testing.T) {
 	for in, want := range map[string]string{"AABB.CCDD.EEFF": "aa:bb:cc:dd:ee:ff", "aa-bb-cc-dd-ee-ff": "aa:bb:cc:dd:ee:ff", "nope": "nope"} {
 		if got := NormaliseMAC(in); got != want {

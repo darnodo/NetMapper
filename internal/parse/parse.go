@@ -310,6 +310,12 @@ func mapRow(reg *pack.Registry, platform, family string, im pack.Impl, m map[str
 		if f.MAC {
 			s = pack.NormaliseMAC(s)
 		}
+		if f.Speed {
+			if n, ok := pack.SpeedBPS(s); ok {
+				row[field] = n
+			}
+			continue
+		}
 		if f.Type == fact.Int {
 			n, err := strconv.ParseInt(s, 10, 64)
 			if err != nil {

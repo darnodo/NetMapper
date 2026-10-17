@@ -22,3 +22,8 @@ Changes:
   The VXLAN rules also accept "Dynamic VLAN to VNI mapping" and a mapping line with a VRF name
   ("[gold, 100001]"), which an EVPN leaf prints.
 - testdata/ntc/show_interfaces*.yml: the interface key became port, to match the template.
+- templates/show_interfaces_status.textfsm: added the LINK_SPEED value, the speed of a connected
+  port without the a- prefix of a negotiated one, empty on a port that is not up or whose Speed
+  column is not a number (#57).
+- testdata/ntc/show_interfaces_status*.yml: each row gained link_speed, read from the Status and
+  Speed columns of the same line in the .raw file.
