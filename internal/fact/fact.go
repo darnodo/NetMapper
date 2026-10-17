@@ -21,6 +21,9 @@ type Field struct {
 	Canonical bool // an interface name, canonicalised by the pack's naming rules
 	MAC       bool // normalised to lowercase colon form
 	Enum      []string
+	// Speed: an int field in bits per second, read from a speed token such as 100M, 2.5G or 25G.
+	// The parser converts it; a token it cannot read leaves the field absent, never 0.
+	Speed bool
 	// TypedBy names the field that says what kind of value this one holds. It is required
 	// whenever this field is present, and a value typed mac is normalised like a MAC field.
 	TypedBy string
@@ -69,7 +72,7 @@ var Families = map[string][]Field{
 		{Name: "description", Type: String},
 		{Name: "admin_state", Type: String, Enum: []string{"up", "down"}},
 		{Name: "oper_state", Type: String, Enum: []string{"up", "down", "other"}},
-		{Name: "speed_bps", Type: Int},
+		{Name: "speed_bps", Type: Int, Speed: true},
 		{Name: "mtu", Type: Int},
 		{Name: "mac", Type: String, MAC: true},
 	},

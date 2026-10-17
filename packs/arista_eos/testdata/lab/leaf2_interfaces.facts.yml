@@ -1,0 +1,17 @@
+# What the interfaces recipe must produce from the leaf2 recordings (EVPN lab, cEOS 4.36). speed_bps (#57):
+# Management0 negotiated (a-1G), the Ethernet ports forced (1G), Port-Channel1 the sum of its two
+# members (2G). Loopbacks, SVIs and Vxlan1 are not in the status table and have no speed.
+status: collected
+rows:
+  - {"admin_state":"up","description":"dc-access1","mac":"aa:c1:ab:db:40:1f","mtu":9214,"name":"Ethernet1","oper_state":"up","speed_bps":1000000000}
+  - {"admin_state":"up","description":"mlag peer link","mac":"aa:c1:ab:b5:2b:69","mtu":9214,"name":"Ethernet10","oper_state":"up","speed_bps":1000000000}
+  - {"admin_state":"up","description":"dc-spine1","mac":"aa:c1:ab:64:e0:8f","mtu":9214,"name":"Ethernet11","oper_state":"up","speed_bps":1000000000}
+  - {"admin_state":"up","description":"dc-spine2","mac":"aa:c1:ab:8f:43:c6","mtu":9214,"name":"Ethernet12","oper_state":"up","speed_bps":1000000000}
+  - {"admin_state":"up","mac":"00:1c:73:ee:56:23","mtu":1500,"name":"Management0","oper_state":"up","speed_bps":1000000000}
+  - {"admin_state":"up","description":"dc-access1","mac":"aa:c1:ab:db:40:1f","mtu":9214,"name":"Port-Channel1","oper_state":"up","speed_bps":2000000000}
+  - {"admin_state":"up","description":"MLAG Peer","mac":"aa:c1:ab:b5:2b:69","mtu":9214,"name":"Port-Channel999","oper_state":"up","speed_bps":1000000000}
+  - {"mtu":65535,"name":"Loopback0"}
+  - {"mtu":65535,"name":"Loopback1"}
+  - {"mac":"00:1c:73:ee:56:24","mtu":1500,"name":"Vlan4090"}
+  - {"mac":"00:1c:73:ee:56:24","mtu":9214,"name":"Vlan4091"}
+  - {"name":"Vxlan1"}
