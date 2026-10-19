@@ -24,8 +24,9 @@ Without `--yes`, prints the preview and exits 3. Needs only `NETMAPPER_DSN`. A s
 be refused prints the refusal and exits 2; an evicted one prints `nothing to do` and exits 0.
 
 With `--yes`, also needs `NETMAPPER_S3_ENDPOINT`, `NETMAPPER_S3_BUCKET`, `NETMAPPER_S3_ACCESS_KEY`,
-`NETMAPPER_S3_SECRET_KEY` (and the optional `NETMAPPER_S3_REGION`, `NETMAPPER_S3_INSECURE`), with a
-key that can delete. Missing variables exit 2 before anything changes.
+`NETMAPPER_S3_SECRET_KEY` (and the optional `NETMAPPER_S3_REGION`, `NETMAPPER_S3_INSECURE`), set to
+the operator's own key, which can read and delete (deploy guide). Missing variables exit 2 before
+anything changes.
 
 Output on stdout, one `key: value` per line, same keys for preview and eviction:
 

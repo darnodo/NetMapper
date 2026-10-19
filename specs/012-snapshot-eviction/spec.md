@@ -40,6 +40,10 @@ evicted snapshots clearly instead of answering empty.
 - **An open snapshot and a pinned snapshot are refused.** Unpin first to evict a pinned one.
   Eviction is also refused while another snapshot of the same perimeter is open or not yet
   resolved, because the registry cleanup cannot know which entries that snapshot will use.
+- **An eviction in progress is visible as `evicting`.** The snapshot moves from `closed` to
+  `evicting` when its data is removed from the database, and to `evicted` once its stored outputs
+  are deleted. An eviction interrupted between the two stays `evicting` until the same command is
+  run again, and no crawl starts while any snapshot is `evicting`.
 - **Eviction is idempotent and resumable.** Evicting an evicted snapshot succeeds and changes
   nothing. An eviction interrupted halfway is completed by running the same command again.
 - **Pinning only protects from eviction.** It does not change what a snapshot contains or how any
@@ -52,8 +56,8 @@ evicted snapshots clearly instead of answering empty.
   identifiers attributed to a deleted entry go with it. Operator decisions (merge, split,
   never-merge) are kept: they are replayable records, not registry rows.
 - **Evict shows before it deletes.** Without `--yes`, the command only reports what it would
-  remove, changes nothing and exits 3; with `--yes`, it evicts. The preview doubles as a dry run and a script
-  stays one command.
+  remove, changes nothing and exits 3; with `--yes`, it evicts. The preview doubles as a dry run
+  and a script stays one command.
 - **Every eviction, pin and unpin is recorded in the audit trail** with who ran it, when, and on
   which snapshot.
 - **A retention policy (keep the last N, or anything younger than X days) is out of scope.** It can
@@ -170,9 +174,8 @@ the evicted snapshot and the audit trail.
 - **Crawl running when eviction is asked**: refused, whatever the perimeter, naming the running
   crawl. A running crawl may rely on an output of the evicted snapshot it found already stored and
   has not recorded yet.
-- **Crawl started while an eviction runs**: the two must not overlap; either the crawl waits or is
-  refused until the eviction ends, or the eviction is refused. After both, every output the crawl
-  references is readable.
+- **Crawl started while an eviction is unfinished**: refused while any snapshot is `evicting`,
+  with a message naming it and the command that finishes the eviction.
 - **Outputs orphaned before the eviction** (by an earlier failure): left in the object store,
   neither counted nor deleted.
 - **Device seen only by the evicted snapshot**: its registry entry and identifiers are deleted. A
@@ -196,8 +199,8 @@ the evicted snapshot and the audit trail.
 - **Pinning an open snapshot**: allowed, so a crawl can be protected before it ends.
 - **Rerunning `judge` on a snapshot whose baseline was evicted**: it is measured against the closest
   earlier snapshot of the same perimeter that is not evicted, or reports no baseline.
-- **Object store unreachable during eviction**: the database part may complete; the command exits
-  non-zero, says the eviction is incomplete, and a rerun finishes it.
+- **Object store unreachable during eviction**: the database part may complete; the snapshot stays
+  `evicting`, the command exits non-zero, says the eviction is incomplete, and a rerun finishes it.
 
 ## Requirements *(mandatory)*
 
@@ -208,25 +211,28 @@ the evicted snapshot and the audit trail.
   raw output links, identifier claims, its crawl's task list, findings and their evidence, entities
   and their claims, resolution, projection, graph, L2 domains and parse generations.
 - **FR-003**: Eviction MUST keep a tombstone: the snapshot's id, its crawl, its open and close
-  times, its verdict, its `evicted` state and the time of eviction.
+  times, its verdict, its state (`evicting` while stored outputs remain to delete, then `evicted`)
+  and the time of eviction.
 - **FR-004**: Eviction MUST delete from the object store every stored output the evicted snapshot
   referenced that no remaining snapshot references, and MUST NOT delete any other output, including
   outputs orphaned before the eviction.
 - **FR-005**: Eviction MUST refuse an open snapshot, a pinned snapshot, any snapshot whose
   perimeter has another snapshot open or closed but not yet resolved, and any eviction while a
-  crawl is running in any perimeter. A crawl and an eviction MUST never run at the same time. A refusal MUST exit non-zero,
-  say why (naming the blocking snapshot when there is one), and change nothing.
+  crawl is running in any perimeter. A refusal MUST exit non-zero, say why (naming the blocking
+  snapshot when there is one), and change nothing. A crawl MUST NOT start while any snapshot is
+  `evicting`. A crawl and an eviction MUST never run at the same time.
 - **FR-006**: Evicting an already evicted snapshot MUST exit 0 and change nothing. Rerunning an
   interrupted eviction MUST complete it.
 - **FR-007**: The operator MUST be able to pin and unpin a snapshot by id. Both MUST be idempotent.
   Pinning an evicted snapshot MUST be refused.
 - **FR-008**: Every eviction, pin and unpin, accepted or refused, MUST be recorded in the audit
   trail with actor, time, action, snapshot id and outcome.
-- **FR-009**: The read API MUST list an evicted snapshot with state `evicted`, and MUST show for
-  every snapshot whether it is pinned.
-- **FR-010**: A graph, device, fact or observation request naming an evicted snapshot MUST get an
-  error that says the snapshot was evicted, distinct from "no such snapshot" and "not projected".
-  Reading the evicted snapshot itself MUST return its tombstone.
+- **FR-009**: The read API MUST list a snapshot being evicted with state `evicting` and an evicted
+  one with state `evicted`, and MUST show for every snapshot whether it is pinned and when it was
+  evicted.
+- **FR-010**: A graph, device, fact or observation request naming an `evicting` or `evicted`
+  snapshot MUST get an error that says the snapshot was evicted, distinct from "no such snapshot"
+  and "not projected". Reading the evicted snapshot itself MUST return its tombstone.
 - **FR-011**: The default snapshot of the read API, the baseline chosen by the coverage gate, and
   the snapshots the engine picks up for judging, resolving and projecting MUST skip evicted
   snapshots.
@@ -245,13 +251,16 @@ the evicted snapshot and the audit trail.
 - **FR-016**: The API role MUST gain no ability to delete or modify anything; eviction is available
   only to the operator.
 - **FR-017**: The README, the deploy guide and the data model document MUST describe the new
-  commands, the `evicted` state, the pin flag, and any access the operator needs to the object
-  store, in the same change.
+  commands, the `evicting` and `evicted` states, the pin flag, and the object store key the operator
+  needs, in the same change. The deploy guide MUST make a dedicated operator key the default; the
+  collector's key MUST NOT gain any right for this feature.
 
 ### Key Entities
 
-- **Snapshot**: one crawl's collected data. Gains the `evicted` state, a pinned flag and the time it
-  was evicted. An evicted snapshot is a tombstone: it keeps its identity and verdict, nothing else.
+- **Snapshot**: one crawl's collected data. Gains the `evicting` and `evicted` states, a pinned
+  flag and the time it was evicted. An evicted snapshot is a tombstone: it keeps its identity and
+  verdict, nothing else. States: `open`, `closed`, `evicting`, `evicted`; pinning is possible on
+  `open` and `closed` only.
 - **Stored output**: raw command output kept once per distinct content and shared by every
   observation that produced the same bytes. Deleted only when no remaining snapshot references it.
 - **Verdict**: the coverage gate's judgement of a snapshot, naming its baseline. Kept on eviction,
@@ -287,11 +296,12 @@ the evicted snapshot and the audit trail.
   snapshots to evict are produced by normal crawls of `test/lab` on NetLab, and the broken crawl by
   running one with credentials that fail. Most checks can run on recorded fixtures without the lab.
 - Operator commands today reach only the database. Deleting stored output needs the operator to
-  have delete access to the object store; the API role keeps its read-only access unchanged
-  (Principle III).
-- The current schema has neither the `evicted` state nor the pin flag, although the data model
-  document lists them, and the verdict lives beside the snapshot rather than in its state. Bringing
-  the schema and the document in line is part of this feature.
+  have its own object store key that can delete; the collector's key and the API's read-only key
+  are unchanged (Principle III).
+- The current schema has neither the `evicting` and `evicted` states nor the pin flag. The data
+  model document lists `evicted` and the pin flag but not `evicting`, and puts the verdict in the
+  state although it lives beside the snapshot. Bringing the schema and the document in line is part
+  of this feature.
 - Grafana dashboards reading the database directly may show evicted snapshots; adapting them is out
   of scope.
 - Retention policies and automatic eviction by the engine are out of scope, and so is a sweep of

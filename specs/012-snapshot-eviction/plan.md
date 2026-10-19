@@ -66,19 +66,25 @@ crawls; no device configuration changes, and the "broken" crawl contacts no devi
 | Principle | Touched | How the plan complies |
 | --------- | ------- | --------------------- |
 | I. Evidence travels with the answer | yes | No answer loses its evidence: a remaining snapshot keeps every observation and output it references (R4). An evicted snapshot is never answered from; naming it gives 410, not an empty answer. Verdicts keep their figures and show the baseline's state. |
-| II. Observations immutable, rest rebuildable | yes | Eviction is the exception the principle names. The pin flag changes a closed snapshot's row but nothing it contains or any answer built from it; the new trigger allows that column alone (R9). See note below. Entity decisions are kept, so a replay of the remaining snapshots gives the same result. |
-| III. Credentials and reach stay in the collector | yes | No device credential anywhere new. The operator gets an object store key that can delete outputs (R10); it opens no device session. `engine` and `api` gain nothing; the API keeps its read-only key and gains no grant. |
+| II. Observations immutable, rest rebuildable | yes | Eviction is the exception the principle names. Pinning and the eviction states change a closed snapshot's lifecycle metadata, never its content; the new trigger allows those changes alone (R9). See note below. Entity decisions are kept, so a replay of the remaining snapshots gives the same result. |
+| III. Credentials and reach stay in the collector | yes | No device credential anywhere new. The operator gets its own object store key that can delete outputs (R10); it opens no device session. The collector's key gains no right, `engine` gains nothing, the API keeps its read-only key and gains no grant. |
 | IV. Read only, outward | no | Nothing reaches a device. |
 | V. Vendor specifics are data | no | No vendor term. |
 
-Note on Principle II: "Snapshots MUST be immutable once closed" is read as covering what the snapshot
-holds. A PATCH amendment that says so in one line ("the pin flag is not content") is proposed in
-the same change; if the amendment is refused, pinning moves to its own table (`snapshot_pin`), at
-the cost of one join in the API.
+Note on Principle II: "Snapshots MUST be immutable once closed" is clarified by a PATCH amendment
+in the same change, scoped to lifecycle metadata. Proposed wording, appended to Principle II:
 
-Workflow rules: the README (operator commands), `docs/how-to/deploy.md` (operator S3 variables and
-key choice, the `snapshot` commands), `docs/c4-model/04-data-model.md` (states, `pinned`,
-`evicted_at`, `eviction_object`, registry cleanup, "Still open": orphan sweep), the 001 CLI contract,
+> A snapshot's lifecycle metadata (its pin flag, the `evicting` and `evicted` states and the time
+> of eviction) is not its content. Content is never modified after closing; it is only removed, as
+> a whole, by eviction.
+
+The new trigger enforces exactly that: on a closed snapshot, only `pinned`, or the move to
+`evicting` with `evicted_at`; nothing else (R9). Pinning stays a column on `snapshot`.
+
+Workflow rules: the README (operator commands), `docs/how-to/deploy.md` (a third,
+dedicated operator key with read and delete as the default, the operator's S3 variables, the
+`snapshot` commands), `docs/c4-model/04-data-model.md` (states, `pinned`, `evicted_at`,
+`eviction_object`, registry cleanup, "Still open": orphan sweep), the 001 CLI contract,
 the 005 REST contract and the Bruno snapshot requests are updated in the same change (FR-017). Every
 path is tested under the role that runs it: eviction and pinning under `netmapper_operator`, the
 410 under `netmapper_api`, the re-checks under `netmapper_engine`.
@@ -123,7 +129,8 @@ internal/api/*_test.go                  # TestEvictedSnapshot
 bruno/snapshots/                        # list and get show the new fields; an evicted request
 specs/001-crawl-loop/contracts/cli.md, specs/005-read-api/contracts/rest.md
 README.md, docs/how-to/deploy.md, docs/c4-model/04-data-model.md
-.specify/memory/constitution.md         # PATCH: pin flag is not content (see Constitution Check)
+.specify/memory/constitution.md         # PATCH: lifecycle metadata is not content (Constitution Check)
+deploy/compose.yaml                     # garage-init creates the dedicated operator key
 ```
 
 **Structure Decision**: the existing layout. One new command file with its test, one migration;
@@ -141,7 +148,7 @@ function in the migration (`crawl_gate_key()`), called by `Start` and `evict_sna
 3. Crawl gate in `jobrunner.Start`; state re-checks in the resolver and the projector, with their
    tests.
 4. API: envelope fields, 410, `baseline_state`; Bruno requests.
-5. Documents and contracts; constitution PATCH.
+5. Documents and contracts; operator key in the dev stack; constitution PATCH.
 6. Quickstart section 2 on a running stack.
 
 ## Complexity Tracking

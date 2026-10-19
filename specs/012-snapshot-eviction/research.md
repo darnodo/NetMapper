@@ -177,21 +177,34 @@ a change of `pinned` alone, or the move to `evicting` with `evicted_at`. `evicti
 `evicted`. `evicted` is final.
 
 **Rationale**: Principle II asks that a snapshot be immutable once closed. The trigger today
-enforces that by refusing any update of a closed row. The pin flag says nothing about what was
-collected and changes no answer, so allowing it alone keeps the principle's intent (see the
-Constitution Check). Eviction is the principle's own exception.
+enforces that by refusing any update of a closed row. A PATCH amendment, approved on 2026-10-19,
+scopes the rule to content: the pin flag, the `evicting` and `evicted` states and `evicted_at` are
+lifecycle metadata; content is never modified, only removed as a whole by eviction. The trigger
+enforces that boundary. A separate `snapshot_pin` table was considered and rejected with the
+amendment.
 
 ## R10. Object store access for the operator
 
 **Decision**: `netmapper snapshot evict --yes` reads the same `NETMAPPER_S3_*` variables as the
-collector, through the existing `rawStore()` helper (`cmd/netmapper/collector.go`), and needs a key
-that can delete. On Garage, `write` permission on the bucket includes delete. The deploy guide
-documents two choices: reuse the collector's read-write key (default in a homelab), or create a
-third key for the operator. The preview needs no object store access.
+collector, through the existing `rawStore()` helper (`cmd/netmapper/collector.go`), with its own
+key. The deploy guide's default becomes three keys: read and write for the collector, read only for
+the API, and a dedicated operator key that can read and delete. The collector's key gains no right
+for this feature. The preview needs no object store access.
 
-**Rationale**: the S3 key gives access to stored command output only. It opens no device session
-and resolves no secret, so Principle III is untouched: the collector keeps the only device
-credentials, the API keeps its read-only key.
+On stores with per-action policies (AWS S3, MinIO), the operator key is `GetObject`,
+`DeleteObject` and `ListBucket`, and the collector key needs no `DeleteObject`. Garage's bucket
+permissions are `read`, `write` and `owner`, and `write` includes delete, so on Garage the operator
+key is `read` + `write` and the collector's existing `write` already allows deleting; that is
+Garage's model and is stated in the guide, not changed here. The dev stack (`deploy/compose.yaml`)
+creates the operator key next to the existing one, so tests run with the documented split.
+
+**Rationale**: a dedicated key keeps the right to remove evidence with the role that is supposed to
+do it, and can be revoked without stopping collection. The S3 key opens no device session and
+resolves no secret, so Principle III is untouched.
+
+**Alternatives considered**: reusing the collector's key (simplest, rejected on 2026-10-19: the
+operator would hold the collector's write key, and deletes would be indistinguishable from the
+collector's in the store's logs).
 
 ## R11. Audit trail
 
