@@ -30,6 +30,7 @@ Every answer carries the snapshot it was built from:
 {
   "snapshot": {
     "id": 12,
+    "opened_at": "2026-09-25T10:44:31Z",
     "closed_at": "2026-09-25T10:44:58Z",
     "state": "closed",
     "verdict": "quarantined",
@@ -70,7 +71,8 @@ kind, so a consumer reads one field whatever it is looking at (spec FR-002a):
 The envelope also carries `has_graph`: whether the snapshot has a projection built from the entity set
 it carries now. `verdict` and `coverage` are `null` for a snapshot never judged, never omitted.
 
-Since feature 012 it also carries `pinned` (a pinned snapshot is never evicted) and `evicted_at`
+Since feature 012 it also carries `opened_at` (when the crawl started, kept on a tombstone),
+`pinned` (a pinned snapshot is never evicted) and `evicted_at`
 (null unless the state is `evicting` or `evicted`). `state` is one of `open`, `closed`, `evicting`,
 `evicted`. An evicted snapshot is a tombstone: listed, readable by id with its verdict, never
 answered from.

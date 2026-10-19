@@ -18,6 +18,7 @@ import (
 // verdict and coverage are always present, as null for a snapshot never judged, rather than omitted.
 type SnapshotRef struct {
 	ID       int64      `json:"id"`
+	OpenedAt time.Time  `json:"opened_at"`
 	ClosedAt *time.Time `json:"closed_at"`
 	State    string     `json:"state"`
 	Verdict  *string    `json:"verdict"`
@@ -34,7 +35,7 @@ type SnapshotRef struct {
 var errNoSnapshot = errors.New("no such snapshot")
 
 const snapshotColumns = `
-	SELECT s.id, s.closed_at, s.state, j.classification, j.coverage::float8,
+	SELECT s.id, s.opened_at, s.closed_at, s.state, j.classification, j.coverage::float8,
 	       EXISTS (SELECT 1 FROM projection p JOIN resolution r ON r.snapshot_id = p.snapshot_id
 	               WHERE p.snapshot_id = s.id AND p.resolution_at = r.computed_at) AS has_graph,
 	       s.pinned, s.evicted_at
@@ -43,7 +44,7 @@ const snapshotColumns = `
 
 func scanSnapshot(row pgx.Row) (SnapshotRef, error) {
 	var s SnapshotRef
-	err := row.Scan(&s.ID, &s.ClosedAt, &s.State, &s.Verdict, &s.Coverage, &s.HasGraph, &s.Pinned, &s.EvictedAt)
+	err := row.Scan(&s.ID, &s.OpenedAt, &s.ClosedAt, &s.State, &s.Verdict, &s.Coverage, &s.HasGraph, &s.Pinned, &s.EvictedAt)
 	return s, err
 }
 

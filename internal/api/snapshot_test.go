@@ -122,15 +122,22 @@ func TestEvictedSnapshot(t *testing.T) {
 	gone := l.Int(`SELECT min(id) FROM observation WHERE snapshot_id = $1`, second)
 	evictAsOwner(t, l, second, true)
 
-	paths := []string{"/v1/devices", "/v1/devices/sw1", "/v1/interfaces/sw1/port1", "/v1/devices/sw1/facts/interfaces",
-		"/v1/findings", fmt.Sprintf("/v1/observations/%d", gone), fmt.Sprintf("/v1/observations/%d/raw/0", gone)}
-	for _, p := range paths {
-		body := c.json(fmt.Sprintf("%s?snapshot=%d", p, second), 410)
-		snap, _ := body["snapshot"].(map[string]any)
-		if body["error"] != "snapshot_evicted" || snap["state"] != "evicted" || snap["evicted_at"] == nil {
-			t.Errorf("%s?snapshot=%d: %v", p, second, body)
+	// Every endpoint that takes ?snapshot= answers 410 for snapshot id in state.
+	paths := func(obs int) []string {
+		return []string{"/v1/devices", "/v1/devices/sw1", "/v1/interfaces/sw1/port1", "/v1/devices/sw1/facts/interfaces",
+			"/v1/findings", fmt.Sprintf("/v1/observations/%d", obs), fmt.Sprintf("/v1/observations/%d/raw/0", obs)}
+	}
+	gone410 := func(id, obs int, state string) {
+		t.Helper()
+		for _, p := range paths(obs) {
+			body := c.json(fmt.Sprintf("%s?snapshot=%d", p, id), 410)
+			snap, _ := body["snapshot"].(map[string]any)
+			if body["error"] != "snapshot_evicted" || snap["state"] != state || snap["evicted_at"] == nil {
+				t.Errorf("%s?snapshot=%d: %v, want 410 with state %s", p, id, body, state)
+			}
 		}
 	}
+	gone410(second, gone, "evicted")
 	if body := c.json("/v1/devices", 200); body["snapshot"].(map[string]any)["id"] != float64(first) {
 		t.Errorf("default snapshot %v, want %d", body["snapshot"], first)
 	}
@@ -161,10 +168,9 @@ func TestEvictedSnapshot(t *testing.T) {
 	// A snapshot being evicted answers the same, with its state.
 	l.Crawl(Doc)
 	third := l.Int(`SELECT max(id) FROM snapshot`)
+	thirdObs := l.Int(`SELECT min(id) FROM observation WHERE snapshot_id = $1`, third)
 	evictAsOwner(t, l, third, false)
-	if body := c.json(fmt.Sprintf("/v1/devices?snapshot=%d", third), 410); body["snapshot"].(map[string]any)["state"] != "evicting" {
-		t.Errorf("evicting snapshot: %v", body)
-	}
+	gone410(third, thirdObs, "evicting")
 
 	// With every graph gone, the default answers as on a fresh install.
 	evictAsOwner(t, l, first, true)
@@ -202,7 +208,8 @@ func TestTombstoneAndBaseline(t *testing.T) {
 	evictAsOwner(t, l, first, true)
 	body := c.json(fmt.Sprintf("/v1/snapshots/%d", first), 200)
 	s := body["snapshot"].(map[string]any)
-	if s["state"] != "evicted" || s["evicted_at"] == nil || s["closed_at"] == nil || s["verdict"] == nil || body["judgement"] == nil {
+	if s["state"] != "evicted" || s["evicted_at"] == nil || s["opened_at"] == nil || s["closed_at"] == nil ||
+		s["verdict"] == nil || body["judgement"] == nil {
 		t.Errorf("tombstone %v", body)
 	}
 	j := c.json(fmt.Sprintf("/v1/snapshots/%d", second), 200)["judgement"].(map[string]any)

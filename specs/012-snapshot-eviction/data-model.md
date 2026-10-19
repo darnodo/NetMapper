@@ -110,6 +110,7 @@ Kept: `snapshot` (tombstone), `job`, `snapshot_judgement` (its own and those nam
 
 ## Read API shapes (changed)
 
-`SnapshotRef` gains `pinned` (boolean) and `evicted_at` (time or null). The judgement view gains
+`SnapshotRef` gains `opened_at` (time, kept on a tombstone), `pinned` (boolean) and `evicted_at`
+(time or null). The judgement view gains
 `baseline_state` (the baseline's `state`, or null without a baseline). See
 [contracts/rest.md](contracts/rest.md).

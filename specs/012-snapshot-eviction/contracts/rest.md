@@ -4,10 +4,11 @@ Merged into `specs/005-read-api/contracts/rest.md` in the same change. No new en
 
 ## Snapshot envelope
 
-Every `snapshot` object (envelope, list entries, `GET /v1/snapshots/{id}`) gains two fields:
+Every `snapshot` object (envelope, list entries, `GET /v1/snapshots/{id}`) gains three fields,
+`opened_at` (when the crawl started, kept on a tombstone, US3/AC1), `pinned` and `evicted_at`:
 
 ```json
-{"id": 7, "closed_at": "2026-10-19T09:12:44Z", "state": "evicted", "verdict": "quarantined",
+{"id": 7, "opened_at": "2026-10-19T09:12:02Z", "closed_at": "2026-10-19T09:12:44Z", "state": "evicted", "verdict": "quarantined",
  "coverage": 0.12, "has_graph": false, "pinned": false, "evicted_at": "2026-10-19T10:03:10Z"}
 ```
 

@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -344,12 +345,19 @@ func TestSnapshotLifecycleTrigger(t *testing.T) {
 	db := testutil.DB(t)
 	ctx := context.Background()
 	id := closedSnapshot(t, db)
+	// A second, real job, so moving the snapshot to it passes the foreign key and only the trigger
+	// can refuse it.
+	if _, err := db.Exec(ctx, `INSERT INTO job (state, config_version, requested_by)
+		SELECT 'succeeded', config_version, 'test' FROM job`); err != nil {
+		t.Fatal(err)
+	}
 	for _, c := range []struct {
 		q  string
 		ok bool
 	}{
 		{"UPDATE snapshot SET pinned = true WHERE id = $1", true},
 		{"UPDATE snapshot SET pinned = false, closed_at = now() - interval '1 day' WHERE id = $1", false},
+		{"UPDATE snapshot SET job_id = (SELECT max(id) FROM job) WHERE id = $1", false},
 		{"UPDATE snapshot SET state = 'open', closed_at = NULL WHERE id = $1", false},
 		{"UPDATE snapshot SET state = 'evicted', evicted_at = now() WHERE id = $1", false},
 		{"UPDATE snapshot SET state = 'evicting', evicted_at = now(), pinned = false WHERE id = $1", false},
@@ -360,8 +368,8 @@ func TestSnapshotLifecycleTrigger(t *testing.T) {
 		{"UPDATE snapshot SET state = 'closed', evicted_at = NULL WHERE id = $1", false},
 	} {
 		_, err := db.Exec(ctx, c.q, id)
-		if (err == nil) != c.ok {
-			t.Errorf("%s: err %v, want allowed=%t", c.q, err, c.ok)
+		if (err == nil) != c.ok || (err != nil && !strings.Contains(err.Error(), "update refused")) {
+			t.Errorf("%s: err %v, want allowed=%t, refused by the trigger", c.q, err, c.ok)
 		}
 	}
 }

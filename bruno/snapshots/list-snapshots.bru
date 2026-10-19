@@ -28,4 +28,5 @@ script:post-response {
 assert {
   res.status: eq 200
   res.body.snapshots[0].pinned: isBoolean
+  res.body.snapshots[0].evicted_at: isDefined
 }

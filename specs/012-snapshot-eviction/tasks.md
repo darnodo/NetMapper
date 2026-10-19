@@ -330,3 +330,10 @@ MVP is US1: once Phase 3 passes, a broken crawl can be removed and the API answe
 (US2) are the guard that makes eviction safe to leave in a script; ship it in the same PR unless
 US1 alone is urgent. US3 adds no behaviour, only what a reader sees, and is small enough to land
 with the other two.
+
+## Phase 7: Convergence
+
+- [X] T049 Add `opened_at` to `SnapshotRef` and `snapshotColumns` in `internal/api/snapshot.go`, to the envelope of `specs/005-read-api/contracts/rest.md` and `specs/012-snapshot-eviction/contracts/rest.md`, and assert it on the tombstone in `TestTombstoneAndBaseline` (`internal/api/snapshot_test.go`) per US3/AC1 (partial)
+- [X] T050 In `TestEvictedSnapshot` (`internal/api/snapshot_test.go`), check the `evicting` snapshot on the same seven paths as the evicted one (devices, device, interface, facts, findings, observation, observation raw), each answering 410 `snapshot_evicted` with state `evicting` per T018 (partial)
+- [X] T051 Add `evicted_at` to the assertions of `bruno/snapshots/list-snapshots.bru` and `bruno/snapshots/get-snapshot.bru` per T044 (partial)
+- [X] T052 Add a `job_id` change on a closed snapshot, refused, to `TestSnapshotLifecycleTrigger` in `internal/store/roles_test.go` per T008 (partial)
