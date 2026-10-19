@@ -19,7 +19,9 @@ Observations, raw output and identifier claims MUST be append only: never update
 outside eviction. Entities, edges, L2 domains, findings and intent matches MUST be derivable from
 that zone alone, by replay, with no manual repair step. Operator decisions that shape resolution
 (merge, split, never-merge) MUST be stored as replayable records rather than applied in place.
-Snapshots MUST be immutable once closed.
+Snapshots MUST be immutable once closed. A snapshot's lifecycle metadata (its pin flag, the
+`evicting` and `evicted` states and the time of eviction) is not its content. Content is never
+modified after closing; it is only removed, as a whole, by eviction.
 
 Rationale: losing the computed zone costs time, never data. A parser fix must be a replay, not a
 re-crawl of the building.
@@ -108,4 +110,4 @@ principle, MINOR for adding one or materially expanding guidance, PATCH for clar
 Reviews verify compliance with the five principles. Complexity that violates one is either
 justified in writing at the point it is introduced or removed. Principle III admits no exception.
 
-**Version**: 1.2.1 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-26
+**Version**: 1.2.2 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-10-19

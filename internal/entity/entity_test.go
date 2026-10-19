@@ -2,6 +2,7 @@ package entity_test
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"net/netip"
 	"slices"
@@ -227,5 +228,41 @@ func TestResolveWorksAsTheOperator(t *testing.T) {
 	}
 	if n := l.Int(`SELECT count(*) FROM finding WHERE snapshot_id = $1 AND category = 'identity_conflict'`, snap); n != 1 {
 		t.Errorf("%d collision findings after the operator resolved, want the set replaced, not stacked", n)
+	}
+}
+
+// T016, 012 research R6: a resolution that read the snapshot as closed, then waited on the perimeter
+// lock while an eviction took it, writes nothing and reports the snapshot as no longer closed. Runs
+// under netmapper_engine.
+func TestResolveStopsWhenSnapshotEvicted(t *testing.T) {
+	env(t)
+	l := NewLab(t, &fake.Network{Devices: map[netip.Addr]*fake.Device{Addr("10.0.0.1"): FakeOS("sw1", "S001")}})
+	l.Crawl(Doc)
+	snap := int64(l.Int(`SELECT id FROM snapshot`))
+	before := l.Strings(`SELECT computed_at::text FROM resolution WHERE snapshot_id = $1`, snap)
+	ctx := context.Background()
+
+	tx, err := l.DB.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('lab', 0))`); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := entity.Resolve(ctx, l.Engine, snap); done <- err }()
+	l.WaitForLockWaiter(tx)
+	if _, err := tx.Exec(ctx, `UPDATE snapshot SET state = 'evicting', evicted_at = now() WHERE id = $1`, snap); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; !errors.Is(err, entity.ErrNotClosed) {
+		t.Errorf("resolve: %v, want ErrNotClosed", err)
+	}
+	if after := l.Strings(`SELECT computed_at::text FROM resolution WHERE snapshot_id = $1`, snap); slices.Compare(after, before) != 0 {
+		t.Errorf("resolution %v, was %v: something was written", after, before)
 	}
 }

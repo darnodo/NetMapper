@@ -54,6 +54,15 @@ crawl 12 (snapshot 9) is running: retry when it ends
 snapshot 8 of perimeter campus is not resolved yet: retry when it is
 ```
 
+The last one applies to a resolved snapshot only. An unresolved snapshot is evicted whatever the
+other snapshots of its perimeter are, and its eviction leaves the device registry as it is.
+
+The collected tables busy for 30 s (API requests that keep them in use), exit 1, nothing changed:
+
+```text
+snapshot 7: the collected tables stayed busy for 30s, nothing was changed; retry
+```
+
 Object store failure after the database part, on stderr, exit 1:
 
 ```text

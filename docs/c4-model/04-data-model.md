@@ -22,7 +22,7 @@ Four zones, and the boundary between the second and the third is the one that ma
 | `api_token`      | `id`, `name`, `hash`, `scopes[]`, `created_at`, `last_used_at`, `revoked_at`                                                                                                                       | the value is never stored, only the SHA-256 of what a caller presents. Revoked, never deleted, so a name is never reused. `read` is the only scope value, and the set is enforced by the interface rather than the schema                                                                                                                  |
 | `job`            | `id`, `type`, `state`, `requested_by`, `parameters`, `snapshot_id`, `config_version`, timestamps, `error`                                                                                          | a run records the config version it used                                                                                                                                                                                                                                                                                                    |
 | `task`           | `id`, `job_id`, `kind` (`find`, `scrape`), `target`, `target_name`, `platform`, `state`, `claimed_by`, `lease_expires`, `attempts`, `cred_attempts`, `last_error`, `parent_task_id`, `skip_reason` | the frontier. Partitioned by job, key `(job_id, id)`, claimed with `FOR UPDATE SKIP LOCKED`. `cred_attempts` holds the per device, per set attempt counts; `last_error` starts with its kind (`lease_expired`, `error`, `deadline`, `credential_unresolved`, `credential_partial`); `skip_reason` is `out_of_perimeter` on a `skipped` task |
-| `audit_log`      | `id`, `ref`, `at`, `actor`, `action`, `target`, `command`, `result`                                                                                                                                | API calls and device commands, append only. A `sent` row before each command leaves, then a result row with the same `ref`                                                                                                                                                                                                                  |
+| `audit_log`      | `id`, `ref`, `at`, `actor`, `action`, `target`, `command`, `result`                                                                                                                                | API calls, device commands and operator actions on snapshots, append only. A `sent` row before each command leaves, then a result row with the same `ref`. `snapshot.evict`, `snapshot.pin` and `snapshot.unpin` are one row each, with no `target` and `command` = `snapshot <id>` (feature 012) |
 
 ## What was collected
 
@@ -30,7 +30,7 @@ Immutable, append only, and the only zone a `collector` writes.
 
 | Table              | Key columns                                                                                                                                                                        | Notes                                                                                                                                                                                                          |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `snapshot`         | `id`, `job_id`, `opened_at`, `closed_at`, `state` (`open`, `closed`, `published`, `degraded`, `quarantined`, `evicted`), `coverage`, `pinned`                                      | an evicted snapshot keeps its row as a tombstone. `closed`: the run ended, the gate has not judged it yet                                                                                                      |
+| `snapshot`         | `id`, `job_id`, `opened_at`, `closed_at`, `state` (`open`, `closed`, `evicting`, `evicted`), `pinned`, `evicted_at` | `closed`: the run ended. The verdict is not a state: it lives in `snapshot_judgement`. On a closed snapshot only lifecycle metadata changes (the pin flag, the move to `evicting`), enforced by a trigger. An evicted snapshot keeps its row as a tombstone with its close time and its verdict (feature 012) |
 | `observation`      | `id`, `snapshot_id`, `collected_at`, `collector_id`, `task_id`, `target`, `transport`, `platform`, `recipe_id`, `fact_family`, `status`, `detail`, `parse_generation_id`, `parsed` | partitioned by snapshot, key `(snapshot_id, id)`, so eviction is a partition drop. `detail` is a machine-readable reason (`unknown_platform`, `timeout`, `no_recipe`, `no_matching_version`); `recipe_id` is `<pack>/<recipe>@<pack version hash>` |
 | `observation_raw`  | `snapshot_id`, `observation_id`, `step_id`, `command`, `hash`                                                                                                                      | one row per command, since a family may need several. Partitioned like `observation`                                                                                                                           |
 | `raw_object`       | `hash`, `size`, `stored_at`                                                                                                                                                        | the object store holds the bytes, this holds the accounting. The reference count is derived from `observation_raw`, never stored                                                                               |
@@ -128,6 +128,25 @@ discovery without ever being tried, which no outcome recorded inside the snapsho
 `EXECUTE` on it plus `INSERT` on the table, and no role but the owner may `UPDATE` or `DELETE` a
 verdict. This is the first table outside the collected zone the engine writes at all.
 
+Snapshot eviction (feature 012) removes one snapshot as a whole: its partitions of `observation`,
+`observation_raw` and `identifier_claim` are detached and dropped, so is its crawl's partition of
+`task`, and its rows go from every computed table, `parse_generation`, `finding` and
+`finding_evidence`. The `snapshot` row stays as a tombstone, with its job and its verdicts; verdicts
+of later snapshots that used it as baseline are not touched. Stored outputs are deleted only when no
+other snapshot references them: their hashes go to `eviction_object (snapshot_id, hash, size)` in
+the same transaction, and the operator command empties that list as it deletes the objects, so an
+interrupted eviction leaves the snapshot `evicting` and resumes. When the evicted snapshot is
+resolved, registry entries (`device`, `device_identifier`) of the perimeter that no entity of a
+remaining snapshot carries go too; entries still carried keep their key, times and `minted_from`,
+which may point at a tombstone. An unresolved snapshot carries no entity and leaves the registry
+alone. The 14 tables the eviction locks exclusively are taken in one `LOCK TABLE ... NOWAIT`,
+retried, so it never deadlocks with API reads. Everything runs in owner functions, `evict_snapshot`,
+`finish_snapshot_eviction` and `set_snapshot_pinned`, with `EXECUTE` for `netmapper_operator` only;
+the operator also gained `INSERT` on `audit_log`, `SELECT, DELETE` on `eviction_object` and
+`EXECUTE` on `crawl_gate_key()`, the advisory lock that keeps a crawl start and an eviction apart.
+`judge_snapshot` now refuses a snapshot or a baseline that is no longer `closed`. `netmapper_api`
+gained nothing.
+
 ## The Go contracts that matter
 
 Five interfaces carry every extension point. Everything else is concrete.
@@ -166,6 +185,13 @@ The shape of the first four is unremarkable, and that is the point: a new transp
 Tables referencing the partitioned `observation` carry `snapshot_id` and use composite foreign keys, and partitions are created per snapshot and per job by `SECURITY DEFINER` functions owned by the schema owner (`create_snapshot_partitions`, `create_task_partition`).
 
 ## Still open
+
+- Stored outputs orphaned outside an eviction (a collector that stored an output and died before
+  recording it) are never deleted. A sweep of the bucket against `raw_object` belongs to the
+  maintenance component; feature 012 only deletes what an evicted snapshot referenced
+
+- A retention policy (keep the last N snapshots, or those younger than X days, pinned ones aside)
+  run by the engine on top of `evict_snapshot`
 
 - A step deadline or a dropped session fails the scrape task and leaves no observation for the
   family, although `observation.status` is never nullable: that family's outcome on that device is

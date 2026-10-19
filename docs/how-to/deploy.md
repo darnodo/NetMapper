@@ -14,12 +14,14 @@ One binary (or one image), several processes. The first argument picks the role:
 | `netmapper engine`         | closes snapshots, judges coverage, resolves identities, projects the graph | database, packs                          |
 | `netmapper api`            | serves the read API                                                 | database, object store (read only)      |
 | `netmapper migrate`, `run`, `token`, ... | operator commands, run on demand                      | database                                |
+| `netmapper snapshot evict --yes` | removes a snapshot, see section 8                            | database, object store (read and delete) |
 
 Only the collector holds device credentials and reaches devices. Keep it that way when you place the
 processes: the API is the one part anyone can reach, and it can log into nothing.
 
 Every process reads `NETMAPPER_DSN`. Logs are JSON lines on stderr. Exit code 1 is a runtime error,
-2 is invalid input.
+2 is invalid input or a refusal, 3 is a preview that changed nothing (`netmapper snapshot evict`
+without `--yes`).
 
 ## 1. PostgreSQL
 
@@ -49,7 +51,22 @@ references live.
 ## 2. Object store
 
 Any S3-compatible store; the development stack uses [Garage](https://garagehq.deuxfleurs.fr/).
-Create a bucket and two keys: one with read and write for the collector, one read only for the API.
+Create a bucket and three keys:
+
+| Key       | Used by                           | Rights                                                   |
+| --------- | --------------------------------- | -------------------------------------------------------- |
+| collector | `netmapper collector`             | read and write; no delete where the store can say so     |
+| API       | `netmapper api`                   | read only                                                |
+| operator  | `netmapper snapshot evict --yes`  | read and delete                                          |
+
+The operator key is the only one meant to delete: evicting a snapshot removes the outputs no other
+snapshot uses (section 8). Keep it with the operator, not with a running process, and revoke it
+without touching collection. On AWS S3 or MinIO, give the collector `s3:GetObject` and
+`s3:PutObject`, the API `s3:GetObject`, the operator `s3:GetObject`, `s3:DeleteObject` and
+`s3:ListBucket`. Garage's bucket permissions are only `read`, `write` and `owner`, and `write`
+includes delete: on Garage the operator key gets `read` and `write`, and the collector's `write`
+can delete too. The separate key still tells the operator's deletes from the collector's and can be
+revoked on its own.
 
 | Variable                  | Meaning                                         |
 | ------------------------- | ----------------------------------------------- |
@@ -60,7 +77,8 @@ Create a bucket and two keys: one with read and write for the collector, one rea
 | `NETMAPPER_S3_REGION`     | optional, default `garage`                      |
 | `NETMAPPER_S3_INSECURE`   | optional; any value means plain HTTP            |
 
-Both exit at start when a variable is missing; the API also exits when the bucket does not exist.
+The collector and the API exit at start when a variable is missing; the API also exits when the
+bucket does not exist. `netmapper snapshot evict --yes` refuses to start (exit 2) without them.
 
 ## 3. Device secrets
 
@@ -212,6 +230,31 @@ snapshot ever taken and slows down as they pile up. Endpoints, fields and errors
 
 The same calls are in a [Bruno](https://www.usebruno.com) collection, [bruno/](../../bruno/): open
 the folder in Bruno, pick the `local` environment and set its secret `token` variable.
+
+## 8. Remove a snapshot
+
+A crawl run with a broken configuration stays in the history until it is evicted. Eviction removes
+everything collected or computed for the snapshot and the stored outputs no other snapshot uses; the
+snapshot stays listed as a tombstone, `evicted`, with its verdict.
+
+```sh
+NETMAPPER_DSN=$OPERATOR_DSN netmapper snapshot evict --id 7          # preview, exit 3, changes nothing
+NETMAPPER_DSN=$OPERATOR_DSN NETMAPPER_S3_...=<operator key> \
+  netmapper snapshot evict --id 7 --yes                              # evict
+NETMAPPER_DSN=$OPERATOR_DSN netmapper snapshot pin --id 2            # never evicted
+NETMAPPER_DSN=$OPERATOR_DSN netmapper snapshot unpin --id 2
+```
+
+Eviction is refused (exit 2) for an open snapshot, a pinned one, and while any crawl is running. A
+resolved snapshot is also refused while another snapshot of the same perimeter is not resolved yet;
+its eviction deletes the device registry entries no remaining snapshot uses. An unresolved snapshot,
+such as a crawl whose resolution keeps failing, is always accepted and leaves the registry alone.
+API requests made during an eviction wait for it, or it waits for them; if the tables stay busy for
+30 s it gives up with nothing changed (exit 1), and you run it again. If the object store fails
+halfway, the snapshot stays `evicting`, no crawl can start, and the same command finishes the job.
+Every eviction, pin and unpin is in `audit_log`. The API answers 410 `snapshot_evicted` for
+`?snapshot=` naming an evicted snapshot. The full reference is
+[cli.md](../../specs/001-crawl-loop/contracts/cli.md).
 
 ## Exposing the API
 

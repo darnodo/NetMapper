@@ -42,6 +42,7 @@ The stored outputs an eviction still has to delete from the object store (resear
 | ------------- | ------------------------------------- |
 | `snapshot_id` | `bigint NOT NULL REFERENCES snapshot` |
 | `hash`        | `bytea NOT NULL`                      |
+| `size`        | `bigint NOT NULL`, for the report of a resumed eviction (added in implementation) |
 
 Primary key `(snapshot_id, hash)`. Written by `evict_snapshot` in the same transaction that drops
 the rows; a row is deleted once its object is gone. No foreign key to `raw_object`: that row is
@@ -75,7 +76,9 @@ Returns one row:
 | `objects_kept`      | stored outputs it references that another snapshot also references       |
 | `devices_deleted`   | registry entries no remaining snapshot of the perimeter would reference  |
 
-Locks: crawl gate, perimeter lock, projection lock, snapshot row `FOR UPDATE` (research R6).
+Locks: crawl gate, perimeter lock, projection lock, snapshot row `FOR UPDATE` (research R6); with
+`p_apply`, the 14 tables it locks exclusively, all at once with `NOWAIT` and retries, before any
+delete (research R3).
 Checks and their order: research R7. Steps with `p_apply`: research R3. On `evicting`, it returns
 `resume` and changes nothing; the counts are then the remaining `eviction_object` rows.
 

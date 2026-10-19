@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/darnodo/NetMapper/internal/store"
 	"github.com/darnodo/NetMapper/internal/testutil"
@@ -316,4 +317,113 @@ func TestOperatorCannotDeleteTokens(t *testing.T) {
 func denied(err error) bool {
 	var pg *pgconn.PgError
 	return errors.As(err, &pg) && pg.Code == "42501"
+}
+
+// closedSnapshot inserts a job and its snapshot as the owner and closes it.
+func closedSnapshot(t *testing.T, db *pgxpool.Pool) int64 {
+	t.Helper()
+	ctx := context.Background()
+	var id int64
+	err := db.QueryRow(ctx, `
+		WITH c AS (INSERT INTO config_version (posted_by, document) VALUES ('test', '') RETURNING id),
+		     j AS (INSERT INTO job (state, config_version, requested_by) SELECT 'succeeded', id, 'test' FROM c RETURNING id)
+		INSERT INTO snapshot (job_id) SELECT id FROM j RETURNING id`).Scan(&id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE snapshot SET state = 'closed', closed_at = now() WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// T008, 012 research R9: on a closed snapshot only lifecycle metadata changes (constitution,
+// Principle II): the pin flag alone, or the move to evicting; then evicting to evicted; evicted is
+// final. Run as the owner, so it is the trigger that refuses, not a grant.
+func TestSnapshotLifecycleTrigger(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	id := closedSnapshot(t, db)
+	for _, c := range []struct {
+		q  string
+		ok bool
+	}{
+		{"UPDATE snapshot SET pinned = true WHERE id = $1", true},
+		{"UPDATE snapshot SET pinned = false, closed_at = now() - interval '1 day' WHERE id = $1", false},
+		{"UPDATE snapshot SET state = 'open', closed_at = NULL WHERE id = $1", false},
+		{"UPDATE snapshot SET state = 'evicted', evicted_at = now() WHERE id = $1", false},
+		{"UPDATE snapshot SET state = 'evicting', evicted_at = now(), pinned = false WHERE id = $1", false},
+		{"UPDATE snapshot SET state = 'evicting', evicted_at = now() WHERE id = $1", true},
+		{"UPDATE snapshot SET pinned = true WHERE id = $1", false},
+		{"UPDATE snapshot SET state = 'evicted' WHERE id = $1", true},
+		{"UPDATE snapshot SET pinned = true WHERE id = $1", false},
+		{"UPDATE snapshot SET state = 'closed', evicted_at = NULL WHERE id = $1", false},
+	} {
+		_, err := db.Exec(ctx, c.q, id)
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err %v, want allowed=%t", c.q, err, c.ok)
+		}
+	}
+}
+
+// T008, 012 research R1, R11: eviction gives the operator owner functions, an INSERT on audit_log
+// for its own actions and the work list, and still no write on the collected zone or the snapshot.
+func TestOperatorCannotTouchCollectedZone(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	op := testutil.As(t, db, "netmapper_operator")
+	for _, q := range []string{
+		"DELETE FROM observation",
+		"DELETE FROM observation_raw",
+		"DELETE FROM identifier_claim",
+		"DELETE FROM raw_object",
+		"UPDATE snapshot SET pinned = true",
+		"UPDATE audit_log SET result = ''",
+		"DELETE FROM audit_log",
+		"INSERT INTO eviction_object (snapshot_id, hash, size) VALUES (1, '\\x00', 0)",
+	} {
+		if _, err := op.Exec(ctx, q); !denied(err) {
+			t.Errorf("operator: %s: %v, want permission denied", q, err)
+		}
+	}
+	if _, err := op.Exec(ctx, `INSERT INTO audit_log (ref, actor, action, target, command, result)
+		VALUES (gen_random_uuid(), 'test', 'snapshot.pin', NULL, 'snapshot 1', 'ok')`); err != nil {
+		t.Errorf("operator: audit row for a snapshot action: %v", err)
+	}
+	if _, err := op.Exec(ctx, `INSERT INTO audit_log (ref, actor, action, target, command, result)
+		VALUES (gen_random_uuid(), 'test', 'ssh.command', NULL, 'show version', 'sent')`); err == nil {
+		t.Error("a device action without a target was accepted")
+	}
+	for _, q := range []string{
+		"SELECT * FROM evict_snapshot(1, false)",
+		"SELECT set_snapshot_pinned(1, true)",
+		"SELECT crawl_gate_key()",
+		"SELECT count(*) FROM eviction_object",
+		"DELETE FROM eviction_object WHERE false",
+	} {
+		if _, err := op.Exec(ctx, q); err != nil {
+			t.Errorf("operator: %s: %v", q, err)
+		}
+	}
+}
+
+// T008, 012 FR-016: the exposed role gains nothing from eviction.
+func TestAPIGainsNothingFromEviction(t *testing.T) {
+	db := testutil.DB(t)
+	ctx := context.Background()
+	api := testutil.As(t, db, "netmapper_api")
+	for _, q := range []string{
+		"SELECT * FROM evict_snapshot(1, false)",
+		"SELECT finish_snapshot_eviction(1)",
+		"SELECT set_snapshot_pinned(1, true)",
+		"SELECT crawl_gate_key()",
+		"SELECT count(*) FROM eviction_object",
+		"DELETE FROM eviction_object",
+		"INSERT INTO audit_log (ref, actor, action, command, result) VALUES (gen_random_uuid(), 'x', 'snapshot.pin', 'snapshot 1', 'ok')",
+		"UPDATE snapshot SET pinned = true",
+	} {
+		if _, err := api.Exec(ctx, q); !denied(err) {
+			t.Errorf("api: %s: %v, want permission denied", q, err)
+		}
+	}
 }

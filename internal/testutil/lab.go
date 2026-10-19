@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/darnodo/NetMapper/internal/collector"
@@ -307,3 +308,22 @@ func MAC(serial string) string {
 
 // Addr parses an address.
 func Addr(s string) netip.Addr { return netip.MustParseAddr(s) }
+
+// WaitForLockWaiter returns once some session waits on an advisory lock that holder holds, so a test
+// that holds one can change state under a process blocked on it. Only waiters blocked by holder
+// count: the lock keys are not schema scoped, so tests of other packages running against the same
+// database can wait on the same key.
+func (l *Lab) WaitForLockWaiter(holder pgx.Tx) {
+	l.T.Helper()
+	var pid int
+	if err := holder.QueryRow(context.Background(), `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
+		l.T.Fatal(err)
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if l.Int(`SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted
+			AND $1 = ANY (pg_blocking_pids(pid))`, pid) > 0 {
+			return
+		}
+	}
+	l.T.Fatal("nothing waits on an advisory lock")
+}

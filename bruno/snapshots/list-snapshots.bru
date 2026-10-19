@@ -13,8 +13,19 @@ get {
 script:post-response {
   // Point the other requests at the newest snapshot that carries a graph.
   // Runtime variables win over the environment, so local.bru stays untouched.
-  const snap = (res.getBody().snapshots || []).find((s) => s.has_graph);
+  const snaps = res.getBody().snapshots || [];
+  const snap = snaps.find((s) => s.has_graph);
   if (res.getStatus() === 200 && snap) {
     bru.setVar("snapshot", snap.id);
   }
+  // And "Get evicted snapshot" at the newest tombstone, if there is one.
+  const gone = snaps.find((s) => s.state === "evicted");
+  if (gone) {
+    bru.setVar("evicted_snapshot", gone.id);
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.snapshots[0].pinned: isBoolean
 }

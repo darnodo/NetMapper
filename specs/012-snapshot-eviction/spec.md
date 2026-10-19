@@ -38,8 +38,10 @@ evicted snapshots clearly instead of answering empty.
   snapshot judged again after its baseline was evicted is measured against the closest earlier
   snapshot that is still there.
 - **An open snapshot and a pinned snapshot are refused.** Unpin first to evict a pinned one.
-  Eviction is also refused while another snapshot of the same perimeter is open or not yet
-  resolved, because the registry cleanup cannot know which entries that snapshot will use.
+  A resolved snapshot is also refused while another snapshot of the same perimeter is open or
+  not yet resolved, because the registry cleanup cannot know which entries that snapshot will use.
+  An unresolved snapshot is not: it carries no entity, so its eviction removes no registry
+  reference and leaves the registry alone.
 - **An eviction in progress is visible as `evicting`.** The snapshot moves from `closed` to
   `evicting` when its data is removed from the database, and to `evicted` once its stored outputs
   are deleted. An eviction interrupted between the two stays `evicting` until the same command is
@@ -74,7 +76,9 @@ evicted snapshots clearly instead of answering empty.
   shows what it would delete and changes nothing; with `--yes` it evicts.
 - Q: What does eviction do when another snapshot of the same perimeter is open or closed but not
   yet resolved? -> A: It refuses (non-zero exit, nothing changed) and names that snapshot; retry
-  once it is resolved.
+  once it is resolved. Amended after review: this applies to evicting a resolved snapshot only;
+  an unresolved one is evicted without the check and without registry cleanup, so two unresolved
+  snapshots whose resolution keeps failing do not block each other.
 - Q: Which stored outputs can eviction delete? -> A: Only those the evicted snapshot referenced and
   no other snapshot uses; older orphans stay for a separate sweep. Eviction is refused while any
   crawl is running, since a crawl can rely on an existing output before recording it.
@@ -183,9 +187,14 @@ the evicted snapshot and the audit trail.
   later crawl that sees the device again gives it a fresh entry.
 - **Device first seen by the evicted snapshot, seen again later**: its entry stays, key unchanged.
 - **Another snapshot of the same perimeter open or not yet resolved**: it has no entities yet, so
-  it cannot say which registry entries it will use. Eviction is refused, names that snapshot, and
-  changes nothing; the operator retries once it is resolved. A resolution that starts while an
-  eviction runs must not reuse an entry the eviction deletes.
+  it cannot say which registry entries it will use. Evicting a resolved snapshot is refused, names
+  that snapshot, and changes nothing; the operator retries once it is resolved. A resolution that
+  starts while an eviction runs must not reuse an entry the eviction deletes.
+- **Evicting an unresolved snapshot**: allowed whatever the other snapshots of the perimeter are,
+  and the registry is left as it is. Two crawls whose resolution keeps failing can both be
+  evicted.
+- **API requests during the eviction**: requests that read the collected tables wait for the
+  eviction's database part, or the eviction waits for them; neither fails because of the other.
 - **Operator decision naming a deleted device key**: the decision stays; replaying it against keys
   that no longer exist behaves as it already does for any unknown key.
 - **Evict without `--yes`**: prints the preview, changes nothing, records nothing in the audit
@@ -218,9 +227,10 @@ the evicted snapshot and the audit trail.
 - **FR-004**: Eviction MUST delete from the object store every stored output the evicted snapshot
   referenced that no remaining snapshot references, and MUST NOT delete any other output, including
   outputs orphaned before the eviction.
-- **FR-005**: Eviction MUST refuse an open snapshot, a pinned snapshot, any snapshot whose
+- **FR-005**: Eviction MUST refuse an open snapshot, a pinned snapshot, a resolved snapshot whose
   perimeter has another snapshot open or closed but not yet resolved, and any eviction while a
-  crawl is running in any perimeter. A refusal MUST exit non-zero, say why (naming the blocking
+  crawl is running in any perimeter. An unresolved snapshot MUST NOT be refused because of other
+  unresolved snapshots. A refusal MUST exit non-zero, say why (naming the blocking
   snapshot when there is one), and change nothing. A crawl MUST NOT start while any snapshot is
   `evicting`. A crawl and an eviction MUST never run at the same time.
 - **FR-006**: Evicting an already evicted snapshot MUST exit 0 and change nothing. Rerunning an
@@ -239,9 +249,10 @@ the evicted snapshot and the audit trail.
 - **FR-011**: The default snapshot of the read API, the baseline chosen by the coverage gate, and
   the snapshots the engine picks up for judging, resolving and projecting MUST skip evicted
   snapshots.
-- **FR-012**: Eviction MUST delete every device registry entry, with its attributed identifiers,
-  that no remaining (non-evicted) snapshot references, whichever snapshot created it. Entries still
-  referenced MUST keep their key and history unchanged.
+- **FR-012**: Eviction of a resolved snapshot MUST delete every device registry entry, with its
+  attributed identifiers, that no remaining (non-evicted) snapshot references, whichever snapshot
+  created it. Entries still referenced MUST keep their key and history unchanged. Eviction of an
+  unresolved snapshot MUST leave the registry unchanged.
 - **FR-013**: Verdicts of other snapshots that name the evicted snapshot as baseline MUST stay
   unchanged.
 - **FR-014**: The evict command MUST change nothing unless given `--yes`. Without it, it MUST show

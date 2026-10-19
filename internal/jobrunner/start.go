@@ -88,6 +88,18 @@ func Start(ctx context.Context, db *pgxpool.Pool, doc []byte, perimeterName, see
 
 	var jobID int64
 	err = pgx.BeginFunc(ctx, db, func(tx pgx.Tx) error {
+		// The crawl gate, shared with evict_snapshot: no crawl starts while an eviction is
+		// unfinished, since a crawl reuses stored outputs before it records them (012, research R4).
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(crawl_gate_key())`); err != nil {
+			return err
+		}
+		var evicting int64
+		err := tx.QueryRow(ctx, `SELECT id FROM snapshot WHERE state = 'evicting' ORDER BY id LIMIT 1`).Scan(&evicting)
+		if err == nil {
+			return Invalid{fmt.Sprintf("snapshot %d is being evicted: finish it with netmapper snapshot evict --id %d --yes", evicting, evicting)}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		var cv int64
 		if err := tx.QueryRow(ctx, `INSERT INTO config_version (posted_by, document) VALUES ($1, $2) RETURNING id`,
 			requestedBy, string(d.Raw)).Scan(&cv); err != nil {

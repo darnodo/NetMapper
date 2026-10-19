@@ -1,0 +1,22 @@
+meta {
+  name: Get evicted snapshot
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/devices?snapshot={{evicted_snapshot}}
+  body: none
+  auth: inherit
+}
+
+docs {
+  A snapshot removed with `netmapper snapshot evict --yes` answers 410, never an empty list.
+  Run "List snapshots" first: it points evicted_snapshot at the newest tombstone.
+}
+
+assert {
+  res.status: eq 410
+  res.body.error: eq snapshot_evicted
+  res.body.snapshot.state: eq evicted
+}

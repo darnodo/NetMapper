@@ -60,10 +60,26 @@ referenced by `observation`. Dropping the partitions rather than deleting rows i
 on a large one. `task` is partitioned by job, not by snapshot, as the issue assumed; one job has
 exactly one snapshot, so the job's partition is the snapshot's task list.
 
-Detaching a partition takes an `ACCESS EXCLUSIVE` lock on its parent table until the transaction
-commits, so API and engine reads of `observation`, `observation_raw`, `identifier_claim` and `task`
-wait for the eviction's database part. At homelab scale that is well under a second; it is not
-worth `DETACH ... CONCURRENTLY`, which cannot run inside a transaction or a function.
+Detaching and dropping a partition takes an `ACCESS EXCLUSIVE` lock on its parent and on every
+table a foreign key ties to it: 14 tables in all (`observation_raw`, `identifier_claim`,
+`observation`, `task`, `snapshot`, `job`, `parse_generation`, `raw_object`, `finding_evidence`,
+`entity_claim`, `interface_alias`, `interface_evidence`, `edge_evidence`, `l2domain_member`),
+measured on a projected snapshot. Until the transaction commits, API and engine reads of those
+tables wait for the eviction's database part. At homelab scale that is well under a second; it is
+not worth `DETACH ... CONCURRENTLY`, which cannot run inside a transaction or a function.
+
+Taken one by one, those locks deadlock with API reads (review of 2026-10-19, reproduced by
+`TestEvictDoesNotDeadlockWithReaders`). A request is one read-only transaction that keeps its locks
+until it ends, and endpoints read the tables in different orders: `GET /v1/observations/{id}` reads
+`observation` then `observation_raw`, `GET /v1/observations/{id}/raw/{step}` the reverse. Taking the
+locks in a fixed order at the start, as first considered, only moves the deadlock to the other
+endpoint: tested both ways, one order fails each time. So the 14 locks are taken in one `LOCK TABLE
+... NOWAIT` inside a subtransaction before anything is deleted. If one table is busy, the
+subtransaction rolls back, releasing what it took, and the eviction retries every 50 ms. It never
+holds one of these locks while waiting for another, so it is never part of a deadlock cycle on
+them. After 30 s of busy tables it gives up with nothing changed, and the command can be run
+again. A foreign key added to one of the partitioned tables adds its table to the list. The preview
+takes none of these locks.
 
 The exact delete order is checked by the integration test on a fully projected snapshot with
 findings and L2 domains: a missed table fails the partition drop on a foreign key, loudly.
@@ -146,8 +162,12 @@ the window above open).
 3. `open`: refused.
 4. Pinned: refused.
 5. A job `running` or `cancelling`, any perimeter: refused, naming the job and its snapshot.
-6. Another snapshot of the same perimeter `closed` with no `resolution` row: refused, naming it
-   (clarification of 2026-10-19). Open snapshots of the perimeter are covered by check 5.
+6. Only when the snapshot itself is resolved: another snapshot of the same perimeter `closed` with
+   no `resolution` row: refused, naming it (clarification of 2026-10-19). Open snapshots of the
+   perimeter are covered by check 5. An unresolved snapshot skips this check (review of
+   2026-10-19): it carries no entity, so evicting it removes no registry reference, and without
+   the exemption two unresolved snapshots whose resolution keeps failing would each block the
+   other for ever.
 
 A refusal exits 2, like `netmapper cancel` on a job that is not running. The preview exits 3.
 
@@ -164,6 +184,10 @@ snapshot's perimeter that no entity of a non-evicted snapshot of that perimeter 
 
 Entries still referenced keep everything, including `minted_from`, which may now point at a
 tombstone. The `snapshot` row stays, so the foreign key holds.
+
+The cleanup runs only when the evicted snapshot is resolved. An unresolved one leaves the registry
+as it is: it removed no reference, and an entry left over is caught by the next eviction of a
+resolved snapshot of the perimeter.
 
 **Rationale**: this is the clarified rule ("no remaining snapshot references it, regardless of which
 snapshot created it"). It runs under the resolver's perimeter lock (R6), so no resolution reads the
