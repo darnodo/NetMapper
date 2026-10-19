@@ -1,6 +1,9 @@
 # PostgreSQL, Garage and an SNMP test agent for development and integration tests.
 #   docker compose -f deploy/compose.yaml up -d
-# S3 access: endpoint localhost:3900, bucket netmapper, key below (dev only).
+# S3 access: endpoint localhost:3900, bucket netmapper, two keys below (dev only): GK0123... for the
+# collector and the tests, GK0abc... for the operator's `netmapper snapshot evict --yes`
+# (docs/how-to/deploy.md). Garage's `write` permission includes delete, so the split names who
+# deletes rather than taking delete away from the collector.
 # SNMP agent: 127.0.0.1:1161/udp, SNMPv3 users in snmpd/snmpd.conf (NETMAPPER_TEST_SNMP).
 services:
   postgres:
@@ -53,6 +56,8 @@ services:
         api CreateBucket '{"globalAlias":"netmapper"}' >/dev/null || true
         bucket=$$(api "GetBucketInfo?globalAlias=netmapper" | tr -d " \n" | sed 's/^{"id":"\([0-9a-f]*\)".*/\1/')
         api AllowBucketKey "{\"bucketId\":\"$$bucket\",\"accessKeyId\":\"GK0123456789abcdef01234567\",\"permissions\":{\"read\":true,\"write\":true,\"owner\":true}}" >/dev/null
+        api ImportKey '{"accessKeyId":"GK0abcdef0123456789abcdef0","secretAccessKey":"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789","name":"netmapper-operator"}' >/dev/null || true
+        api AllowBucketKey "{\"bucketId\":\"$$bucket\",\"accessKeyId\":\"GK0abcdef0123456789abcdef0\",\"permissions\":{\"read\":true,\"write\":true,\"owner\":false}}" >/dev/null
         echo garage ready
 
 volumes:

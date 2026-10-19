@@ -2,6 +2,8 @@ package jobrunner_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -116,5 +118,39 @@ func TestStartStoresSNMPv3Protocols(t *testing.T) {
 	want := "v3-named sha256/aes256, v3-default sha/aes, ro-ssh NULL/NULL"
 	if strings.Join(got, ", ") != want {
 		t.Errorf("got %q, want %q", strings.Join(got, ", "), want)
+	}
+}
+
+// T015, 012 research R4: no crawl starts while an eviction is unfinished, because a crawl reuses
+// stored outputs before it records them.
+func TestStartRefusedWhileEvicting(t *testing.T) {
+	db := testutil.DB(t)
+	op := testutil.As(t, db, "netmapper_operator")
+	ctx := context.Background()
+	first, err := jobrunner.Start(ctx, op, []byte(doc), "lab", "good", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snap int64
+	if err := db.QueryRow(ctx, `UPDATE snapshot SET state = 'closed', closed_at = now() WHERE job_id = $1 RETURNING id`, first).Scan(&snap); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE job SET state = 'succeeded' WHERE id = $1`, first); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(ctx, `UPDATE snapshot SET state = 'evicting', evicted_at = now() WHERE id = $1`, snap); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = jobrunner.Start(ctx, op, []byte(doc), "lab", "good", "test")
+	var invalid jobrunner.Invalid
+	want := fmt.Sprintf("snapshot %d is being evicted: finish it with netmapper snapshot evict --id %d --yes", snap, snap)
+	if !errors.As(err, &invalid) || err.Error() != want {
+		t.Fatalf("start: %v, want %q", err, want)
+	}
+	var jobs int
+	db.QueryRow(ctx, `SELECT count(*) FROM job`).Scan(&jobs)
+	if jobs != 1 {
+		t.Errorf("%d jobs, want only the first", jobs)
 	}
 }

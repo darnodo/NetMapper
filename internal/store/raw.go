@@ -42,3 +42,9 @@ func (s *RawStore) Get(ctx context.Context, hash []byte) ([]byte, error) {
 	_, err = buf.ReadFrom(o)
 	return buf.Bytes(), err
 }
+
+// Delete removes the bytes stored under hash. An object already gone is not an error, so an
+// eviction interrupted between a delete and its bookkeeping can simply run again (012, research R5).
+func (s *RawStore) Delete(ctx context.Context, hash []byte) error {
+	return s.Client.RemoveObject(ctx, s.Bucket, RawKey(hash), minio.RemoveObjectOptions{})
+}

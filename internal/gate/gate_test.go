@@ -139,3 +139,35 @@ func TestQuarantinedSnapshotStaysReadable(t *testing.T) {
 		t.Errorf("collected zone reads %q after re-judging, was %q", after, before)
 	}
 }
+
+// T017, 012 research R6: no verdict is written for a snapshot, or against a baseline, that is no
+// longer closed; judge_snapshot refuses under the engine's role, the role that calls it.
+func TestJudgeRefusesEvicted(t *testing.T) {
+	l := oneDevice(t)
+	l.Crawl(Doc)
+	l.Crawl(Doc)
+	first, second := l.Int(`SELECT min(id) FROM snapshot`), l.Int(`SELECT max(id) FROM snapshot`)
+	ctx := context.Background()
+	judge := func(snap int, baseline any) error {
+		// A verdict with a baseline carries a coverage figure, one without carries none.
+		_, err := l.Engine.Exec(ctx, `SELECT judge_snapshot($1, $2::bigint, 'published',
+			CASE WHEN $2::bigint IS NULL THEN NULL ELSE 1 END, 0, 0, 0, '{}', '{}', 2)`, snap, baseline)
+		return err
+	}
+	if err := judge(second, first); err != nil {
+		t.Fatalf("both closed: %v", err)
+	}
+	if _, err := l.DB.Exec(ctx, `UPDATE snapshot SET state = 'evicting', evicted_at = now() WHERE id = $1`, first); err != nil {
+		t.Fatal(err)
+	}
+	before := l.Int(`SELECT count(*) FROM snapshot_judgement`)
+	if err := judge(second, first); err == nil || !strings.Contains(err.Error(), "is not closed") {
+		t.Errorf("baseline evicting: %v, want refused", err)
+	}
+	if err := judge(first, nil); err == nil || !strings.Contains(err.Error(), "is not closed") {
+		t.Errorf("snapshot evicting: %v, want refused", err)
+	}
+	if after := l.Int(`SELECT count(*) FROM snapshot_judgement`); after != before {
+		t.Errorf("%d verdicts written by refused calls", after-before)
+	}
+}

@@ -57,7 +57,9 @@ jobs:
           fi
 
   # Every commit of the history, not only the diff: a secret removed in a later commit is still
-  # published. Known development values are allowlisted in .gitleaks.toml.
+  # published. Known development values are allowlisted in .gitleaks.toml. -v prints each finding
+  # (file, line, commit, rule) so a failure says where to look; --redact keeps the value out of the
+  # log, and --no-color keeps the log free of escape codes.
   secrets:
     runs-on: ubuntu-latest
     steps:
@@ -72,4 +74,4 @@ jobs:
       - name: gitleaks
         run: |
           go install github.com/zricethezav/gitleaks/v8@v8.30.1
-          gitleaks git --no-banner --redact .
+          gitleaks git --no-banner --redact -v --no-color .

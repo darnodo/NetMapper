@@ -24,7 +24,9 @@ Early. What works today:
   well it is known, and a finding when two ends of a cable carry different VLANs untagged (stored
   in the database, not served by the API yet);
 - a read-only REST API behind bearer tokens, including any fact family of one device
-  (`/v1/devices/{name}/facts/{family}`).
+  (`/v1/devices/{name}/facts/{family}`);
+- snapshot eviction and pinning from the command line, so a crawl run with a broken configuration
+  can be removed without wiping the rest.
 
 Supported platforms: Arista EOS. Others are added as data, see [writing a pack](docs/how-to/write-a-pack.md).
 
@@ -93,6 +95,14 @@ curl -H "Authorization: Bearer $TOKEN" localhost:8080/v1/devices
 `run` returns at once. Until the crawl is over and its graph is built, `/v1/devices` answers
 `not_projected`; `/v1/snapshots` shows the snapshot `closed` with `has_graph: true` when it is ready.
 
+A crawl you do not want to keep can be evicted; the preview shows what would go:
+
+```sh
+./netmapper snapshot evict --id 2          # preview only, exit 3
+./netmapper snapshot evict --id 2 --yes    # needs the NETMAPPER_S3_* variables
+./netmapper snapshot pin --id 1            # never evicted
+```
+
 The development stack logs in as a PostgreSQL superuser, which is fine for a trial and wrong for
 anything else: [deploying NetMapper](docs/how-to/deploy.md) sets up one login per process.
 
@@ -106,6 +116,7 @@ anything else: [deploying NetMapper](docs/how-to/deploy.md) sets up one login pe
 
 - API contract: [specs/005-read-api/contracts/rest.md](specs/005-read-api/contracts/rest.md)
 - API requests for Bruno: [bruno/](bruno/)
+- Command line: [specs/001-crawl-loop/contracts/cli.md](specs/001-crawl-loop/contracts/cli.md)
 - Configuration document: [specs/001-crawl-loop/contracts/config.md](specs/001-crawl-loop/contracts/config.md)
 - Pack format: [specs/001-crawl-loop/contracts/pack-format.md](specs/001-crawl-loop/contracts/pack-format.md)
 - Architecture: [docs/c4-model/](docs/c4-model/00-overview.md)

@@ -18,6 +18,7 @@ import (
 // verdict and coverage are always present, as null for a snapshot never judged, rather than omitted.
 type SnapshotRef struct {
 	ID       int64      `json:"id"`
+	OpenedAt time.Time  `json:"opened_at"`
 	ClosedAt *time.Time `json:"closed_at"`
 	State    string     `json:"state"`
 	Verdict  *string    `json:"verdict"`
@@ -25,20 +26,25 @@ type SnapshotRef struct {
 	// A projection exists and was built from the entity set the snapshot carries now. A projection
 	// whose resolution_at is older answers from a set that no longer exists (research R9).
 	HasGraph bool `json:"has_graph"`
+	// Lifecycle metadata (012): a pinned snapshot is never evicted; evicted_at is set once an
+	// eviction started, with state evicting and then evicted.
+	Pinned    bool       `json:"pinned"`
+	EvictedAt *time.Time `json:"evicted_at"`
 }
 
 var errNoSnapshot = errors.New("no such snapshot")
 
 const snapshotColumns = `
-	SELECT s.id, s.closed_at, s.state, j.classification, j.coverage::float8,
+	SELECT s.id, s.opened_at, s.closed_at, s.state, j.classification, j.coverage::float8,
 	       EXISTS (SELECT 1 FROM projection p JOIN resolution r ON r.snapshot_id = p.snapshot_id
-	               WHERE p.snapshot_id = s.id AND p.resolution_at = r.computed_at) AS has_graph
+	               WHERE p.snapshot_id = s.id AND p.resolution_at = r.computed_at) AS has_graph,
+	       s.pinned, s.evicted_at
 	FROM snapshot s
 	LEFT JOIN snapshot_judgement j ON j.snapshot_id = s.id AND j.active`
 
 func scanSnapshot(row pgx.Row) (SnapshotRef, error) {
 	var s SnapshotRef
-	err := row.Scan(&s.ID, &s.ClosedAt, &s.State, &s.Verdict, &s.Coverage, &s.HasGraph)
+	err := row.Scan(&s.ID, &s.OpenedAt, &s.ClosedAt, &s.State, &s.Verdict, &s.Coverage, &s.HasGraph, &s.Pinned, &s.EvictedAt)
 	return s, err
 }
 
@@ -86,7 +92,21 @@ func pickSnapshot(w http.ResponseWriter, r *http.Request, tx pgx.Tx) (s Snapshot
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "no_such_snapshot"})
 		return s, false, nil
 	}
+	if err == nil && evicted(w, s) {
+		return s, false, nil
+	}
 	return s, err == nil, err
+}
+
+// evicted answers 410 for a snapshot that is evicted or being evicted: it existed and its data was
+// removed on purpose, which is neither "no such snapshot" nor "not projected" (012, FR-010). It
+// reports whether it wrote the response.
+func evicted(w http.ResponseWriter, s SnapshotRef) bool {
+	if s.State != "evicting" && s.State != "evicted" {
+		return false
+	}
+	writeJSON(w, http.StatusGone, map[string]any{"error": "snapshot_evicted", "snapshot": s})
+	return true
 }
 
 // requireGraph refuses a snapshot that carries no current graph: still open, closed but not yet
@@ -128,6 +148,9 @@ type judgement struct {
 	Breakdown          json.RawMessage `json:"breakdown"`
 	GateVersion        int             `json:"gate_version"`
 	ComputedAt         time.Time       `json:"computed_at"`
+	// The baseline's state today, so a reader sees that the snapshot a figure was measured against
+	// has since been evicted (012). Null without a baseline.
+	BaselineState *string `json:"baseline_state"`
 }
 
 // GET /v1/snapshots/{id}: one snapshot with its judgement. Served whatever its state, since a verdict
@@ -146,11 +169,12 @@ func (s *Server) snapshot(w http.ResponseWriter, r *http.Request, tx pgx.Tx) err
 	}
 	var j judgement
 	err = tx.QueryRow(r.Context(), `
-		SELECT classification, coverage::float8, baseline_snapshot_id, baseline_devices, carried_over,
-		       reached, thresholds, breakdown, gate_version, computed_at
-		FROM snapshot_judgement WHERE snapshot_id = $1 AND active`, id).Scan(
+		SELECT j.classification, j.coverage::float8, j.baseline_snapshot_id, j.baseline_devices,
+		       j.carried_over, j.reached, j.thresholds, j.breakdown, j.gate_version, j.computed_at, b.state
+		FROM snapshot_judgement j LEFT JOIN snapshot b ON b.id = j.baseline_snapshot_id
+		WHERE j.snapshot_id = $1 AND j.active`, id).Scan(
 		&j.Classification, &j.Coverage, &j.BaselineSnapshotID, &j.BaselineDevices, &j.CarriedOver,
-		&j.Reached, &j.Thresholds, &j.Breakdown, &j.GateVersion, &j.ComputedAt)
+		&j.Reached, &j.Thresholds, &j.Breakdown, &j.GateVersion, &j.ComputedAt, &j.BaselineState)
 	var jp *judgement
 	switch {
 	case err == nil:

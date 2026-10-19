@@ -124,6 +124,12 @@ func resolveIn(ctx context.Context, tx pgx.Tx, s snapshot) (Result, error) {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, s.perimeter); err != nil {
 		return Result{}, err
 	}
+	// Resolve read the state before this lock. An eviction takes the same lock, so one that
+	// committed while this waited is seen here, and nothing is written for an evicted snapshot
+	// (012, research R6).
+	if err := stillClosed(ctx, tx, s.id); err != nil {
+		return Result{}, err
+	}
 
 	groups, err := readGroups(ctx, tx, s.id)
 	if err != nil {
@@ -176,4 +182,16 @@ func describe(ctx context.Context, db store.DB, id int64) (snapshot, error) {
 		return s, fmt.Errorf("snapshot %d: %w", id, ErrNotFound)
 	}
 	return s, err
+}
+
+// stillClosed re-reads the snapshot's state inside the transaction, after the lock.
+func stillClosed(ctx context.Context, tx pgx.Tx, id int64) error {
+	var state string
+	if err := tx.QueryRow(ctx, `SELECT state FROM snapshot WHERE id = $1`, id).Scan(&state); err != nil {
+		return err
+	}
+	if state != "closed" {
+		return fmt.Errorf("snapshot %d is %s: %w", id, state, ErrNotClosed)
+	}
+	return nil
 }

@@ -30,6 +30,7 @@ Every answer carries the snapshot it was built from:
 {
   "snapshot": {
     "id": 12,
+    "opened_at": "2026-09-25T10:44:31Z",
     "closed_at": "2026-09-25T10:44:58Z",
     "state": "closed",
     "verdict": "quarantined",
@@ -70,6 +71,12 @@ kind, so a consumer reads one field whatever it is looking at (spec FR-002a):
 The envelope also carries `has_graph`: whether the snapshot has a projection built from the entity set
 it carries now. `verdict` and `coverage` are `null` for a snapshot never judged, never omitted.
 
+Since feature 012 it also carries `opened_at` (when the crawl started, kept on a tombstone),
+`pinned` (a pinned snapshot is never evicted) and `evicted_at`
+(null unless the state is `evicting` or `evicted`). `state` is one of `open`, `closed`, `evicting`,
+`evicted`. An evicted snapshot is a tombstone: listed, readable by id with its verdict, never
+answered from.
+
 ## Errors
 
 | Status | Body                                            | When                                                        |
@@ -85,6 +92,7 @@ it carries now. `verdict` and `coverage` are `null` for a snapshot never judged,
 | 404    | `{"error": "no_such_family", "snapshot": {…}}`  | the family named is not in the fact schema (feature 007)    |
 | 404    | `{"error": "not_collected", "snapshot": {…}}`   | the device has no observation of that family (feature 007)  |
 | 409    | `{"error": "not_projected", "snapshot": {…}}`   | the snapshot is open, unprojected, or its projection is stale; `snapshot` is `null` when no snapshot carries a graph at all |
+| 410    | `{"error": "snapshot_evicted", "snapshot": {…}}` | `?snapshot=` names a snapshot that is `evicting` or `evicted`, on any endpoint that takes it; checked before `not_projected` (feature 012) |
 | 500    | `{"error": "internal"}`                         | nothing more: detail goes to the log, never to the caller   |
 
 `?snapshot=<id>` applies to `/v1/devices`, `/v1/devices/{name}`, `/v1/devices/{name}/facts/{family}`,
@@ -95,14 +103,17 @@ observation endpoints, with no default: see below.
 
 ### `GET /v1/snapshots`
 
-Every snapshot, newest first: id, state, `closed_at`, verdict, coverage, and whether it carries a
-current graph. This is how a caller discovers what they can ask about. It lists snapshots rather than
+Every snapshot, newest first: id, state, `closed_at`, verdict, coverage, whether it carries a
+current graph, `pinned` and `evicted_at`. Tombstones are listed with the rest. This is how a caller discovers what they can ask about. It lists snapshots rather than
 answering from one, so it carries no top-level `snapshot`; each entry is one.
 
 ### `GET /v1/snapshots/{id}`
 
 One snapshot with its verdict, the figure the verdict rests on, what it was compared against, and the
-breakdown of what did not come back (FR-007).
+breakdown of what did not come back (FR-007). Answered whatever the state, an evicted snapshot
+included. The judgement carries `baseline_state`, the baseline snapshot's state today (`evicted`
+once it has been evicted), or `null` without a baseline; `baseline_snapshot_id` and `coverage` never
+change after the baseline is evicted (feature 012).
 
 ### `GET /v1/devices`
 

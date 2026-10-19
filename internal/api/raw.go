@@ -35,19 +35,28 @@ type command struct {
 // observationScope reads the optional ?snapshot= of the observation endpoints. With it, a lookup is
 // pinned to that snapshot's partition; without it, every partition is searched (issue #6). Unlike the
 // graph endpoints there is no default snapshot: an observation id belongs to exactly one snapshot, so
-// a default would answer 404 for evidence from any older crawl. ok is false when the response has
-// already been written.
-func observationScope(w http.ResponseWriter, r *http.Request) (snapshot *int64, ok bool) {
+// a default would answer 404 for evidence from any older crawl. A named snapshot that is evicted, or
+// being evicted, answers 410 (012). ok is false when the response has already been written.
+func observationScope(w http.ResponseWriter, r *http.Request, tx pgx.Tx) (snapshot *int64, ok bool, err error) {
 	q := r.URL.Query().Get("snapshot")
 	if q == "" {
-		return nil, true
+		return nil, true, nil
 	}
-	id, err := strconv.ParseInt(q, 10, 64)
-	if err != nil {
+	id, perr := strconv.ParseInt(q, 10, 64)
+	if perr != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_snapshot"})
-		return nil, false
+		return nil, false, nil
 	}
-	return &id, true
+	s, err := loadSnapshot(r.Context(), tx, id)
+	switch {
+	case errors.Is(err, errNoSnapshot):
+		// Left to the lookup, which answers no_such_snapshot or no_such_observation as before.
+	case err != nil:
+		return nil, false, err
+	case evicted(w, s):
+		return nil, false, nil
+	}
+	return &id, true, nil
 }
 
 // pin narrows a query on observation or observation_raw to one snapshot when the request named one,
@@ -82,9 +91,9 @@ func (s *Server) observation(w http.ResponseWriter, r *http.Request, tx pgx.Tx) 
 	if !ok {
 		return nil
 	}
-	snapshot, ok := observationScope(w, r)
+	snapshot, ok, err := observationScope(w, r, tx)
 	if !ok {
-		return nil
+		return err
 	}
 	ctx := r.Context()
 	q, args := pin(`
@@ -92,7 +101,7 @@ func (s *Server) observation(w http.ResponseWriter, r *http.Request, tx pgx.Tx) 
 		       status, detail
 		FROM observation WHERE id = $1`, []any{id}, snapshot)
 	var o observation
-	err := tx.QueryRow(ctx, q, args...).Scan(&o.ID, &o.SnapshotID, &o.CollectedAt, &o.Target,
+	err = tx.QueryRow(ctx, q, args...).Scan(&o.ID, &o.SnapshotID, &o.CollectedAt, &o.Target,
 		&o.Transport, &o.Platform, &o.RecipeID, &o.Family, &o.Status, &o.Detail)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return notFound(ctx, w, tx, snapshot, "no_such_observation")
@@ -132,15 +141,15 @@ func (s *Server) rawOutput(w http.ResponseWriter, r *http.Request, tx pgx.Tx) er
 	if !ok {
 		return nil
 	}
-	snapshot, ok := observationScope(w, r)
+	snapshot, ok, err := observationScope(w, r, tx)
 	if !ok {
-		return nil
+		return err
 	}
 	ctx := r.Context()
 	q, args := pin(`SELECT hash FROM observation_raw WHERE observation_id = $1 AND step_id = $2`,
 		[]any{id, r.PathValue("step")}, snapshot)
 	var hash []byte
-	err := tx.QueryRow(ctx, q, args...).Scan(&hash)
+	err = tx.QueryRow(ctx, q, args...).Scan(&hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// No such step, or no such observation: tell them apart.
 		q, args := pin(`SELECT 1 FROM observation WHERE id = $1`, []any{id}, snapshot)

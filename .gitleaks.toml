@@ -12,6 +12,8 @@ regexTarget = "secret"
 regexes = [
   '''^GK0123456789abcdef01234567$''',                                         # S3 access key
   '''^0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef$''',   # S3 secret key
+  '''^GK0abcdef0123456789abcdef0$''',                                         # S3 access key, operator (012)
+  '''^abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789$''',   # S3 secret key, operator (012)
   '''^netmapper-dev-admin-token$''',                                          # Garage admin token
   '''^4a1c3f0e9d8b7a6c5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a29$''',   # Garage rpc_secret
 ]

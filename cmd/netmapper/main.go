@@ -1,6 +1,6 @@
 // Command netmapper is the one binary: `collector`, `engine` and `api` roles, and the operator
-// subcommands `migrate`, `run`, `cancel`, `judge`, `resolve`, `decide`, `project` and `token`
-// (contracts/cli.md, 005 contracts/rest.md).
+// subcommands `migrate`, `run`, `cancel`, `judge`, `resolve`, `decide`, `project`, `token` and
+// `snapshot` (contracts/cli.md, 005 contracts/rest.md, 012 contracts/cli.md).
 package main
 
 import (
@@ -18,11 +18,13 @@ import (
 	"github.com/darnodo/NetMapper/internal/store"
 )
 
-// Exit codes: 0 success, 1 runtime error, 2 invalid input.
+// Exit codes: 0 success, 1 runtime error, 2 invalid input or refusal, 3 preview only (snapshot evict
+// without --yes: nothing done).
 const (
 	exitOK      = 0
 	exitError   = 1
 	exitInvalid = 2
+	exitPreview = 3
 )
 
 var commands = map[string]func(ctx context.Context, args []string) int{
@@ -37,6 +39,7 @@ var commands = map[string]func(ctx context.Context, args []string) int{
 	"engine":    cmdEngine,
 	"api":       cmdAPI,
 	"token":     cmdToken,
+	"snapshot":  cmdSnapshot,
 }
 
 func main() {
@@ -44,7 +47,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 	if len(os.Args) < 2 || commands[os.Args[1]] == nil {
-		fmt.Fprintln(os.Stderr, "usage: netmapper migrate|run|cancel|judge|resolve|decide|project|token|collector|engine|api [flags]")
+		fmt.Fprintln(os.Stderr, "usage: netmapper migrate|run|cancel|judge|resolve|decide|project|token|snapshot|collector|engine|api [flags]")
 		os.Exit(exitInvalid)
 	}
 	os.Exit(commands[os.Args[1]](ctx, os.Args[2:]))

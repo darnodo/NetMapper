@@ -229,6 +229,16 @@ func projectIn(ctx context.Context, tx pgx.Tx, reg *pack.Registry, s snapshot) (
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, $2)`, projectionLockClass, s.id); err != nil {
 		return Result{}, err
 	}
+	// Project read the state before this lock. An eviction takes the same lock, so one that
+	// committed while this waited is seen here, and nothing is written for an evicted snapshot
+	// (012, research R6).
+	var state string
+	if err := tx.QueryRow(ctx, `SELECT state FROM snapshot WHERE id = $1`, s.id).Scan(&state); err != nil {
+		return Result{}, err
+	}
+	if state != "closed" {
+		return Result{}, fmt.Errorf("snapshot %d is %s: %w", s.id, state, ErrNotClosed)
+	}
 
 	p := &projection{snap: s}
 	if err := p.readEntities(ctx, tx); err != nil {
@@ -262,7 +272,8 @@ func projectIn(ctx context.Context, tx pgx.Tx, reg *pack.Registry, s snapshot) (
 }
 
 // projectionLockClass keeps this feature's advisory locks from colliding with the ones 003 takes on a
-// perimeter name, which use the single-argument form.
+// perimeter name, which use the single-argument form. evict_snapshot (migration 0013) takes the same
+// lock with this value written in SQL: change both or neither.
 const projectionLockClass = 4
 
 func (p *projection) countPorts() int {

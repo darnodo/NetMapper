@@ -61,8 +61,9 @@ func cmdCollector(ctx context.Context, args []string) int {
 	return exitOK
 }
 
-// rawStore reads NETMAPPER_S3_*. The collector writes the object store and `netmapper api` reads it
-// to serve raw output; nothing else touches it.
+// rawStore reads NETMAPPER_S3_*. The collector writes the object store, `netmapper api` reads it to
+// serve raw output, and `netmapper snapshot evict --yes` deletes the outputs of an evicted snapshot
+// with the operator's own key; nothing else touches it.
 func rawStore() (*store.RawStore, error) {
 	var missing []string
 	get := func(k string) string {

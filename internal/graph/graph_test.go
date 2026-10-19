@@ -517,3 +517,40 @@ func TestOSPFNotProjected(t *testing.T) {
 		t.Errorf("OSPF rows changed the projection:\n got %v\nwant %v", got, want)
 	}
 }
+
+// T016, 012 research R6: a projection that read the snapshot as closed, then waited on the
+// projection lock while an eviction took it, writes nothing and reports the snapshot as no longer
+// closed. Runs under netmapper_engine.
+func TestProjectStopsWhenSnapshotEvicted(t *testing.T) {
+	t.Setenv("NM_SNMP", "public")
+	t.Setenv("NM_SSH", "lab-ssh-secret")
+	l := NewLab(t, &fake.Network{Devices: map[netip.Addr]*fake.Device{Addr("10.0.0.1"): FakeOS("sw1", "S001")}})
+	l.Crawl(Doc)
+	id := snap(l)
+	before := l.Strings(`SELECT computed_at::text FROM projection WHERE snapshot_id = $1`, id)
+	ctx := context.Background()
+
+	tx, err := l.DB.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(4, $1)`, id); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := graph.Project(ctx, l.Engine, l.Registry, id); done <- err }()
+	l.WaitForLockWaiter(tx)
+	if _, err := tx.Exec(ctx, `UPDATE snapshot SET state = 'evicting', evicted_at = now() WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; !errors.Is(err, graph.ErrNotClosed) {
+		t.Errorf("project: %v, want ErrNotClosed", err)
+	}
+	if after := l.Strings(`SELECT computed_at::text FROM projection WHERE snapshot_id = $1`, id); slices.Compare(after, before) != 0 {
+		t.Errorf("projection %v, was %v: something was written", after, before)
+	}
+}

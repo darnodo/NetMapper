@@ -9,3 +9,9 @@ get {
   body: none
   auth: inherit
 }
+
+assert {
+  res.status: eq 200
+  res.body.snapshot.pinned: isBoolean
+  res.body.snapshot.evicted_at: isDefined
+}
