@@ -21,7 +21,9 @@ netmapper snapshot unpin --id N
 ## evict
 
 Without `--yes`, prints the preview and exits 3. Needs only `NETMAPPER_DSN`. A snapshot that would
-be refused prints the refusal and exits 2; an evicted one prints `nothing to do` and exits 0.
+be refused prints the refusal and exits 2; an evicted one prints `nothing to do` and exits 0. An
+`evicting` one prints the block with `result: resume`, the counts of what is left, and one
+`pending: <hex hash>` line per stored output still to delete, and exits 3.
 
 With `--yes`, also needs `NETMAPPER_S3_ENDPOINT`, `NETMAPPER_S3_BUCKET`, `NETMAPPER_S3_ACCESS_KEY`,
 `NETMAPPER_S3_SECRET_KEY` (and the optional `NETMAPPER_S3_REGION`, `NETMAPPER_S3_INSECURE`), set to
@@ -65,8 +67,9 @@ Print `pinned`, `unpinned`, or `nothing to do`, exit 0. On an `evicting` or `evi
 
 ## Audit
 
-Every `evict --yes`, `pin` and `unpin`, accepted or refused, writes one `audit_log` row
-(data-model.md). A preview writes none.
+Every `evict --yes`, `pin` and `unpin` on an existing snapshot, accepted or refused, writes one
+`audit_log` row (data-model.md). Invalid input writes none: a missing or bad `--id`, an unknown
+snapshot, missing `NETMAPPER_S3_*` variables. A preview writes none.
 
 ## Interaction with `netmapper run`
 

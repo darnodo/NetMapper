@@ -60,6 +60,11 @@ referenced by `observation`. Dropping the partitions rather than deleting rows i
 on a large one. `task` is partitioned by job, not by snapshot, as the issue assumed; one job has
 exactly one snapshot, so the job's partition is the snapshot's task list.
 
+Detaching a partition takes an `ACCESS EXCLUSIVE` lock on its parent table until the transaction
+commits, so API and engine reads of `observation`, `observation_raw`, `identifier_claim` and `task`
+wait for the eviction's database part. At homelab scale that is well under a second; it is not
+worth `DETACH ... CONCURRENTLY`, which cannot run inside a transaction or a function.
+
 The exact delete order is checked by the integration test on a fully projected snapshot with
 findings and L2 domains: a missed table fails the partition drop on a foreign key, loudly.
 

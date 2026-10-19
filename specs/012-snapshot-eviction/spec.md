@@ -161,7 +161,8 @@ the evicted snapshot and the audit trail.
    reads that verdict, **Then** the coverage figure and baseline id are unchanged and the baseline
    is shown as evicted.
 3. **Given** evictions, pins and unpins were run, **When** the audit trail is read, **Then** each
-   one appears with actor, time, action and snapshot id, including refused attempts.
+   one on an existing snapshot appears with actor, time, action and snapshot id, including refused
+   attempts.
 
 ### Edge Cases
 
@@ -190,7 +191,8 @@ the evicted snapshot and the audit trail.
 - **Evict without `--yes`**: prints the preview, changes nothing, records nothing in the audit
   trail, and exits 3, so a script that forgot `--yes` does not read it as done. A preview of a
   snapshot that would be refused says why and exits as the refusal would. A preview of an already
-  evicted snapshot says there is nothing to do and exits 0.
+  evicted snapshot says there is nothing to do and exits 0. A preview of an `evicting` snapshot
+  exits 3 and lists the stored outputs still to delete.
 - **Evicting the only snapshot with a graph**: allowed; the read API then answers "not projected"
   without a snapshot name, as it does on a fresh install.
 - **Observation looked up by id without naming a snapshot**: an observation of an evicted snapshot
@@ -225,8 +227,9 @@ the evicted snapshot and the audit trail.
   interrupted eviction MUST complete it.
 - **FR-007**: The operator MUST be able to pin and unpin a snapshot by id. Both MUST be idempotent.
   Pinning an evicted snapshot MUST be refused.
-- **FR-008**: Every eviction, pin and unpin, accepted or refused, MUST be recorded in the audit
-  trail with actor, time, action, snapshot id and outcome.
+- **FR-008**: Every eviction, pin and unpin of an existing snapshot, accepted or refused, MUST be
+  recorded in the audit trail with actor, time, action, snapshot id and outcome. Invalid input (an
+  unknown id, missing object store settings) and previews are not recorded.
 - **FR-009**: The read API MUST list a snapshot being evicted with state `evicting` and an evicted
   one with state `evicted`, and MUST show for every snapshot whether it is pinned and when it was
   evicted.
@@ -243,8 +246,9 @@ the evicted snapshot and the audit trail.
   unchanged.
 - **FR-014**: The evict command MUST change nothing unless given `--yes`. Without it, it MUST show
   the snapshot (id, close time, verdict, pinned or not) and what eviction would remove, as listed in
-  FR-015, and exit with code 3, distinct from success (0), runtime error (1), invalid input (2) and
-  refusal.
+  FR-015, and exit with code 3, distinct from success (0), runtime error (1) and invalid input or
+  refusal (2, as `netmapper cancel` uses for a job that is not running). On a snapshot already
+  `evicting`, the preview also exits 3 and lists the stored outputs still to delete.
 - **FR-015**: The evict command MUST report what it removed, or would remove in a preview: the
   number of observations, the number and total size of stored outputs deleted, the number of stored
   outputs kept because another snapshot shares them, and the number of registry entries deleted.
