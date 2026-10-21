@@ -7,6 +7,8 @@ needs no change to Go code, and a pull request that puts a vendor name outside `
 Two packs to copy from:
 
 - [`packs/arista_eos`](../../packs/arista_eos): a real platform, tested against a live lab.
+- [`packs/cisco_iosxe`](../../packs/cisco_iosxe): a second real one, four families only, with a
+  platform that has no per-command pager (section 5).
 - [`internal/pack/testdata/fakeos`](../../internal/pack/testdata/fakeos): an invented one, the
   smallest pack that works.
 
@@ -117,7 +119,17 @@ read-only collector:
 
 Copy [`packs/arista_eos/scrapli.yaml`](../../packs/arista_eos/scrapli.yaml) and adjust the prompt
 pattern and `failed-when-contains`. Turn paging off in the command itself (`| no-more`, `| no-pager`)
-rather than with `terminal length 0`.
+rather than with `terminal length 0`. A platform with no such pipe, such as IOS-XE, may take its
+terminal length from the SSH pty request instead: then ask for a tall pty in the platform file,
+as [`packs/cisco_iosxe/scrapli.yaml`](../../packs/cisco_iosxe/scrapli.yaml) does, and check on a
+device that a long output comes back whole.
+
+```yaml
+default:
+  options:
+    - option: transport-pty-height
+      value: 32767
+```
 
 ## 6. Recipes: one per fact family
 
@@ -284,7 +296,9 @@ it is a device with nothing to report.
 
 A `<switch>_<family>.facts.yml` file in `testdata/lab/` (`status:` and `rows:`) is compared with
 what the whole recipe produces from that switch's recordings, one per step: maps, values, split,
-defaults, merge and the schema check together. Then:
+defaults, merge and the schema check together. It runs the implementation that fits the software
+version the recordings were made on, which `recordedOn` in
+[`packs/packs_test.go`](../../packs/packs_test.go) lists per pack: add your pack there. Then:
 
 ```sh
 go test ./packs/

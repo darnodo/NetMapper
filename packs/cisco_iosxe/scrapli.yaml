@@ -1,0 +1,33 @@
+# scrapligo platform definition for IOS-XE, reduced for a read-only collector, as for EOS:
+# - one privilege level matching both the '>' and '#' prompts, so the driver never sends `enable`,
+#   `disable` or `configure terminal`. The netmapper account is privilege 1 (prompt `cat1>`); an
+#   account deployed at 15 lands on '#' and must not hang the session;
+# - no on-open or on-close commands, so nothing reaches the device unless a recipe sends it and the
+#   audit log records it.
+# IOS-XE has no per-command pager switch like EOS's `| no-more`, and scrapligo's own cisco_iosxe
+# definition sends `terminal length 0` on open. IOS-XE takes its terminal length from the SSH pty
+# request instead (0 is ignored, 32767 is honoured), so the session asks for a pty of 32767 rows and
+# nothing pages before that many lines (research R3).
+platform-type: 'cisco_iosxe'
+default:
+  driver-type: 'network'
+  privilege-levels:
+    exec:
+      name: 'exec'
+      pattern: '(?im)^[\w.\-@()/: ]{1,63}[>#]\s?$'
+      previous-priv:
+      deescalate:
+      escalate:
+      escalate-auth: false
+      escalate-prompt:
+  default-desired-privilege-level: 'exec'
+  failed-when-contains:
+    - "% Ambiguous command"
+    - "% Incomplete command"
+    - "% Invalid input detected"
+    - "% Unknown command"
+  network-on-open: []
+  network-on-close: []
+  options:
+    - option: transport-pty-height
+      value: 32767

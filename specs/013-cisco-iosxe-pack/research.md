@@ -250,3 +250,46 @@ marked "to confirm when recording" and is settled in implementation step 1, on t
   collections of an unchanged lab give the same rows (SC-003).
 - The lab passwords stay the `test/lab` ones; the Catalyst's `secret 9` hash appears only in its
   running-config, which no recipe reads and no recording holds.
+
+## Recorded on 2026-10-21 (tasks T008)
+
+One deploy of `test/lab-iosxe` on NetLab, all recordings, then destroyed.
+
+- **Times**: deploy started 13:27:23 UTC; `Startup complete in: 0:12:27`; `cat1` on both `eos-a`
+  data ports in LLDP at 13:43:08, 15 min 45 s after the deploy started. Within R11's 12 to 16
+  minutes.
+- **Lab change**: on the management network every node is every other node's LLDP neighbour
+  (`eos-a` saw `eos-b` and `cat1` on Management0), so the crawl would reach `eos-b` without going
+  through `cat1` (FR-012). LLDP is turned off on the Arista nodes' Management0 (`no lldp
+  transmit`, `no lldp receive`); `cat1.cfg` still does not touch `GigabitEthernet0/0`. Applied
+  live, then `cat1`'s Gi0/0 entries aged out: `cat1` lists `eos-a` twice and `eos-b` once. Put
+  first in `eos-a.cfg` and `eos-b.cfg`, the lines did not hold on the next deploy (T033):
+  containerlab's `arista_ceos` kind rewrites the Management0 block of the startup-config. They
+  are now an `exec` of each Arista node in `iosxe.clab.yaml`. The first form of that `exec`
+  (`bash -c "printf ... | Cli -p 15"`) failed (containerlab split it and dropped the `\n`); the
+  form in the file now, `Cli -p 15 -c '...'` with YAML `\n`, was applied with `containerlab
+  exec` on the running lab and worked on both nodes, but has not yet run as part of a deploy.
+- **Privilege and startup-config** (R6): `show privilege` gives level 1 as `netmapper`; LLDP, SNMP
+  and the account came from `cat1.cfg`.
+- **Port-channel** (R10): Po1 is up over LACP between `cat1` and `eos-a` (`Po1(SU)`, both members
+  `P`). Members print `Operational Mode: trunk (member of bundle Po1)`, and `down (suspended member
+  of bundle Po1)` once Po1 is shut. A port with no link prints `Operational Mode: down`, so the
+  mode is read from `Administrative Mode` in that case.
+- **LLDP off** (R5): `% LLDP is not enabled`, one line.
+- **Wrapped allowed list** (R10): not wrapped. With every even VLAN from 2 to 200 plus 99, the
+  "Vlans allowed on trunk" line is one line of about 390 characters on a 200-column terminal, with
+  ranges merged (`98-100`). No TextFSM `List` needed.
+- **Down trunk** (R10): with Po1 shut, `show interfaces trunk` prints nothing at all;
+  `show interfaces switchport` gives Po1 `Administrative Mode: trunk`, `Operational Mode: down`.
+- **VLAN status words** (R9): `act/lshut` (after `shutdown` under the VLAN) and `suspended`
+  (after `state suspend`) recorded; `show vlan brief` answers at privilege 1.
+- **Pty height** (R3): the collector's own SSH transport, built from the branch with
+  `scrapli.yaml`, read `show interfaces` (315 lines) and `show interfaces switchport` (283 lines)
+  whole, with no `--More--`. Its output equals the interactive recording once each line's
+  trailing spaces and the blank lines around the output are trimmed, which scrapligo does; every
+  `cat1` recording was trimmed that way so it is what the collector stores.
+- **Refusal** (R4): `show running-config` at privilege 1 gives a caret line and `% Invalid input
+  detected at '^' marker.`
+- **SNMP** (R1, R2): sysObjectID `1.3.6.1.4.1.9.1.3160`; sysDescr as in R1; sysName
+  `cat1.example.com`; `entPhysicalSerialNum.1` equals `System Serial Number` (each Cat9kv deploy
+  generates a new serial and base MAC).

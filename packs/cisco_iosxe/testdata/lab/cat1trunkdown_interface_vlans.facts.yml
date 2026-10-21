@@ -1,0 +1,14 @@
+# cat1 with Port-channel1 shut, reverted after recording (feature 013, T008 step 9). The trunk view
+# is blank, so Port-channel1 keeps its mode only; its members print `down (suspended member of
+# bundle Po1)` and keep their channel.
+status: collected
+rows:
+  - {interface: GigabitEthernet1/0/1, channel: Port-channel1}
+  - {interface: GigabitEthernet1/0/2, channel: Port-channel1}
+  - {interface: GigabitEthernet1/0/3, mode: access, access_vlan: 10}
+  - {interface: GigabitEthernet1/0/4, mode: access, access_vlan: 1}
+  - {interface: GigabitEthernet1/0/5, mode: access, access_vlan: 1}
+  - {interface: GigabitEthernet1/0/6, mode: dynamic auto}
+  - {interface: GigabitEthernet1/0/7, mode: access, access_vlan: 1}
+  - {interface: GigabitEthernet1/0/8, mode: access, access_vlan: 1}
+  - {interface: Port-channel1, mode: trunk}

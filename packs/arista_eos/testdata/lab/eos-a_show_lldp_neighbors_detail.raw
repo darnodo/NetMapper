@@ -1,0 +1,48 @@
+Interface Ethernet1 detected 1 LLDP neighbors:
+
+  Neighbor 0c00.9d67.3300/"Gi1/0/1", age 29 seconds
+  Discovered 0:04:27 ago; Last changed 0:04:27 ago
+  - Chassis ID type: MAC address (4)
+    Chassis ID     : 0c00.9d67.3300
+  - Port ID type: Interface name(5)
+    Port ID     : "Gi1/0/1"
+  - Time To Live: 120 seconds
+  - Port Description: "GigabitEthernet1/0/1"
+  - System Name: "cat1.example.com"
+  - System Description: "Cisco IOS Software [IOSXE], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.15.1, RELEASE SOFTWARE (fc4)\x0aTechnical Support: http://www.cisco.com/techsupport\x0aCopyright (c) 1986-2024 by Cisco Systems, Inc.\x0aCompiled Sun 11-Aug-24 22:16 by mcpre"
+  - System Capabilities : Bridge, Router
+    Enabled Capabilities: Bridge
+  - Management Address Subtype: ('IPv4 ',)
+    Management Address        : 172.20.22.3
+    Interface Number Subtype  : System Port Number (3)
+    Interface Number          : 0
+    OID String                : 
+  - IEEE802.3 MAC/PHY Configuration/Status
+    Auto-negotiation       : Not Supported
+    Operational MAU Type   : Unknown
+
+Interface Ethernet2 detected 1 LLDP neighbors:
+
+  Neighbor 0c00.9d67.3300/"Gi1/0/2", age 26 seconds
+  Discovered 0:04:25 ago; Last changed 0:04:25 ago
+  - Chassis ID type: MAC address (4)
+    Chassis ID     : 0c00.9d67.3300
+  - Port ID type: Interface name(5)
+    Port ID     : "Gi1/0/2"
+  - Time To Live: 120 seconds
+  - Port Description: "GigabitEthernet1/0/2"
+  - System Name: "cat1.example.com"
+  - System Description: "Cisco IOS Software [IOSXE], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.15.1, RELEASE SOFTWARE (fc4)\x0aTechnical Support: http://www.cisco.com/techsupport\x0aCopyright (c) 1986-2024 by Cisco Systems, Inc.\x0aCompiled Sun 11-Aug-24 22:16 by mcpre"
+  - System Capabilities : Bridge, Router
+    Enabled Capabilities: Bridge
+  - Management Address Subtype: ('IPv4 ',)
+    Management Address        : 172.20.22.3
+    Interface Number Subtype  : System Port Number (3)
+    Interface Number          : 0
+    OID String                : 
+  - IEEE802.3 MAC/PHY Configuration/Status
+    Auto-negotiation       : Not Supported
+    Operational MAU Type   : Unknown
+
+Interface Management0 detected 0 LLDP neighbors:
+

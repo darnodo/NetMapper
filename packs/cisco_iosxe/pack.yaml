@@ -1,0 +1,98 @@
+name: cisco_iosxe
+version: 1                      # bump on any template or recipe change
+read_only: ["show "]            # every CLI command in the pack must start with one of these
+# A sysObjectID rule matches that OID exactly (or below it). Not the Cisco prefix 1.3.6.1.4.1.9.1,
+# which also covers classic IOS, IOS-XR, ASA and wireless controllers. A Catalyst whose model is not
+# listed answers SNMP, matches no pack, and is identified by the SSH rule instead (research R1).
+# Models from CISCO-PRODUCTS-MIB (github.com/cisco/cisco-mibs, commit abdc1ce7); only 3160 was seen
+# on a device, the Cat9kv of test/lab-iosxe, and it is not in that MIB.
+fingerprint:
+  snmp:
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3160, version_regex: &v 'Version (?P<version>\d+\.\d+\.\d+\w*),' }  # Cat9kv (recorded)
+    # Catalyst 9300, 9300L and 9300X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2435, version_regex: *v }  # C9300-24T
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2436, version_regex: *v }  # C9300-24P
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2437, version_regex: *v }  # C9300-24U
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2438, version_regex: *v }  # C9300-24UX
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2439, version_regex: *v }  # C9300-48T
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2440, version_regex: *v }  # C9300-48P
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2441, version_regex: *v }  # C9300-48U
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2442, version_regex: *v }  # C9300-48UXM
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2494, version_regex: *v }  # C9300 stack (also a standalone switch)
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2564, version_regex: *v }  # C9300-48UN
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2780, version_regex: *v }  # C9300-24S
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2781, version_regex: *v }  # C9300-48S
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2792, version_regex: *v }  # C9300L-24T-4G
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2793, version_regex: *v }  # C9300L-48T-4G
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2794, version_regex: *v }  # C9300L-24T-4X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2795, version_regex: *v }  # C9300L-48T-4X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2796, version_regex: *v }  # C9300L-24P-4G
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2797, version_regex: *v }  # C9300L-48P-4G
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2798, version_regex: *v }  # C9300L-24P-4X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2799, version_regex: *v }  # C9300L-48P-4X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2800, version_regex: *v }  # C9300L-24UXG-4X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2801, version_regex: *v }  # C9300L-48UXG-4X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2802, version_regex: *v }  # C9300L-24UXG-2Q
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2803, version_regex: *v }  # C9300L-48UXG-2Q
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2804, version_regex: *v }  # C9300L stack
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2833, version_regex: *v }  # C9300-24UBX
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2834, version_regex: *v }  # C9300-48UB
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2835, version_regex: *v }  # C9300-24UB
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2873, version_regex: *v }  # C9300-24H
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2874, version_regex: *v }  # C9300-48H
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2992, version_regex: *v }  # C9300L-48PF-4X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2993, version_regex: *v }  # C9300L-48PF-4G
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3037, version_regex: *v }  # C9300X-12Y
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3038, version_regex: *v }  # C9300X-24Y
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3039, version_regex: *v }  # C9300X-48HX
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3040, version_regex: *v }  # C9300X-48TX
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3086, version_regex: *v }  # C9300X-48HXN
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3087, version_regex: *v }  # C9300X-24HX
+    # Catalyst 9500 and 9500X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2418, version_regex: *v }  # C9500-12Q
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2419, version_regex: *v }  # C9500-24Q
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2420, version_regex: *v }  # C9500-40X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2566, version_regex: *v }  # C9500-32C
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2567, version_regex: *v }  # C9500-32QC
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2568, version_regex: *v }  # C9500-48Y4C
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2573, version_regex: *v }  # C9500-24Y4C
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2592, version_regex: *v }  # C9500-16X
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2593, version_regex: *v }  # C9500 stack
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.2688, version_regex: *v }  # C9500 virtual stack (StackWise Virtual)
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3084, version_regex: *v }  # C9500X-28C8D
+    - { sys_object_id_prefix: 1.3.6.1.4.1.9.1.3155, version_regex: *v }  # C9500X virtual stack
+  ssh:
+    # The second line of show version is the sysDescr line, so both transports read the same
+    # version (17.15.1), not the first line's 17.15.01.
+    - command: show version
+      match: 'Cisco IOS XE Software'
+      version_regex: *v
+identifiers:                    # extracted during find, written as identifier claims
+  - kind: serial
+    strength: strong
+    ssh: { command: show version, regex: 'System Serial Number\s+:\s+(?P<value>\S+)' }
+    snmp: { oid: 1.3.6.1.2.1.47.1.1.1.1.11.1 }
+  - kind: chassis_mac
+    strength: strong
+    normalise: mac              # also the LLDP chassis ID the switch advertises (research R2)
+    ssh: { command: show version, regex: 'Base Ethernet MAC Address\s+:\s+(?P<value>\S+)' }
+  - kind: hostname
+    strength: weak
+    snmp: { oid: 1.3.6.1.2.1.1.5.0 }
+# Spelling -> canonical, applied by the parser and, for the far end of a link, by the projector.
+# The canonical name is the long form show interfaces prints. Longest abbreviation first: Twe before
+# Tw, so TwentyFiveGigE and TwoGigabitEthernet stay apart (research R8).
+interface_names:
+  - { match: '^Twe(\d.*)$', replace: 'TwentyFiveGigE$1' }
+  - { match: '^Tw(\d.*)$', replace: 'TwoGigabitEthernet$1' }
+  - { match: '^Te(\d.*)$', replace: 'TenGigabitEthernet$1' }
+  - { match: '^Fi(\d.*)$', replace: 'FiveGigabitEthernet$1' }
+  - { match: '^Fo(\d.*)$', replace: 'FortyGigabitEthernet$1' }
+  - { match: '^Hu(\d.*)$', replace: 'HundredGigE$1' }
+  - { match: '^Gi(\d.*)$', replace: 'GigabitEthernet$1' }
+  - { match: '^Fa(\d.*)$', replace: 'FastEthernet$1' }
+  - { match: '^Ap(\d.*)$', replace: 'AppGigabitEthernet$1' }
+  - { match: '^Po(\d.*)$', replace: 'Port-channel$1' }
+  - { match: '^Vl(\d.*)$', replace: 'Vlan$1' }
+  - { match: '^Lo(\d.*)$', replace: 'Loopback$1' }
+  - { match: '^Tu(\d.*)$', replace: 'Tunnel$1' }

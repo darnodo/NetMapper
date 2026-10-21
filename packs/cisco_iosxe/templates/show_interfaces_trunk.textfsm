@@ -1,0 +1,34 @@
+Value Required INTERFACE (\S+)
+Value NATIVE (\d+)
+Value ALLOWED (\S+)
+Value ACTIVE (\S+)
+
+# Active trunks only: a trunk that is down is not listed, and with none the output is blank. Four
+# tables, one row per port in each, merged on the port by the recipe: native VLAN, VLANs allowed,
+# VLANs allowed and active. The fourth (spanning tree forwarding) is not read. IOS-XE prints each
+# list on one line, ranges merged (98-100), even past the terminal width (feature 013, research R10).
+Start
+  ^Port\s+Mode\s+Encapsulation\s+Status\s+Native\s+vlan\s*$$ -> Native
+  ^\s*$$
+  ^. -> Error
+
+Native
+  ^${INTERFACE}\s+\S+\s+\S+\s+\S+\s+${NATIVE}\s*$$ -> Record
+  ^Port\s+Vlans\s+allowed\s+on\s+trunk\s*$$ -> Allowed
+  ^\s*$$
+  ^. -> Error
+
+Allowed
+  ^${INTERFACE}\s+${ALLOWED}\s*$$ -> Record
+  ^Port\s+Vlans\s+allowed\s+and\s+active\s+in\s+management\s+domain\s*$$ -> Active
+  ^\s*$$
+  ^. -> Error
+
+Active
+  ^${INTERFACE}\s+${ACTIVE}\s*$$ -> Record
+  ^Port\s+Vlans\s+in\s+spanning\s+tree -> Forwarding
+  ^\s*$$
+  ^. -> Error
+
+Forwarding
+  ^.*
