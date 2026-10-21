@@ -338,12 +338,12 @@ func TestNoSecretInRecordedOutput(t *testing.T) {
 	}
 }
 
-// Each <switch>_<family>.facts.yml under testdata/lab is what the family's recipe must produce from
-// that switch's recordings, one per step, through the whole parse: step maps, values, split,
 // recordedOn is the software version each pack's lab recordings were made on, which picks the
 // implementation TestFamiliesFromLab runs (feature 013: IOS-XE recipes fit 17.15 and later only).
 var recordedOn = map[string]string{"arista_eos": "4.36.0F", "cisco_iosxe": "17.15.1"}
 
+// Each <switch>_<family>.facts.yml under testdata/lab is what the family's recipe must produce from
+// that switch's recordings, one per step, through the whole parse: step maps, values, split,
 // defaults, merge and schema validation (feature 007, research R11). No lab needed.
 func TestFamiliesFromLab(t *testing.T) {
 	reg, err := pack.LoadRoot(".")
@@ -916,6 +916,7 @@ func TestIOSXEInterfaceNames(t *testing.T) {
 		{"Te1/1/1", "TenGigabitEthernet1/1/1"},
 		{"Fi1/0/1", "FiveGigabitEthernet1/0/1"},
 		{"Fo1/1/1", "FortyGigabitEthernet1/1/1"},
+		{"Fou1/0/29", "FourHundredGigE1/0/29"},
 		{"Hu1/0/49", "HundredGigE1/0/49"},
 		{"Gi1/0/1", "GigabitEthernet1/0/1"},
 		{"Gi0/0", "GigabitEthernet0/0"},
@@ -1015,7 +1016,11 @@ func TestIOSXERefusedIsNotEmpty(t *testing.T) {
 	}
 	refused := iosxeLab(t, "cat1_show_running_config_refused.txt")
 	for _, family := range reg.Families("cisco_iosxe") {
-		im := reg.Implementations("cisco_iosxe", family, "17.15.1")[0]
+		impls := reg.Implementations("cisco_iosxe", family, "17.15.1")
+		if len(impls) == 0 {
+			t.Fatalf("%s: no implementation for 17.15.1", family)
+		}
+		im := impls[0]
 		var outputs [][]byte
 		for _, st := range im.Steps {
 			base := "cat1_" + strings.TrimSuffix(st.Template, ".textfsm")

@@ -87,6 +87,7 @@ interface_names:
   - { match: '^Tw(\d.*)$', replace: 'TwoGigabitEthernet$1' }
   - { match: '^Te(\d.*)$', replace: 'TenGigabitEthernet$1' }
   - { match: '^Fi(\d.*)$', replace: 'FiveGigabitEthernet$1' }
+  - { match: '^Fou(\d.*)$', replace: 'FourHundredGigE$1' }   # C9500X-28C8D
   - { match: '^Fo(\d.*)$', replace: 'FortyGigabitEthernet$1' }
   - { match: '^Hu(\d.*)$', replace: 'HundredGigE$1' }
   - { match: '^Gi(\d.*)$', replace: 'GigabitEthernet$1' }

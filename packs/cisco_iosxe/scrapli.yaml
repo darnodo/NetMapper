@@ -3,7 +3,9 @@
 #   `disable` or `configure terminal`. The netmapper account is privilege 1 (prompt `cat1>`); an
 #   account deployed at 15 lands on '#' and must not hang the session;
 # - no on-open or on-close commands, so nothing reaches the device unless a recipe sends it and the
-#   audit log records it.
+#   audit log records it;
+# - no space in the prompt pattern (an IOS-XE hostname has none), so an indented output line that
+#   ends in '#' or '>', such as `  Description: to core#`, is not read as the prompt.
 # IOS-XE has no per-command pager switch like EOS's `| no-more`, and scrapligo's own cisco_iosxe
 # definition sends `terminal length 0` on open. IOS-XE takes its terminal length from the SSH pty
 # request instead (0 is ignored, 32767 is honoured), so the session asks for a pty of 32767 rows and
@@ -14,7 +16,7 @@ default:
   privilege-levels:
     exec:
       name: 'exec'
-      pattern: '(?im)^[\w.\-@()/: ]{1,63}[>#]\s?$'
+      pattern: '(?im)^[\w.\-@()/:]{1,63}[>#]\s?$'
       previous-priv:
       deescalate:
       escalate:

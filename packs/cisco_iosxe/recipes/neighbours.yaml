@@ -19,5 +19,6 @@ implementations:
       remote_mgmt_address: MGMT_ADDRESS
       remote_mgmt_address_type: MGMT_ADDRESS_SUBTYPE
       protocol: '=lldp'
+    # The template captures IP and IPV6 only, so there is no other value to map.
     values:
-      remote_mgmt_address_type: { IP: ipv4, IPV6: ipv6, '*': other }
+      remote_mgmt_address_type: { IP: ipv4, IPV6: ipv6 }
