@@ -55,7 +55,9 @@ as for `arista_eos`.
 
 **Testing**: `go test ./...`. `TestPacks` (every `.raw` against its template),
 `TestFamiliesFromLab` (`<switch>_<family>.facts.yml` for `cat1`), `TestNoSecretInRecordedOutput`,
-all picking up the new pack by glob. New tests in `packs/packs_test.go`: interface name rules
+all picking up the new pack by glob. `TestFamiliesFromLab` asks every pack for version `4.36.0F`,
+which no IOS-XE recipe fits: it gets a version per pack (test-only change, found while writing
+the tasks). New tests in `packs/packs_test.go`: interface name rules
 (R8), legacy VLANs left out (R9), a refused command giving `parse_failed` (R4), each `show
 version` matching only its own pack (R1), LLDP off giving `empty` (R5).
 

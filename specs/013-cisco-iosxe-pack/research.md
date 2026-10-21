@@ -233,7 +233,9 @@ marked "to confirm when recording" and is settled in implementation step 1, on t
 ## R12. No Go change
 
 - **Finding**: `TestPacks`, `TestFamiliesFromLab` and `TestNoSecretInRecordedOutput` glob every
-  pack's `testdata`, so the new pack is tested with no change to them. Fingerprint, identifiers,
+  pack's `testdata`. `TestFamiliesFromLab` also asks every pack for version `4.36.0F`, which
+  `>=17.15` does not fit, so it needs a version per pack (a test-only change, tasks T009); the
+  other two need none. Fingerprint, identifiers,
   naming, MAC normalisation, speed tokens, VLAN lists and the far-end canonicalisation are all
   vendor-neutral and cover what R1 to R10 need. `internal/testutil` uses `fakeos` only.
 - **Decision**: the feature is pack data, lab files, documentation, and tests in
