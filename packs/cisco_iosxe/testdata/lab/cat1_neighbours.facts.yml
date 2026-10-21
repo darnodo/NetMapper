@@ -1,0 +1,8 @@
+# What the neighbours recipe must produce from the cat1 recordings (test/lab-iosxe, Cat9kv 17.15.01):
+# two links to eos-a in Port-channel1, one to eos-b. Local ports in long form; remote ports as the
+# Arista names them.
+status: collected
+rows:
+  - {local_interface: GigabitEthernet1/0/1, protocol: lldp, remote_chassis_id: 001c.736d.643f, remote_interface: Ethernet1, remote_mgmt_address: 172.20.22.2, remote_mgmt_address_type: ipv4, remote_system_name: eos-a}
+  - {local_interface: GigabitEthernet1/0/2, protocol: lldp, remote_chassis_id: 001c.736d.643f, remote_interface: Ethernet2, remote_mgmt_address: 172.20.22.2, remote_mgmt_address_type: ipv4, remote_system_name: eos-a}
+  - {local_interface: GigabitEthernet1/0/3, protocol: lldp, remote_chassis_id: 001c.73f5.b1c9, remote_interface: Ethernet1, remote_mgmt_address: 172.20.22.4, remote_mgmt_address_type: ipv4, remote_system_name: eos-b}

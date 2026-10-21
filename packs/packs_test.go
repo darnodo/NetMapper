@@ -338,6 +338,10 @@ func TestNoSecretInRecordedOutput(t *testing.T) {
 	}
 }
 
+// recordedOn is the software version each pack's lab recordings were made on, which picks the
+// implementation TestFamiliesFromLab runs (feature 013: IOS-XE recipes fit 17.15 and later only).
+var recordedOn = map[string]string{"arista_eos": "4.36.0F", "cisco_iosxe": "17.15.1"}
+
 // Each <switch>_<family>.facts.yml under testdata/lab is what the family's recipe must produce from
 // that switch's recordings, one per step, through the whole parse: step maps, values, split,
 // defaults, merge and schema validation (feature 007, research R11). No lab needed.
@@ -354,9 +358,13 @@ func TestFamiliesFromLab(t *testing.T) {
 		t.Run(f, func(t *testing.T) {
 			platform := strings.Split(f, string(filepath.Separator))[0]
 			sw, family, _ := strings.Cut(strings.TrimSuffix(filepath.Base(f), ".facts.yml"), "_")
-			im := reg.Implementations(platform, family, "4.36.0F")
+			version, ok := recordedOn[platform]
+			if !ok {
+				t.Fatalf("no recorded version for pack %s in recordedOn", platform)
+			}
+			im := reg.Implementations(platform, family, version)
 			if len(im) == 0 {
-				t.Fatalf("no %s implementation for 4.36.0F", family)
+				t.Fatalf("no %s implementation for %s", family, version)
 			}
 			var outputs [][]byte
 			for _, st := range im[0].Steps {
@@ -882,5 +890,290 @@ func TestOSPFErrorsAreNotEmpty(t *testing.T) {
 	outs[1] = nil
 	if s, _, err := parse.Parse(reg, "arista_eos", "ospf_neighbours", im, outs); s != parse.Empty {
 		t.Errorf("blank neighbour view: %s %v, want empty", s, err)
+	}
+}
+
+// iosxeLab reads a cat1 recording of test/lab-iosxe (feature 013).
+func iosxeLab(t *testing.T, name string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("cisco_iosxe", "testdata", "lab", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// Every IOS-XE abbreviation and its long form give one canonical name, the long form show
+// interfaces prints; Tw and Twe are two different port types (feature 013, research R8).
+func TestIOSXEInterfaceNames(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ short, long string }{
+		{"Twe1/0/1", "TwentyFiveGigE1/0/1"},
+		{"Tw1/0/1", "TwoGigabitEthernet1/0/1"},
+		{"Te1/1/1", "TenGigabitEthernet1/1/1"},
+		{"Fi1/0/1", "FiveGigabitEthernet1/0/1"},
+		{"Fo1/1/1", "FortyGigabitEthernet1/1/1"},
+		{"Fou1/0/29", "FourHundredGigE1/0/29"},
+		{"Hu1/0/49", "HundredGigE1/0/49"},
+		{"Gi1/0/1", "GigabitEthernet1/0/1"},
+		{"Gi0/0", "GigabitEthernet0/0"},
+		{"Fa0", "FastEthernet0"},
+		{"Ap1/0/1", "AppGigabitEthernet1/0/1"},
+		{"Po1", "Port-channel1"},
+		{"Vl10", "Vlan10"},
+		{"Lo0", "Loopback0"},
+		{"Tu1", "Tunnel1"},
+	} {
+		if got := reg.Normalise("cisco_iosxe", c.short); got != c.long {
+			t.Errorf("%s: got %s, want %s", c.short, got, c.long)
+		}
+		if got := reg.Normalise("cisco_iosxe", c.long); got != c.long {
+			t.Errorf("%s (long form): got %s", c.long, got)
+		}
+	}
+}
+
+// cat1's show version and SNMP answer match the IOS-XE pack only, with one version on both
+// transports; an unlisted Cisco sysObjectID matches no pack, and EOS still matches its own pack
+// (feature 013, research R1).
+func TestIOSXEFingerprint(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := string(iosxeLab(t, "cat1_show_version.txt"))
+	m := regexp.MustCompile(`1\.3\.6\.1\.2\.1\.1\.1\.0 = STRING: "([^"]*)"`).FindStringSubmatch(string(iosxeLab(t, "cat1_snmp_system.txt")))
+	if m == nil {
+		t.Fatal("no sysDescr in cat1_snmp_system.txt")
+	}
+	sysDescr := m[1]
+	for _, c := range []struct {
+		name      string
+		ev        pack.Evidence
+		platform  string
+		osVersion string
+	}{
+		{"ssh", pack.Evidence{CLI: map[string]string{"show version": version}}, "cisco_iosxe", "17.15.1"},
+		{"snmp", pack.Evidence{SysObjectID: "1.3.6.1.4.1.9.1.3160", SysDescr: sysDescr}, "cisco_iosxe", "17.15.1"},
+		{"unlisted Cisco OID", pack.Evidence{SysObjectID: "1.3.6.1.4.1.9.1.1", SysDescr: sysDescr}, "", ""},
+		// A hand-written EOS header, enough for the arista_eos rule (no EOS show version is recorded).
+		{"eos", pack.Evidence{CLI: map[string]string{"show version": "Arista cEOSLab\nSoftware image version: 4.36.0F-47083774.4360F\n"}}, "arista_eos", "4.36.0F-47083774.4360F"},
+	} {
+		platform, osVersion, _ := reg.Fingerprint(c.ev)
+		if platform != c.platform || osVersion != c.osVersion {
+			t.Errorf("%s: got %q %q, want %q %q", c.name, platform, osVersion, c.platform, c.osVersion)
+		}
+	}
+}
+
+// The serial and base MAC regexes read cat1's show version, and the base MAC is the chassis ID
+// eos-a receives from cat1 over LLDP, so the far end of eos-a's link resolves to cat1 by a strong
+// identifier (feature 013, research R2).
+func TestIOSXEIdentifiers(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := string(iosxeLab(t, "cat1_show_version.txt"))
+	got := map[string]string{}
+	for _, id := range reg.Pack("cisco_iosxe").Identifiers {
+		if id.SSH == nil {
+			continue
+		}
+		m := regexp.MustCompile(id.SSH.Regex).FindStringSubmatch(version)
+		if m == nil {
+			t.Fatalf("%s: no match in cat1_show_version.txt", id.Kind)
+		}
+		got[id.Kind] = m[1]
+	}
+	snmp := string(iosxeLab(t, "cat1_snmp_system.txt"))
+	if !strings.Contains(snmp, `1.3.6.1.2.1.47.1.1.1.1.11.1 = STRING: "`+got["serial"]+`"`) {
+		t.Errorf("serial %q differs from entPhysicalSerialNum.1 in cat1_snmp_system.txt", got["serial"])
+	}
+	lldp, err := os.ReadFile(filepath.Join("arista_eos", "testdata", "lab", "eos-a_show_lldp_neighbors_detail.raw"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	chassis := regexp.MustCompile(`Chassis ID\s+:\s+(\S+)`).FindStringSubmatch(string(lldp))
+	if chassis == nil {
+		t.Fatal("no chassis ID in eos-a's LLDP recording")
+	}
+	if pack.NormaliseMAC(got["chassis_mac"]) != pack.NormaliseMAC(chassis[1]) {
+		t.Errorf("base MAC %s is not the LLDP chassis ID %s", got["chassis_mac"], chassis[1])
+	}
+}
+
+// A command refused at privilege 1 prints the caret and `% Invalid input detected`, as an unknown
+// command does. On any step of any IOS-XE recipe that is parse_failed, never empty or collected
+// (feature 013, research R4).
+func TestIOSXERefusedIsNotEmpty(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused := iosxeLab(t, "cat1_show_running_config_refused.txt")
+	for _, family := range reg.Families("cisco_iosxe") {
+		impls := reg.Implementations("cisco_iosxe", family, "17.15.1")
+		if len(impls) == 0 {
+			t.Fatalf("%s: no implementation for 17.15.1", family)
+		}
+		im := impls[0]
+		var outputs [][]byte
+		for _, st := range im.Steps {
+			base := "cat1_" + strings.TrimSuffix(st.Template, ".textfsm")
+			b, err := os.ReadFile(filepath.Join("cisco_iosxe", "testdata", "lab", base+".raw"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			outputs = append(outputs, b)
+		}
+		for i := range outputs {
+			outs := slices.Clone(outputs)
+			outs[i] = refused
+			if status, _, _ := parse.Parse(reg, "cisco_iosxe", family, im, outs); status != parse.ParseFailed {
+				t.Errorf("%s, step %d refused: %s, want parse_failed", family, i+1, status)
+			}
+		}
+	}
+}
+
+// LLDP turned off (`no lldp run`, the IOS-XE default) means no neighbour; LLDP on gives rows. Of
+// several management addresses, the first IPv4 one is kept, else the first IPv6 one (feature 013,
+// research R5). The address lists are written by hand: the lab advertises one IPv4 address.
+func TestIOSXELLDP(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("cisco_iosxe", "neighbours", "17.15.1")[0]
+	if s, _, err := parse.Parse(reg, "cisco_iosxe", "neighbours", im, [][]byte{iosxeLab(t, "cat1lldpoff_show_lldp_neighbors_detail_empty.raw")}); s != parse.Empty {
+		t.Errorf("LLDP off: %s (%v), want empty", s, err)
+	}
+	if s, _, err := parse.Parse(reg, "cisco_iosxe", "neighbours", im, [][]byte{iosxeLab(t, "cat1_show_lldp_neighbors_detail.raw")}); s != parse.Collected {
+		t.Errorf("LLDP on: %s (%v), want collected", s, err)
+	}
+	block := func(addresses string) []byte {
+		return []byte("------------------------------------------------\nLocal Intf: Gi1/0/1\nChassis id: 001c.736d.643f\n" +
+			"Port id: Ethernet1\nSystem Name: eos-a\n\nManagement Addresses:\n" + addresses +
+			"Auto Negotiation - not supported\nVlan ID: 99\n\n\nTotal entries displayed: 1")
+	}
+	for _, c := range []struct{ addresses, address, typ string }{
+		{"    IP: 10.0.0.1\n    IPV6: 2001:db8::1\n", "10.0.0.1", "ipv4"},
+		{"    IPV6: 2001:db8::1\n    IP: 10.0.0.1\n", "10.0.0.1", "ipv4"},
+		{"    IPV6: 2001:db8::1\n    IPV6: 2001:db8::2\n", "2001:db8::1", "ipv6"},
+		{"    IP: 10.0.0.1\n    IP: 10.0.0.2\n", "10.0.0.1", "ipv4"},
+	} {
+		s, rows, err := parse.Parse(reg, "cisco_iosxe", "neighbours", im, [][]byte{block(c.addresses)})
+		if s != parse.Collected || len(rows) != 1 {
+			t.Fatalf("%q: %s, %d rows (%v)", c.addresses, s, len(rows), err)
+		}
+		if rows[0]["remote_mgmt_address"] != c.address || rows[0]["remote_mgmt_address_type"] != c.typ {
+			t.Errorf("%q: got %v %v, want %s %s", c.addresses, rows[0]["remote_mgmt_address"], rows[0]["remote_mgmt_address_type"], c.address, c.typ)
+		}
+	}
+}
+
+// VLANs 1002 to 1005 are in cat1's show vlan brief, act/unsup, and are not vlans rows (feature 013,
+// spec FR-006).
+func TestIOSXELegacyVLANsAreNotDeclared(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := iosxeLab(t, "cat1_show_vlan_brief.raw")
+	for v := 1002; v <= 1005; v++ {
+		if !regexp.MustCompile(fmt.Sprintf(`(?m)^%d\s+\S+\s+act/unsup`, v)).Match(out) {
+			t.Fatalf("VLAN %d is not in the recording as act/unsup", v)
+		}
+	}
+	im := reg.Implementations("cisco_iosxe", "vlans", "17.15.1")[0]
+	_, rows, err := parse.Parse(reg, "cisco_iosxe", "vlans", im, [][]byte{out})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rows {
+		if id, _ := r["vlan_id"].(int64); id >= 1002 && id <= 1005 {
+			t.Errorf("VLAN %d is a vlans row", id)
+		}
+	}
+}
+
+// The trunk and port variants recorded on cat1 by changing one setting at a time (feature 013,
+// T008): members carry their channel only, a long allowed list comes back whole in normal form, a
+// shut trunk keeps its mode only, the access port its VLAN.
+func TestIOSXETrunkVariants(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	im := reg.Implementations("cisco_iosxe", "interface_vlans", "17.15.1")[0]
+	// Every even VLAN from 2 to 200 plus 99: 98, 99 and 100 merge into one range.
+	evens := []string{}
+	for v := 2; v <= 200; v += 2 {
+		switch v {
+		case 98:
+			evens = append(evens, "98-100")
+		case 100:
+		default:
+			evens = append(evens, fmt.Sprint(v))
+		}
+	}
+	for _, c := range []struct {
+		switchport, trunk, port string
+		want                    map[string]any
+	}{
+		{"cat1_show_interfaces_switchport", "cat1_show_interfaces_trunk", "Port-channel1",
+			map[string]any{"interface": "Port-channel1", "mode": "trunk", "native_vlan": int64(99),
+				"allowed_vlans": []string{"10", "20", "99"}, "active_vlans": []string{"10", "20", "99"}}},
+		{"cat1_show_interfaces_switchport", "cat1_show_interfaces_trunk", "GigabitEthernet1/0/1",
+			map[string]any{"interface": "GigabitEthernet1/0/1", "channel": "Port-channel1"}},
+		{"cat1_show_interfaces_switchport", "cat1_show_interfaces_trunk", "GigabitEthernet1/0/3",
+			map[string]any{"interface": "GigabitEthernet1/0/3", "mode": "access", "access_vlan": int64(10)}},
+		{"cat1_show_interfaces_switchport", "cat1wrapped_show_interfaces_trunk", "Port-channel1",
+			map[string]any{"interface": "Port-channel1", "mode": "trunk", "native_vlan": int64(99),
+				"allowed_vlans": evens, "active_vlans": []string{"10", "20", "99"}}},
+		{"cat1trunkdown_show_interfaces_switchport", "cat1trunkdown_show_interfaces_trunk_empty", "Port-channel1",
+			map[string]any{"interface": "Port-channel1", "mode": "trunk"}},
+		{"cat1trunkdown_show_interfaces_switchport", "cat1trunkdown_show_interfaces_trunk_empty", "GigabitEthernet1/0/2",
+			map[string]any{"interface": "GigabitEthernet1/0/2", "channel": "Port-channel1"}},
+	} {
+		outputs := [][]byte{iosxeLab(t, c.switchport+".raw"), iosxeLab(t, c.trunk+".raw")}
+		_, rows, err := parse.Parse(reg, "cisco_iosxe", "interface_vlans", im, outputs)
+		if err != nil {
+			t.Fatalf("%s + %s: %v", c.switchport, c.trunk, err)
+		}
+		var got map[string]any
+		for _, r := range rows {
+			if r["interface"] == c.port {
+				got = r
+			}
+		}
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s + %s, %s:\n got %v\nwant %v", c.switchport, c.trunk, c.port, got, c.want)
+		}
+	}
+}
+
+// The IOS-XE pack covers the four families of feature 013 and no other: the nine management and
+// routing families have no implementation, so the collector writes them unsupported with
+// no_recipe (spec FR-007, FR-011).
+func TestIOSXEFamilies(t *testing.T) {
+	reg, err := pack.LoadRoot(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := reg.Families("cisco_iosxe")
+	slices.Sort(got)
+	if want := []string{"interface_vlans", "interfaces", "neighbours", "vlans"}; !slices.Equal(got, want) {
+		t.Errorf("families %v, want %v", got, want)
+	}
+	for _, family := range []string{"snmp", "aaa_servers", "local_users", "management_apis", "aaa_methods",
+		"management_servers", "bgp_peers", "ospf_interfaces", "ospf_neighbours"} {
+		if im := reg.Implementations("cisco_iosxe", family, "17.15.1"); len(im) != 0 {
+			t.Errorf("%s has an implementation", family)
+		}
 	}
 }

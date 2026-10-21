@@ -1,0 +1,14 @@
+family: vlans
+implementations:
+  - id: vlans-cli
+    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    transport: ssh
+    steps:
+      # VLAN 1 always exists, so this family is never empty on IOS-XE. VLANs 1002 to 1005 give no
+      # row (the template skips them, spec FR-006).
+      - command: show vlan brief
+        template: show_vlan_brief.textfsm
+    map: { vlan_id: VLAN_ID, name: NAME, status: STATUS }
+    # `shutdown` under a VLAN prints act/lshut (recorded); sus/lshut is that VLAN also suspended.
+    values:
+      status: { active: active, suspended: suspended, act/lshut: shutdown, sus/lshut: shutdown, '*': other }

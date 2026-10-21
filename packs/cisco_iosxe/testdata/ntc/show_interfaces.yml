@@ -1,0 +1,29 @@
+parsed_sample:
+    - description: ""
+      link_speed: 10G
+      link_status: administratively down
+      mac_address: ac3a.6738.c8ff
+      mtu: "1500"
+      port: TwentyFiveGigE2/0/32
+      protocol_status: down
+    - description: ""
+      link_speed: 10G
+      link_status: administratively down
+      mac_address: ac3a.6738.c8ff
+      mtu: "1500"
+      port: TwentyFiveGigE2/0/33
+      protocol_status: down
+    - description: ""
+      link_speed: 10G
+      link_status: administratively down
+      mac_address: ac3a.6738.c8ff
+      mtu: "1500"
+      port: TwentyFiveGigE2/0/34
+      protocol_status: down
+    - description: ""
+      link_speed: ""
+      link_status: administratively down
+      mac_address: ac3a.6738.c8ff
+      mtu: "1500"
+      port: TwentyFiveGigE2/0/35
+      protocol_status: down

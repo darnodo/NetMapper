@@ -1,0 +1,28 @@
+# Configuration for the IOS-XE lab (feature 013, iosxe.clab.yaml). Same credentials as test/lab:
+#   export LAB_SNMP_COMMUNITY=public LAB_SSH_PASSWORD=admin
+perimeters:
+  - name: lab-iosxe
+    include: [172.20.22.0/24]
+    exclude: [172.20.22.1/32]       # the containerlab gateway
+
+credential_sets:                    # tried in this order (FR-018)
+  - name: ro-snmp
+    kind: snmp_v2c
+    secret_ref: env:LAB_SNMP_COMMUNITY
+    max_attempts_per_device: 1
+    perimeters: [lab-iosxe]
+  - name: ro-ssh
+    kind: ssh
+    username: netmapper
+    secret_ref: env:LAB_SSH_PASSWORD
+    max_attempts_per_device: 2
+    perimeters: [lab-iosxe]
+
+seed_sets:
+  - name: iosxe-seeds               # eos-a only: cat1 is found through LLDP, eos-b through cat1
+    targets: [172.20.22.2]
+
+discovery:
+  lease: 1m
+  step_idle_timeout: 30s
+  step_deadline: 5m

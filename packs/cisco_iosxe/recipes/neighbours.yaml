@@ -1,0 +1,24 @@
+family: neighbours
+implementations:
+  - id: lldp-cli
+    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    transport: ssh
+    steps:
+      - command: show lldp neighbors detail
+        template: show_lldp_neighbors_detail.textfsm
+        # LLDP on and nobody at the other end, and LLDP turned off (`no lldp run`, the IOS-XE
+        # default): both are "no neighbour" (recorded on test/lab-iosxe cat1, research R5).
+        empty_lines:
+          - '^Total entries displayed: 0$'
+          - '^% LLDP is not enabled$'
+    map:
+      local_interface: LOCAL_INTERFACE     # short form (Gi1/0/1), canonicalised by interface_names
+      remote_chassis_id: CHASSIS_ID
+      remote_system_name: NEIGHBOR_NAME
+      remote_interface: NEIGHBOR_PORT_ID   # as the neighbour names it, canonicalised by the projector
+      remote_mgmt_address: MGMT_ADDRESS
+      remote_mgmt_address_type: MGMT_ADDRESS_SUBTYPE
+      protocol: '=lldp'
+    # The template captures IP and IPV6 only, so there is no other value to map.
+    values:
+      remote_mgmt_address_type: { IP: ipv4, IPV6: ipv6 }

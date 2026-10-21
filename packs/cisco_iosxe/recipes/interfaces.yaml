@@ -1,0 +1,22 @@
+family: interfaces
+implementations:
+  - id: interfaces-cli
+    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    transport: ssh
+    # One command: names in long form, description, both states, MTU, MAC and the speed of a port
+    # that is up. Not show interfaces status: its speed column prints a bare `a-1000`, which is not a
+    # speed token, and it gives nothing more (research R7).
+    steps:
+      - command: show interfaces
+        template: show_interfaces.textfsm
+    map:
+      name: PORT
+      description: DESCRIPTION
+      admin_state: LINK_STATUS
+      oper_state: PROTOCOL_STATUS
+      speed_bps: LINK_SPEED
+      mtu: MTU
+      mac: MAC_ADDRESS
+    values:
+      admin_state: { administratively down: down, '*': up }
+      oper_state: { up: up, down: down, '*': other }

@@ -1,0 +1,122 @@
+Value LOCAL_INTERFACE (\S+)
+Value CHASSIS_ID (.*)
+Value NEIGHBOR_PORT_ID (.*)
+Value NEIGHBOR_NAME (.+?)
+Value MGMT_ADDRESS (\S+)
+Value MGMT_ADDRESS_SUBTYPE (IP|IPV6)
+
+Start
+  ^.*not advertised
+  ^.*Invalid input detected -> EOF
+  ^.*LLDP is not enabled -> EOF
+  ^Local\s+Intf:\s+${LOCAL_INTERFACE}\s*$$
+  ^Local\s+Intf\s+service\s+instance
+  ^Chassis\s+id:\s+${CHASSIS_ID}\s*$$
+  ^Port\s+id:\s+${NEIGHBOR_PORT_ID}\s*$$
+  ^Port\s+Description:
+  ^System\s+Name:?\s*$$
+  ^System\s+Name(:\s+${NEIGHBOR_NAME})\s*$$
+  ^System\s+Description -> GetDescription
+  ^Time
+  ^System\s+Capabilities
+  ^Enabled\s+Capabilities
+  ^Management\s+Addresses -> Addresses
+  ^Auto\s+Negotiation
+  ^Physical\s+media
+  ^\s+.+\s*$$
+  ^Media\s+Attachment
+  ^Vlan\s+ID
+  ^Peer\s+Source\s+MAC
+  ^(?:PoE|\s+Power)
+  ^\s*-+\s*$$ -> Record
+  ^Power\s+via\s+MDI -> PowerMDI
+  ^MED -> Med
+  ^\s*\^\s*
+  ^\s*Total\s+entries\s+displayed -> Record
+  ^\s*$$
+  # Capture time-stamp if vty line has command time-stamping turned on
+  ^Load\s+for\s+
+  ^Time\s+source\s+is
+  ^.*$$ -> Error
+
+# Management addresses: the first IPv4 one of the block, else the first IPv6 one (research R5).
+# Addresses is entered on "Management Addresses:"; AddressesV6 holds an IPv6 address that an IPv4
+# one still replaces; AddressesDone ignores the other addresses. The first line after the addresses
+# goes back to Start (TextFSM cannot Continue into another state, so each exit is listed).
+Addresses
+  ^\s+${MGMT_ADDRESS_SUBTYPE}:\s+${MGMT_ADDRESS}\s*$$ -> Continue
+  ^\s+IP:\s+\S+\s*$$ -> AddressesDone
+  ^\s+IPV6:\s+\S+\s*$$ -> AddressesV6
+  ^\s+OID
+  ^\s+[\d+\.]{8,}
+  ^Auto\s+Negotiation -> Start
+  ^Physical\s+media -> Start
+  ^Media\s+Attachment -> Start
+  ^Vlan\s+ID -> Start
+  ^Peer\s+Source\s+MAC -> Start
+  ^.*not advertised -> Start
+  ^Power\s+via\s+MDI -> PowerMDI
+  ^MED -> Med
+  ^\s*-+\s*$$ -> Record Start
+  ^\s*Total\s+entries\s+displayed -> Record Start
+  ^\s*$$
+  ^.*$$ -> Error
+
+AddressesV6
+  ^\s+IPV6:
+  ^\s+${MGMT_ADDRESS_SUBTYPE}:\s+${MGMT_ADDRESS}\s*$$ -> AddressesDone
+  ^\s+OID
+  ^\s+[\d+\.]{8,}
+  ^Auto\s+Negotiation -> Start
+  ^Physical\s+media -> Start
+  ^Media\s+Attachment -> Start
+  ^Vlan\s+ID -> Start
+  ^Peer\s+Source\s+MAC -> Start
+  ^.*not advertised -> Start
+  ^Power\s+via\s+MDI -> PowerMDI
+  ^MED -> Med
+  ^\s*-+\s*$$ -> Record Start
+  ^\s*Total\s+entries\s+displayed -> Record Start
+  ^\s*$$
+  ^.*$$ -> Error
+
+AddressesDone
+  ^\s+\S
+  ^Auto\s+Negotiation -> Start
+  ^Physical\s+media -> Start
+  ^Media\s+Attachment -> Start
+  ^Vlan\s+ID -> Start
+  ^Peer\s+Source\s+MAC -> Start
+  ^.*not advertised -> Start
+  ^Power\s+via\s+MDI -> PowerMDI
+  ^MED -> Med
+  ^\s*-+\s*$$ -> Record Start
+  ^\s*Total\s+entries\s+displayed -> Record Start
+  ^\s*$$
+  ^.*$$ -> Error
+
+GetDescription
+  ^.* -> IgnoreDescription
+
+IgnoreDescription
+  ^Time\s+remaining -> Start
+  ^\S*
+  ^\s*$$
+  ^.* -> Error
+
+PowerMDI
+  ^\s+Power\s+Pair:
+  ^\s+Power\s+Class:
+  ^\s+Power\s+Device\s+Type:
+  ^\s+Power\s+Source:
+  ^\s+Power\s+Priority:
+  ^\s+Power\s+Requested:
+  ^\s*$$ -> Start
+
+Med
+  ^\s+\S+
+  ^\s*$$
+  ^\s*Total\s+entries\s+displayed -> Record
+  ^\s*-+\s*$$ -> Continue.Record
+  ^\s*-+\s*$$ -> Start
+  ^.* -> Error

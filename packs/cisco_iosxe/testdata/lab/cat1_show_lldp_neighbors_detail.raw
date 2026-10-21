@@ -1,0 +1,68 @@
+------------------------------------------------
+Local Intf: Gi1/0/1
+Local Intf service instance: -
+Chassis id: 001c.736d.643f
+Port id: Ethernet1
+Port Description - not advertised
+System Name: eos-a
+
+System Description:
+Arista Networks EOS version 4.36.0F-47083774.4360F (engineering build) running on an Arista cEOSLab
+
+Time remaining: 94 seconds
+System Capabilities: B,R
+Enabled Capabilities: B
+Management Addresses:
+    IP: 172.20.22.2
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: 99
+Peer Source MAC: aac1.ab0d.a50d
+
+------------------------------------------------
+Local Intf: Gi1/0/2
+Local Intf service instance: -
+Chassis id: 001c.736d.643f
+Port id: Ethernet2
+Port Description - not advertised
+System Name: eos-a
+
+System Description:
+Arista Networks EOS version 4.36.0F-47083774.4360F (engineering build) running on an Arista cEOSLab
+
+Time remaining: 97 seconds
+System Capabilities: B,R
+Enabled Capabilities: B
+Management Addresses:
+    IP: 172.20.22.2
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: 99
+Peer Source MAC: aac1.ab4c.bafe
+
+------------------------------------------------
+Local Intf: Gi1/0/3
+Local Intf service instance: -
+Chassis id: 001c.73f5.b1c9
+Port id: Ethernet1
+Port Description - not advertised
+System Name: eos-b
+
+System Description:
+Arista Networks EOS version 4.36.0F-47083774.4360F (engineering build) running on an Arista cEOSLab
+
+Time remaining: 92 seconds
+System Capabilities: B,R
+Enabled Capabilities: B
+Management Addresses:
+    IP: 172.20.22.4
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: 10
+Peer Source MAC: aac1.ab2b.367f
+
+
+Total entries displayed: 3

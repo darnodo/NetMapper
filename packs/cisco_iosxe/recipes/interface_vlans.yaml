@@ -1,0 +1,28 @@
+family: interface_vlans
+implementations:
+  - id: interface-vlans-cli
+    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    transport: ssh
+    # The switchport view gives every switched port with its mode, access VLAN and port-channel; the
+    # trunk view gives what each active trunk carries. A trunk that is down is absent from the trunk
+    # view and keeps its mode only, as on EOS. With no active trunk the trunk view is blank, which
+    # is nothing to report (research R10).
+    steps:
+      - command: show interfaces switchport
+        template: show_interfaces_switchport.textfsm
+      - command: show interfaces trunk
+        template: show_interfaces_trunk.textfsm
+    merge_on: [interface]
+    map:
+      interface: INTERFACE
+      mode: MODE
+      access_vlan: ACCESS_VLAN
+      channel: CHANNEL
+      native_vlan: NATIVE
+      allowed_vlans: ALLOWED
+      active_vlans: ACTIVE
+    # Any other mode word (dynamic auto, dynamic desirable, private-vlan ...) is kept as printed.
+    values:
+      mode: { trunk: trunk, static access: access }
+      allowed_vlans: { none: '' }
+      active_vlans: { none: '' }
