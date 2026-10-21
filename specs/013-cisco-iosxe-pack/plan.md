@@ -33,7 +33,7 @@ Planning checks on a throwaway probe on NetLab (Cat9kv 17.15.01 and cEOS 4.36.0F
 deployed twice, then destroyed): R1 to R11. What only the full lab can show is marked "to confirm when recording" in research and
 is settled in implementation step 1.
 
-**Spec amendments from research, to approve before `/speckit-tasks`**:
+**Spec amendments from research, approved 2026-10-21 and applied to the spec**:
 
 - Edge case "Privilege level" and clarification 1: a command refused at privilege 1 makes its
   family `parse_failed`, not `denied`. IOS-XE answers a refused command with `% Invalid input

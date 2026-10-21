@@ -57,6 +57,10 @@ Until then `cat1` is `unreachable` or its ports are `notconnect`: record nothing
 If the EVPN fabric is running too and `cat1` does not start, stop one of the two labs (research
 R11).
 
+Check that the startup-config was loaded (research R6): if the `netmapper` login is refused,
+the bootstrap applied without `cat1.cfg`; log in as `admin` (the vrnetlab default account), read
+`show running-config`, fix `cat1.cfg` and redeploy with `--reconfigure`.
+
 Check before recording, on `cat1` as `netmapper`: `show privilege` says level 1; `show lldp
 neighbors` lists `eos-a` twice and `eos-b` once, each with its 172.20.22.x address under
 `Management Addresses`. On `eos-a`, `show lldp neighbors detail` gives `cat1` a 172.20.22.3

@@ -18,7 +18,7 @@ There is no virtual C9200, so that one needs fixtures from real hardware later.
 
 ### Session 2026-10-21
 
-- Q: What privilege level should the netmapper account on the Catalyst have? → A: Privilege 1 (the default user level); a command it refuses makes its family `denied` and the gap is documented.
+- Q: What privilege level should the netmapper account on the Catalyst have? → A: Privilege 1 (the default user level); a command it refuses makes its family `parse_failed` (amended 2026-10-21 after research R4: IOS-XE answers a refused command like an unknown one, and the collector gives `denied` only when a session fails to open), and the gap is documented.
 - Q: Should the VLANs IOS-XE always lists (1002 to 1005) be reported in the `vlans` family? → A: No; they are left out, like Arista's internal VLANs, and the pack documents it.
 - Q: How should this feature handle a Catalyst 9300 stack? → A: Out of scope: a stack is a single device like any other, with no stack-specific logic; the switchover caveat (serial and base MAC may change) is a known gap.
 
@@ -134,7 +134,7 @@ nodes are.
 ### Edge Cases
 
 - **Catalyst still booting**: a Catalyst that is up as a container but not yet answering SSH or
-  SNMP during its 5 to 10 minute boot is `unreachable` like any silent device. The lab procedure
+  SNMP during its boot (12 to 16 minutes measured on NetLab) is `unreachable` like any silent device. The lab procedure
   waits for readiness rather than relying on the crawl retrying.
 - **LLDP off by default**: IOS-XE does not run LLDP unless it is enabled globally. A Catalyst with
   LLDP off has an `empty` neighbours family over LLDP, and the Arista sees no neighbour on that
@@ -151,7 +151,9 @@ nodes are.
   a switchover, the serial and base MAC may change, and the stack may then be seen as a new device.
   This is a known gap, not a tested behaviour.
 - **Privilege level**: the netmapper account runs at privilege 1. A show command refused at that
-  level makes its family `denied`, not `parse_failed`, and the refusal is listed as a known gap.
+  level prints `% Invalid input detected`, like an unknown command, so its family is
+  `parse_failed`, with the device's answer kept in the raw output. The refusal is listed as a
+  known gap.
 - **Version differences**: output formats that change between IOS-XE releases are handled by
   version ranges on the recipe; a device on a release the pack does not cover gets
   `no_matching_version`, not wrong rows.
@@ -195,8 +197,8 @@ nodes are.
   enabled on every side and configured at deploy time with what the crawl needs. The second Arista
   is reachable from the seed only through the Catalyst's LLDP neighbours, so the crawl proves it
   goes through the Catalyst.
-- **FR-013**: The lab documentation MUST state the Catalyst boot time (5 to 10 minutes), how to
-  check that a node is ready, and how to record outputs from it.
+- **FR-013**: The lab documentation MUST state the Catalyst boot time (12 to 16 minutes measured
+  on NetLab), how to check that a node is ready, and how to record outputs from it.
 - **FR-014**: The pack documentation MUST list the IOS-XE release it was recorded on, the platforms
   it was tested on, and its known gaps, including:
   - C9200: no virtual image, no family claimed as supported until fixtures from real hardware
@@ -204,6 +206,8 @@ nodes are.
   - IOS-XE has CDP on and LLDP off by default, so a Catalyst without `lldp run` shows no
     neighbours; CDP is not collected;
   - the management and routing families have no recipe yet;
+  - a command refused at privilege 1 is `parse_failed`, not `denied`: IOS-XE answers it with
+    `% Invalid input detected`, the same as an unknown command;
   - stacks: a stack is treated as a single device with no stack-specific logic; after a
     switchover, its serial and base MAC may change, so the stack may be seen as a new device.
 - **FR-015**: The README and the how-to guides MUST be updated in the same change to list IOS-XE as
@@ -232,7 +236,7 @@ nodes are.
 - **SC-003**: Two crawls of the unchanged lab produce the same rows for every Catalyst family.
 - **SC-004**: The pack's tests run in under a minute from committed fixtures with NetLab off.
 - **SC-005**: Starting from a stopped NetLab, the maintainer can deploy the lab, wait for
-  readiness and run the cross-platform crawl in under 20 minutes by following the documented
+  readiness and run the cross-platform crawl in under 25 minutes by following the documented
   procedure.
 - **SC-006**: Replaying the stored raw output of a Catalyst collection through the pack gives the
   same rows as the live collection.

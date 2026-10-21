@@ -83,8 +83,8 @@ marked "to confirm when recording" and is settled in implementation step 1, on t
   a command refused at privilege 1 makes its family `parse_failed`, with the device's answer in
   the raw output, and the refusal is a known gap. Every command of R5 to R10 was run at
   privilege 1 on 17.15.01 and answered.
-- **Spec amendment proposed** (edge case "Privilege level", clarification 1): "`denied`" becomes
-  "`parse_failed`".
+- **Spec amendment, approved 2026-10-21** (edge case "Privilege level", clarification 1, FR-014):
+  "`denied`" becomes "`parse_failed`", and the pack README lists it as a known gap.
 
 ## R5. `neighbours`: `show lldp neighbors detail`
 
@@ -114,6 +114,23 @@ marked "to confirm when recording" and is settled in implementation step 1, on t
   `GigabitEthernet0/0` holds `172.20.21.2/24`, the Arista's LLDP view of the Catalyst gives
   `Management Address : 172.20.21.2` (IPv4 only), and SSH as `netmapper` and SNMP still answer at
   that address. Confirmed.
+- **How the startup-config is loaded** (read in the image's `/launch.py`, then checked on a third
+  probe in passthrough mode, 2026-10-21): vrnetlab writes a bootstrap configuration (hostname,
+  `admin` privilege 15, `line vty 0 4` with `login local` and `transport input all`, `ip route
+  vrf Mgmt-vrf` to the gateway, `GigabitEthernet0/0` with its description and address, RSA key,
+  NETCONF and RESTCONF), appends the lab's startup-config to it, and IOS-XE applies the whole file
+  once, at first boot (`CVAC-4-CONFIG_DONE`, then `Startup complete`). Passthrough changes only
+  the `GigabitEthernet0/0` address. On the third probe, after `Startup complete`: `show privilege`
+  as `netmapper` gives level 1; the running-config holds `username netmapper secret 9 ...`,
+  `lldp run` and `snmp-server community nm-probe-ro RO`; SNMP answers that community and not
+  `public`, so the community comes from the startup-config and not from a vrnetlab default;
+  `GigabitEthernet0/0` is in `Mgmt-vrf` with 172.20.21.2; the Arista's LLDP view gives
+  172.20.21.2. The boot log's `%PARSER-4-BADCFG: Unexpected end of configuration file` and
+  `invalid magic number` lines appear on every boot and change nothing.
+- **Rules for `cat1.cfg`**, written in its header comment: it must not configure
+  `GigabitEthernet0/0`, `Mgmt-vrf`, the vty lines or the `admin` account, which the bootstrap
+  owns. A change to it takes effect only on a new deploy (12 minutes or more):
+  `containerlab deploy --reconfigure`.
 - **Alternatives considered**: seeding the Catalyst as well (proves the crawl from the Catalyst to
   the second Arista, not from the first Arista to the Catalyst); `lldp management-address` (no
   such per-interface choice on IOS-XE 17.15).
@@ -210,8 +227,8 @@ marked "to confirm when recording" and is settled in implementation step 1, on t
   assumed. Readiness: `docker logs clab-netmapper-iosxe-cat1 | grep "Startup
   complete"`, then `eos-a` lists `cat1` in `show lldp neighbors`. Nothing is recorded or crawled
   before both.
-- **Spec amendment proposed**: FR-013 and the "Catalyst still booting" edge case state about 15
-  to 16 minutes (measured) instead of 5 to 10; SC-005 becomes 25 minutes instead of 20.
+- **Spec amendment, approved 2026-10-21**: FR-013 and the "Catalyst still booting" edge case
+  state 12 to 16 minutes (measured) instead of 5 to 10; SC-005 becomes 25 minutes instead of 20.
 
 ## R12. No Go change
 

@@ -38,6 +38,10 @@ Canonical interface names: the long form IOS-XE prints in `show interfaces`
 | `eos-a` eth1, eth2 to `cat1` Gi1/0/1, Gi1/0/2 | port-channel trunk, native VLAN and pruned allowed list |
 | `cat1` Gi1/0/3 to `eos-b` eth1 | access port, VLAN 10 |
 
+`cat1.cfg` is appended to vrnetlab's bootstrap configuration and applied once at first boot. It
+must not configure `GigabitEthernet0/0`, `Mgmt-vrf`, the vty lines or the `admin` account (research
+R6).
+
 Readiness: vrnetlab's `Startup complete` in the `cat1` container log, then `cat1` in `eos-a`'s
 `show lldp neighbors`.
 
