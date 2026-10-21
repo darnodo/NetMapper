@@ -79,7 +79,7 @@ interfaces trunk`. Then the variants, each reverted after:
 | `cat1lldpoff_show_lldp_neighbors_detail_empty.raw` | `cat1`: `no lldp run` | `show lldp neighbors detail` |
 | `cat1trunkdown_*` | `cat1`: `shutdown` on Port-channel1 | `show interfaces switchport`, `show interfaces trunk` |
 | `cat1wrapped_show_interfaces_trunk.raw` | `cat1` and `eos-a`: an allowed list long enough to wrap | `show interfaces trunk` |
-| `cat1_show_running_config_refused_empty.raw` | none | `show running-config` (refused at privilege 1) |
+| `cat1_show_running_config_refused.txt` | none | `show running-config` (refused at privilege 1); `.txt`, since no template reads it |
 
 Settle the "to confirm" items of research R3, R5, R9 and R10 from these outputs. Never edit a
 recording. Then, with no lab:
