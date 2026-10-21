@@ -1,0 +1,19 @@
+parsed_sample:
+    - chassis_id: 7c25.86c9.aaaa
+      local_interface: Gi1/0/2
+      mgmt_address: ""
+      mgmt_address_subtype: ""
+      neighbor_name: ""
+      neighbor_port_id: "502"
+    - chassis_id: 94f1.2879.5555
+      local_interface: Gi1/0/1
+      mgmt_address: 192.168.1.81
+      mgmt_address_subtype: IP
+      neighbor_name: HpSwitch
+      neighbor_port_id: 94f1.2879.5555
+    - chassis_id: 4448.c1c4.dddd
+      local_interface: Gi1/0/9
+      mgmt_address: 192.168.1.40
+      mgmt_address_subtype: IP
+      neighbor_name: 44:48:c1:c4:dd:dd
+      neighbor_port_id: 4448.c1c4.dddd

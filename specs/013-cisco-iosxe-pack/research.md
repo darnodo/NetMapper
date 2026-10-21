@@ -268,7 +268,11 @@ One deploy of `test/lab-iosxe` on NetLab, all recordings, then destroyed.
   are now an `exec` of each Arista node in `iosxe.clab.yaml`. The first form of that `exec`
   (`bash -c "printf ... | Cli -p 15"`) failed (containerlab split it and dropped the `\n`); the
   form in the file now, `Cli -p 15 -c '...'` with YAML `\n`, was applied with `containerlab
-  exec` on the running lab and worked on both nodes, but has not yet run as part of a deploy.
+  exec` on the running lab and worked on both nodes. Then checked on a plain deploy (tasks T035,
+  15:13:35 UTC, no command by hand): containerlab logged `Executed command` for `eos-a` and
+  `eos-b`, both carry `no lldp transmit` and `no lldp receive` under Management0, and once `cat1`
+  was up (`Startup complete in: 0:12:27`, LLDP on both links at 15:29:23, 15 min 48 s after the
+  deploy) `eos-a` listed `cat1` on Et1 and Et2 and `eos-b` on Et1, nothing on Ma0.
 - **Privilege and startup-config** (R6): `show privilege` gives level 1 as `netmapper`; LLDP, SNMP
   and the account came from `cat1.cfg`.
 - **Port-channel** (R10): Po1 is up over LACP between `cat1` and `eos-a` (`Po1(SU)`, both members

@@ -2,7 +2,9 @@
 
 A platform pack teaches NetMapper a vendor: how to recognise it, which read-only commands to send,
 and how to turn their output into facts. A pack is a directory of YAML and TextFSM files. Adding one
-needs no change to Go code, and a pull request that puts a vendor name outside `packs/` is refused.
+needs no change outside `packs/`: no Go code in the collector, engine or API, only the line that
+names the software version its recordings were made on in `packs/packs_test.go` (section 8). A
+pull request that puts a vendor name outside `packs/` is refused.
 
 Two packs to copy from:
 

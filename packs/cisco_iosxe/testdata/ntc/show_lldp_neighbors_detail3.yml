@@ -1,0 +1,7 @@
+parsed_sample:
+    - chassis_id: 10.10.0.1
+      local_interface: Gi0/1/7
+      mgmt_address: 10.10.0.1
+      mgmt_address_subtype: IP
+      neighbor_name: SEPC8F9F9D61BC2
+      neighbor_port_id: C8F9F9D61BC2:P1

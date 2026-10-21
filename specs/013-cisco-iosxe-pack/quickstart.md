@@ -169,3 +169,6 @@ the branch build, PostgreSQL, object store, engine, `run` and API on the Mac ove
   differ (SC-003).
 - Replay (SC-006): `cat1`'s stored outputs of snapshot 2, fetched through the API and parsed with
   the pack, give the stored rows exactly, for the four families.
+- Lab without a manual step (tasks T035, a fourth deploy): the `exec` of `iosxe.clab.yaml` turned
+  LLDP off on both Arista nodes' Management0 on its own; `eos-a` saw `cat1` only, on Et1 and Et2
+  (US4 scenario 1). Ready 15 min 48 s after the deploy.

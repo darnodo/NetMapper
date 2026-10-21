@@ -195,3 +195,9 @@ T006.
 2. US2 adds the L2 families; US3 is one test; US4's README closes the lab.
 3. T033 is the only other boot of the Cat9kv: run it once everything else passes, so a failure
    there is a live-only difference worth a new recording, not a template bug found late.
+
+## Phase 8: Convergence
+
+- [X] T035 [VM] On the next deploy of `test/lab-iosxe` (`sudo containerlab deploy -t iosxe.clab.yaml`, no `containerlab exec` by hand), check that the `exec` of `eos-a` and `eos-b` in `test/lab-iosxe/iosxe.clab.yaml` ran (no `Failed to execute command` in the deploy log, `no lldp transmit` and `no lldp receive` under Management0 in `show running-config interfaces Management0`) and that `show lldp neighbors` on `eos-a` lists `cat1` on Et1 and Et2 and nothing on Ma0; fix the `exec` form if not, then record the outcome in `specs/013-cisco-iosxe-pack/research.md` ("Recorded on") per FR-012, US4/AC1 (partial)
+- [X] T036 Reword the introduction of `docs/how-to/write-a-pack.md` (line 5, "needs no change to Go code") so it agrees with section 8: adding a pack needs no change outside `packs/`, and its test version goes in `recordedOn` in `packs/packs_test.go` per FR-015, plan: workflow rule on documents (contradicts)
+- [X] T037 [P] Write a `.yml` (ntc `parsed_sample` format, keys in lower case as `TestPacks` compares them) next to each of the seven samples in `packs/cisco_iosxe/testdata/ntc/`, with the values this pack's templates extract, checked by hand against each `.raw`; update `packs/cisco_iosxe/NOTICE` (the `.yml` files are written for this pack, not copied) per T002 (partial)

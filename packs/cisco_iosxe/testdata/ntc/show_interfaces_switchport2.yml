@@ -1,0 +1,5 @@
+parsed_sample:
+    - access_vlan: ""
+      channel: ""
+      interface: SM1/1
+      mode: dynamic auto

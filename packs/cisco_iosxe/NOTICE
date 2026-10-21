@@ -28,8 +28,10 @@ Changes:
   cisco_ios_show_interfaces_01.raw; show_interfaces_switchport.raw and
   show_interfaces_switchport2.raw from tests/cisco_ios/show_interfaces_switchport/
   cisco_ios_show_interfaces_switchport_app_interfaces.raw and
-  cisco_ios_show_interfaces_switchport3.raw. Their .yml files are not copied: the templates above
-  keep other values under other names.
+  cisco_ios_show_interfaces_switchport3.raw. Their .yml files are not copied, since the templates
+  above keep other values under other names: each .yml next to a sample was written for this pack
+  from what its template extracts, and checked against the upstream .yml on every field both keep
+  (ports, chassis ID, names, addresses, states, MAC, MTU, mode, access VLAN).
 
 templates/show_vlan_brief.textfsm and templates/show_interfaces_trunk.textfsm are not from
 ntc-templates.
