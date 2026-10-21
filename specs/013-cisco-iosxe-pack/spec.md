@@ -14,6 +14,14 @@ A pack for Cisco IOS-XE should let a Catalyst 9300 or 9500 be discovered like th
 system info, LLDP neighbours, interfaces, and so on. A Cat9kv runs in containerlab to test against.
 There is no virtual C9200, so that one needs fixtures from real hardware later.
 
+## Clarifications
+
+### Session 2026-10-21
+
+- Q: What privilege level should the netmapper account on the Catalyst have? → A: Privilege 1 (the default user level); a command it refuses makes its family `denied` and the gap is documented.
+- Q: Should the VLANs IOS-XE always lists (1002 to 1005) be reported in the `vlans` family? → A: No; they are left out, like Arista's internal VLANs, and the pack documents it.
+- Q: How should this feature handle a Catalyst 9300 stack? → A: Out of scope: a stack is a single device like any other, with no stack-specific logic; the switchover caveat (serial and base MAC may change) is a known gap.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A Catalyst in the path no longer stops the crawl (Priority: P1)
@@ -67,8 +75,8 @@ spans both devices.
 **Acceptance Scenarios**:
 
 1. **Given** a Catalyst with VLANs configured, **When** `vlans` is collected, **Then** every
-   configured VLAN appears with its id, name and state, and VLANs that only exist internally are not
-   reported as configured VLANs.
+   configured VLAN appears with its id, name and state. The legacy default VLANs 1002 to 1005,
+   which IOS-XE always lists as `act/unsup`, are not rows.
 2. **Given** a trunk between the Arista and the Catalyst with the same native VLAN and allowed list
    on both sides, **When** the crawl closes, **Then** `interface_vlans` on each side gives the same
    mode, native VLAN and allowed list, and the L2 domain for each allowed VLAN covers both devices.
@@ -138,10 +146,12 @@ nodes are.
   `TenGigabitEthernet1/1/1`, `TwentyFiveGigE1/1/1` and others, abbreviated as `Gi`, `Te`, `Twe`,
   `Hu` and so on in LLDP and in some show commands. Every spelling maps to one canonical name so
   an edge seen from both sides matches.
-- **Stacks**: a Catalyst 9300 stack is one device with several serial numbers, one per member.
-  The device is one entity; member serials do not split it or merge it with another device.
-- **Privilege level**: some show commands need a higher privilege than the login level. A command
-  refused for privilege makes the family `denied`, not `parse_failed`.
+- **Stacks**: a Catalyst 9300 stack is treated as a single device like any other, with no
+  stack-specific logic: it is identified by the serial and base MAC its `show version` gives. After
+  a switchover, the serial and base MAC may change, and the stack may then be seen as a new device.
+  This is a known gap, not a tested behaviour.
+- **Privilege level**: the netmapper account runs at privilege 1. A show command refused at that
+  level makes its family `denied`, not `parse_failed`, and the refusal is listed as a known gap.
 - **Version differences**: output formats that change between IOS-XE releases are handled by
   version ranges on the recipe; a device on a release the pack does not cover gets
   `no_matching_version`, not wrong rows.
@@ -156,8 +166,8 @@ nodes are.
 
 - **FR-001**: The system MUST ship a platform pack for Cisco IOS-XE that identifies Catalyst 9300
   and 9500 switches over SSH and over SNMP, and records the IOS-XE version.
-- **FR-002**: The pack MUST claim the serial number and the chassis MAC as strong identifiers and
-  the hostname as a weak one, as the Arista pack does.
+- **FR-002**: The pack MUST claim the serial number and the chassis MAC (the base MAC on IOS-XE)
+  as strong identifiers and the hostname as a weak one, as the Arista pack does.
 - **FR-003**: The pack MUST fill the `neighbours` family from LLDP only, with the remote
   management address and its type, so the crawl continues past a Catalyst. CDP is out of scope.
 - **FR-004**: The pack MUST fill the `interfaces` family.
@@ -165,6 +175,8 @@ nodes are.
   canonical name, so that an Arista's LLDP row about a Catalyst port and the Catalyst's own rows
   name the same port the same way.
 - **FR-006**: The pack MUST fill `vlans` and `interface_vlans` following the fact-family contract.
+  The legacy default VLANs 1002 to 1005 are not `vlans` rows, as for VLANs a device creates on
+  its own; the pack README states it.
 - **FR-007**: The management families (`snmp`, `aaa_servers`, `local_users`, `management_apis`,
   `aaa_methods`, `management_servers`) and the routing families (`bgp_peers`, `ospf_interfaces`,
   `ospf_neighbours`) are out of scope: the pack defines no recipe for them, and they are
@@ -191,9 +203,14 @@ nodes are.
     exist;
   - IOS-XE has CDP on and LLDP off by default, so a Catalyst without `lldp run` shows no
     neighbours; CDP is not collected;
-  - the management and routing families have no recipe yet.
+  - the management and routing families have no recipe yet;
+  - stacks: a stack is treated as a single device with no stack-specific logic; after a
+    switchover, its serial and base MAC may change, so the stack may be seen as a new device.
 - **FR-015**: The README and the how-to guides MUST be updated in the same change to list IOS-XE as
   a supported platform.
+- **FR-016**: The netmapper account on a Catalyst MUST be privilege 1, with no access to
+  configuration mode, in the lab configuration and in the deploy guide. The pack MUST NOT need a
+  higher privilege for the families of this feature.
 
 ### Key Entities
 
@@ -230,9 +247,9 @@ nodes are.
 - NetLab has the memory and CPU for the existing Arista lab or the EVPN lab plus one Cat9kv
   node; if not, the mixed lab is deployed on its own.
 - Collection is over SSH CLI and SNMP, as for Arista; no NETCONF or RESTCONF transport is added.
-- The netmapper account on the Catalyst has a privilege level that allows every show command the
-  pack uses, documented in the lab and deploy guides.
-- Out of scope, each a later change: C9200 support (fixtures from real hardware), CDP, and the
-  management and routing families.
+- The show commands this feature needs (version, inventory, LLDP, interfaces, VLANs, trunks) run
+  at privilege 1 on IOS-XE; this is checked on the Cat9kv when fixtures are recorded.
+- Out of scope, each a later change: C9200 support (fixtures from real hardware), CDP, stack
+  handling (fixtures from a real stack), and the management and routing families.
 - Principles touched: IV (read-only commands only) and V (vendor specifics stay in the pack). No
   change to the engine, API or collector code is expected.
