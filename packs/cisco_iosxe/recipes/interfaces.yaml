@@ -1,7 +1,7 @@
 family: interfaces
 implementations:
   - id: interfaces-cli
-    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    versions: '>=17.9'          # 17.15.1 (lab) and 17.9.10 (C9300LM) recorded (feature 013, research R1)
     transport: ssh
     # One command: names in long form, description, both states, MTU, MAC and the speed of a port
     # that is up. Not show interfaces status: its speed column prints a bare `a-1000`, which is not a

@@ -10,7 +10,7 @@ go to the object store, like an Arista's. What this feature adds is pack data an
 | ---- | ----- | ----- |
 | `pack.yaml` | name, version, `read_only`, fingerprint, identifiers, interface name rules | name equals the directory; version bumped on any template or recipe change |
 | `scrapli.yaml` | the SSH session definition | one privilege level, no on-open or on-close command, pty height 32767 |
-| `recipes/*.yaml` | one recipe per family: `neighbours`, `interfaces`, `vlans`, `interface_vlans` | every command starts with `show `; `versions: '>=17.15'` |
+| `recipes/*.yaml` | one recipe per family: `neighbours`, `interfaces`, `vlans`, `interface_vlans` | every command starts with `show `; `versions: '>=17.9'` |
 | `templates/*.textfsm` | five templates | compile in Go TextFSM (no lookbehind or lookahead) |
 | `testdata/lab/` | recorded outputs and expected rows | see "Recorded fixture" |
 | `README.md` | recorded release, tested platforms, known gaps | FR-014 list |

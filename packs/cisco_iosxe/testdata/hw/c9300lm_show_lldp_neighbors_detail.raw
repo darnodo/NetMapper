@@ -1,0 +1,561 @@
+Load for five secs: 3%/0%; one minute: 4%; five minutes: 4%
+Time source is NTP, 14:41:07.244 UTC Wed Jan 01 2025
+
+------------------------------------------------
+Local Intf: Twe1/1/1
+Chassis id: 0200.0000.0001
+Port id: Ethernet45
+Port Description: desc-01
+System Name: host-01
+
+System Description: 
+Switch, firmware 1.0
+
+Time remaining: 105 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    IP: 198.18.0.1
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: 41
+Peer Source MAC: 0200.0000.0002
+
+------------------------------------------------
+Local Intf: Twe2/1/1
+Chassis id: 0200.0000.0003
+Port id: Ethernet45
+Port Description: desc-02
+System Name: host-02
+
+System Description: 
+Switch, firmware 1.0
+
+Time remaining: 103 seconds
+System Capabilities: B,R
+Enabled Capabilities: B,R
+Management Addresses:
+    IP: 198.18.0.2
+Auto Negotiation - not supported
+Physical media capabilities - not advertised
+Media Attachment Unit type - not advertised
+Vlan ID: 41
+Peer Source MAC: 0200.0000.0004
+
+------------------------------------------------
+Local Intf: Gi3/0/5
+Chassis id: 0200.0000.0005
+Port id: 0200.0000.0005
+Port Description - not advertised
+System Name - not advertised
+System Description - not advertised
+
+Time remaining: 3408 seconds
+System Capabilities - not advertised
+Enabled Capabilities - not advertised
+Management Addresses - not advertised
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0005
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    Inventory information - not advertised
+    Capabilities: 
+    Device type: Endpoint Class I
+    Network Policies - not advertised
+    Power requirements - not advertised
+    Location - not advertised
+
+------------------------------------------------
+Local Intf: Gi1/0/11
+Chassis id: 0200.0000.0006
+Port id: 0200.0000.0006
+Port Description: desc-03
+System Name: host-03
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 99 seconds
+System Capabilities: B,W,R,S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 198.18.0.3
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+    Other/unknown
+Media Attachment Unit type: 16
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0006
+
+------------------------------------------------
+Local Intf: Gi2/0/10
+Chassis id: 0200.0000.0007
+Port id: 0200.0000.0007
+Port Description - not advertised
+System Name - not advertised
+System Description - not advertised
+
+Time remaining: 3461 seconds
+System Capabilities - not advertised
+Enabled Capabilities - not advertised
+Management Addresses - not advertised
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0007
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    Inventory information - not advertised
+    Capabilities: 
+    Device type: Endpoint Class I
+    Network Policies - not advertised
+    Power requirements - not advertised
+    Location - not advertised
+
+------------------------------------------------
+Local Intf: Gi2/0/17
+Chassis id: 0200.0000.0008
+Port id: 0200.0000.0008
+Port Description - not advertised
+System Name - not advertised
+System Description - not advertised
+
+Time remaining: 3469 seconds
+System Capabilities - not advertised
+Enabled Capabilities - not advertised
+Management Addresses - not advertised
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type - not advertised
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0008
+
+MED Information:
+
+    MED Codes:
+          (NP) Network Policy, (LI) Location Identification
+          (PS) Power Source Entity, (PD) Power Device
+          (IN) Inventory
+
+    Inventory information - not advertised
+    Capabilities: 
+    Device type: Endpoint Class I
+    Network Policies - not advertised
+    Power requirements - not advertised
+    Location - not advertised
+
+------------------------------------------------
+Local Intf: Gi1/0/14
+Chassis id: 0200.0000.0009
+Port id: 0200.0000.0009
+Port Description: desc-03
+System Name: host-04
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 110 seconds
+System Capabilities: B,W,R,S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 198.18.0.4
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 16
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0009
+
+------------------------------------------------
+Local Intf: Gi1/0/15
+Chassis id: 0200.0000.000a
+Port id: 0200.0000.000a
+Port Description: desc-03
+System Name: host-05
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 112 seconds
+System Capabilities: B,W,R,S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 198.18.0.5
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 16
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.000a
+
+------------------------------------------------
+Local Intf: Gi1/0/13
+Chassis id: 0200.0000.000b
+Port id: 0200.0000.000b
+Port Description: desc-03
+System Name: host-06
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 103 seconds
+System Capabilities: B,W,R,S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 198.18.0.6
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    Pause(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 16
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.000b
+
+------------------------------------------------
+Local Intf: Gi1/0/12
+Chassis id: 0200.0000.000c
+Port id: 0200.0000.000c
+Port Description: desc-03
+System Name: host-07
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 101 seconds
+System Capabilities: B,W,R,S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 198.18.0.7
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    Pause(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 16
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.000c
+
+------------------------------------------------
+Local Intf: Gi1/0/9
+Chassis id: 0200.0000.000d
+Port id: 0200.0000.000d
+Port Description: desc-03
+System Name: host-08
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 102 seconds
+System Capabilities: B,W,R,S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 198.18.0.8
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    Pause(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 16
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.000d
+
+------------------------------------------------
+Local Intf: Gi1/0/10
+Chassis id: 0200.0000.000e
+Port id: 0200.0000.000e
+Port Description: desc-03
+System Name: host-09
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 102 seconds
+System Capabilities: B,W,R,S
+Enabled Capabilities: S
+Management Addresses:
+    IP: 198.18.0.9
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    Pause(FD)
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 16
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.000e
+
+------------------------------------------------
+Local Intf: Gi1/0/8
+Chassis id: 0200.0000.000f
+Port id: 0200.0000.000f
+Port Description: desc-04
+System Name: host-10
+
+System Description: 
+Camera, firmware 1.0
+
+Time remaining: 119 seconds
+System Capabilities: S
+Enabled Capabilities: S
+Management Addresses - not advertised
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    100base-TX(FD)
+    100base-TX(HD)
+    10base-T(FD)
+    10base-T(HD)
+Media Attachment Unit type: 65535
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.000f
+PoE+ Power-via-MDI TLV:
+ Power Pair: Signal
+ Power Class: Class 3
+ Power Device Type: Type 1 PD
+ Power Source: PSE
+ Power Priority: critical
+ Power Requested: 13000 mW
+ Power Allocated: 13000 mW
+
+------------------------------------------------
+Local Intf: Gi1/0/2
+Chassis id: 0200.0000.0010
+Port id: 0200.0000.0010
+Port Description: desc-03
+System Name: host-11
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 98 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 198.18.0.10
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    1000baseT(HD)
+    100base-TX(FD)
+    100base-TX(HD)
+    Other/unknown
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0010
+UPOE/UPOE+ Power-via-MDI TLV:
+ Power Pair: Ignore
+ Power Class: Class 5
+ Power Device Type: Type 3 SS PD
+ Power Source: PSE
+ Power Priority: unknown
+ Power Requested: 26500 mW
+ Power Allocated: 26500 mW
+
+------------------------------------------------
+Local Intf: Gi1/0/4
+Chassis id: 0200.0000.0011
+Port id: 0200.0000.0011
+Port Description: desc-03
+System Name: host-12
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 101 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 198.18.0.11
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    1000baseT(HD)
+    100base-TX(FD)
+    100base-TX(HD)
+    Other/unknown
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0011
+UPOE/UPOE+ Power-via-MDI TLV:
+ Power Pair: Ignore
+ Power Class: Class 5
+ Power Device Type: Type 3 SS PD
+ Power Source: PSE
+ Power Priority: unknown
+ Power Requested: 26500 mW
+ Power Allocated: 26500 mW
+
+------------------------------------------------
+Local Intf: Gi1/0/3
+Chassis id: 0200.0000.0012
+Port id: 0200.0000.0012
+Port Description: desc-03
+System Name: host-13
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 90 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 198.18.0.12
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    1000baseT(HD)
+    100base-TX(FD)
+    100base-TX(HD)
+    Other/unknown
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0012
+UPOE/UPOE+ Power-via-MDI TLV:
+ Power Pair: Ignore
+ Power Class: Class 5
+ Power Device Type: Type 3 SS PD
+ Power Source: PSE
+ Power Priority: unknown
+ Power Requested: 26500 mW
+ Power Allocated: 26500 mW
+
+------------------------------------------------
+Local Intf: Gi1/0/5
+Chassis id: 0200.0000.0013
+Port id: 0200.0000.0013
+Port Description: desc-03
+System Name: host-14
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 93 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 198.18.0.13
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    1000baseT(HD)
+    100base-TX(FD)
+    100base-TX(HD)
+    Other/unknown
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0013
+UPOE/UPOE+ Power-via-MDI TLV:
+ Power Pair: Ignore
+ Power Class: Class 5
+ Power Device Type: Type 3 SS PD
+ Power Source: PSE
+ Power Priority: unknown
+ Power Requested: 26500 mW
+ Power Allocated: 26500 mW
+
+------------------------------------------------
+Local Intf: Gi1/0/6
+Chassis id: 0200.0000.0014
+Port id: 0200.0000.0014
+Port Description: desc-03
+System Name: host-15
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 92 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 198.18.0.14
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    1000baseT(HD)
+    100base-TX(FD)
+    100base-TX(HD)
+    Other/unknown
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0014
+UPOE/UPOE+ Power-via-MDI TLV:
+ Power Pair: Ignore
+ Power Class: Class 5
+ Power Device Type: Type 3 SS PD
+ Power Source: PSE
+ Power Priority: unknown
+ Power Requested: 26500 mW
+ Power Allocated: 26500 mW
+
+------------------------------------------------
+Local Intf: Gi1/0/7
+Chassis id: 0200.0000.0015
+Port id: 0200.0000.0015
+Port Description: desc-03
+System Name: host-16
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 118 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 198.18.0.15
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+    100base-TX(FD)
+    Other/unknown
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0015
+UPOE/UPOE+ Power-via-MDI TLV:
+ Power Pair: Ignore
+ Power Class: Class 5
+ Power Device Type: Type 3 SS PD
+ Power Source: PSE
+ Power Priority: unknown
+ Power Requested: 32100 mW
+ Power Allocated: 32100 mW
+
+
+Total entries displayed: 19
+

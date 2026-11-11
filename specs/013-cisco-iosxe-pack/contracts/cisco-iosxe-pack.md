@@ -30,7 +30,7 @@ settled when the lab is recorded (implementation step 1).
 
 ## Recipes
 
-Every implementation: `versions: '>=17.15'`, `transport: ssh`.
+Every implementation: `versions: '>=17.9'`, `transport: ssh`.
 
 ### neighbours (`lldp-cli`)
 

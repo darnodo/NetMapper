@@ -7,7 +7,9 @@ families it fills are in
 [fact-families.md](../../specs/001-crawl-loop/contracts/fact-families.md).
 
 It fills four families: `neighbours` (LLDP), `interfaces`, `vlans` and `interface_vlans`. Every
-recipe fits IOS-XE 17.15 and later; a device on an older release gets `no_matching_version`.
+recipe fits IOS-XE 17.9 and later; a device on an older release gets `no_matching_version`. The
+outputs of one C9300LM on 17.9.10 are in `testdata/hw` (anonymised): they read the same as on
+17.15. Other releases are assumed to read the same until an output shows otherwise.
 
 ## Recognition
 
@@ -31,6 +33,14 @@ recipe fits IOS-XE 17.15 and later; a device on an older release gets `no_matchi
   since its operational mode only says `down`; a port-channel member gives its channel only.
 - `interfaces`: the speed is that of a port that is up; the management port `GigabitEthernet0/0`
   prints `Auto Speed` even when up and has none. A port-channel prints the speed of one member.
+
+## Test data
+
+- `testdata/lab`: the Cat9kv 17.15.01 of test/lab-iosxe.
+- `testdata/hw`: one C9300LM on 17.9.10, anonymised.
+- `testdata/ntc`: samples from ntc-templates.
+- `testdata/mock`: output forms seen on hardware, written by hand: the `exec prompt timestamp`
+  lines, a UPOE neighbour in LLDP, VLAN names longer than their column (VTP version 3).
 
 ## Known gaps
 

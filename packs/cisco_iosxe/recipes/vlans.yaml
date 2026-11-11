@@ -1,7 +1,7 @@
 family: vlans
 implementations:
   - id: vlans-cli
-    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    versions: '>=17.9'          # 17.15.1 (lab) and 17.9.10 (C9300LM) recorded (feature 013, research R1)
     transport: ssh
     steps:
       # VLAN 1 always exists, so this family is never empty on IOS-XE. VLANs 1002 to 1005 give no

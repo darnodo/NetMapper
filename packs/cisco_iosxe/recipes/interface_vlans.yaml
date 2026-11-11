@@ -1,7 +1,7 @@
 family: interface_vlans
 implementations:
   - id: interface-vlans-cli
-    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    versions: '>=17.9'          # 17.15.1 (lab) and 17.9.10 (C9300LM) recorded (feature 013, research R1)
     transport: ssh
     # The switchport view gives every switched port with its mode, access VLAN and port-channel; the
     # trunk view gives what each active trunk carries. A trunk that is down is absent from the trunk

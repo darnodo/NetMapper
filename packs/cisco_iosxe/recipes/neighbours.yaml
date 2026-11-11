@@ -1,7 +1,7 @@
 family: neighbours
 implementations:
   - id: lldp-cli
-    versions: '>=17.15'         # only 17.15.1 recorded (feature 013, research R1)
+    versions: '>=17.9'          # 17.15.1 (lab) and 17.9.10 (C9300LM) recorded (feature 013, research R1)
     transport: ssh
     steps:
       - command: show lldp neighbors detail
