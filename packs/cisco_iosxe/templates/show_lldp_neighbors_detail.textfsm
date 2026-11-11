@@ -27,7 +27,9 @@ Start
   ^Media\s+Attachment
   ^Vlan\s+ID
   ^Peer\s+Source\s+MAC
-  ^(?:PoE|\s+Power)
+  # `PoE+ Power-via-MDI TLV:`, or `UPOE/UPOE+ Power-via-MDI TLV:` from a UPOE device (recorded on a
+  # C9300LM, 17.9.10), then its indented Power lines.
+  ^(?:PoE|UPOE|\s+Power)
   ^\s*-+\s*$$ -> Record
   ^Power\s+via\s+MDI -> PowerMDI
   ^MED -> Med

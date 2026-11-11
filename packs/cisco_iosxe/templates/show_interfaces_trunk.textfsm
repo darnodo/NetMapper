@@ -10,6 +10,9 @@ Value ACTIVE (\S+)
 Start
   ^Port\s+Mode\s+Encapsulation\s+Status\s+Native\s+vlan\s*$$ -> Native
   ^\s*$$
+  # Printed first when the vty line has `exec prompt timestamp` (recorded on a C9300LM, 17.9.10).
+  ^Load\s+for\s+
+  ^Time\s+source\s+is
   ^. -> Error
 
 Native
