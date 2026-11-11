@@ -64,8 +64,17 @@ platform MUST require no change to transports, worker pool, resolver, projector 
 request that adds a vendor name outside a pack MUST be rejected unless it also states why the pack
 boundary cannot hold it.
 
+The same holds for the tests of a pack. What a pack must read MUST be shown by data in that pack:
+an output under its `testdata/` and the rows expected from it. Test code that runs over packs MUST
+name no vendor, device or site, and MUST NOT assert a value or a count tied to one recorded device.
+Lab and hardware recordings are both evidence, and neither is the reference. An output form first
+seen on a device MUST be added to the pack as an output written in the shape it was seen in, with
+its expected rows, and MUST be seen failing before the template is fixed. Vendor-specific tests that
+predate this rule are not extended.
+
 Rationale: the day something vendor-specific leaks outside the registry, adding a platform stops
-being a directory of data and becomes a patch.
+being a directory of data and becomes a patch. A test that knows one switch proves that switch; a
+test that reads the pack's data covers every output anyone adds to it.
 
 ## Architectural Constraints
 
@@ -88,6 +97,8 @@ being a directory of data and becomes a patch.
   collected and what was computed.
 - A change to a parser, template or recipe MUST be verifiable by replay over stored raw output
   before it is trusted on live devices.
+- A recipe's version bound MUST move only with outputs recorded on that release and stored in the
+  pack. A release with no recorded output is not claimed.
 - New interfaces returning graph data MUST ship with evidence and freshness in the same response,
   reviewed as a gate rather than as a follow-up.
 - Open design questions are recorded in `docs/`, not resolved silently in code.
@@ -110,4 +121,4 @@ principle, MINOR for adding one or materially expanding guidance, PATCH for clar
 Reviews verify compliance with the five principles. Complexity that violates one is either
 justified in writing at the point it is introduced or removed. Principle III admits no exception.
 
-**Version**: 1.2.2 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-10-19
+**Version**: 1.3.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-11-11
