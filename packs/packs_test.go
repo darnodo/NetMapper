@@ -339,7 +339,7 @@ func TestNoSecretInRecordedOutput(t *testing.T) {
 }
 
 // recordedOn is the software version each pack's lab recordings were made on, which picks the
-// implementation TestFamiliesFromLab runs (feature 013: IOS-XE recipes fit 17.15 and later only).
+// implementation TestFamiliesFromLab runs (feature 013: IOS-XE recipes fit 17.9 and later).
 var recordedOn = map[string]string{"arista_eos": "4.36.0F", "cisco_iosxe": "17.15.1"}
 
 // Each <switch>_<family>.facts.yml under testdata/lab is what the family's recipe must produce from
@@ -1157,23 +1157,48 @@ func TestIOSXETrunkVariants(t *testing.T) {
 	}
 }
 
-// The IOS-XE pack covers the four families of feature 013 and no other: the nine management and
-// routing families have no implementation, so the collector writes them unsupported with
-// no_recipe (spec FR-007, FR-011).
-func TestIOSXEFamilies(t *testing.T) {
+// Every recording set with a show version (<switch>_show_version.txt under testdata) is read at
+// the version it gives: each family of the pack it matches has an implementation for that version,
+// and that switch's outputs parse to collected or empty, never parse_failed. No value of a given
+// switch is checked here: a new recording set is covered as soon as it is added.
+func TestRecordedSetsAtTheirVersion(t *testing.T) {
 	reg, err := pack.LoadRoot(".")
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := reg.Families("cisco_iosxe")
-	slices.Sort(got)
-	if want := []string{"interface_vlans", "interfaces", "neighbours", "vlans"}; !slices.Equal(got, want) {
-		t.Errorf("families %v, want %v", got, want)
+	versions, _ := filepath.Glob(filepath.Join("*", "testdata", "*", "*_show_version.txt"))
+	if len(versions) == 0 {
+		t.Fatal("no recorded show version found")
 	}
-	for _, family := range []string{"snmp", "aaa_servers", "local_users", "management_apis", "aaa_methods",
-		"management_servers", "bgp_peers", "ospf_interfaces", "ospf_neighbours"} {
-		if im := reg.Implementations("cisco_iosxe", family, "17.15.1"); len(im) != 0 {
-			t.Errorf("%s has an implementation", family)
-		}
+	for _, f := range versions {
+		t.Run(f, func(t *testing.T) {
+			b, _ := os.ReadFile(f)
+			platform, version, ok := reg.Fingerprint(pack.Evidence{CLI: map[string]string{"show version": string(b)}})
+			if !ok || version == "" {
+				t.Fatalf("no pack or no version: %q %q", platform, version)
+			}
+			base := strings.TrimSuffix(f, "show_version.txt")
+			for _, family := range reg.Families(platform) {
+				impls := reg.Implementations(platform, family, version)
+				if len(impls) == 0 {
+					t.Fatalf("%s: no implementation for %s", family, version)
+				}
+				var outputs [][]byte
+				for _, st := range impls[0].Steps {
+					name := base + strings.TrimSuffix(st.Template, ".textfsm")
+					out, err := os.ReadFile(name + ".raw")
+					if os.IsNotExist(err) {
+						out, err = os.ReadFile(name + "_empty.raw")
+					}
+					if err != nil {
+						t.Fatalf("%s, step %q: %v", family, st.Command, err)
+					}
+					outputs = append(outputs, out)
+				}
+				if status, _, err := parse.Parse(reg, platform, family, impls[0], outputs); status == parse.ParseFailed {
+					t.Errorf("%s at %s: parse_failed (%v)", family, version, err)
+				}
+			}
+		})
 	}
 }

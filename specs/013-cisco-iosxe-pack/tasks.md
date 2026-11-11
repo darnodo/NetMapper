@@ -143,7 +143,7 @@ collected, so the crawl goes past it.
 
 **Independent Test**: T028, and the observations of T033.
 
-- [X] T028 [P] [US3] `TestIOSXEFamilies` in `packs/packs_test.go`: `reg.Families("cisco_iosxe")` is exactly `neighbours`, `interfaces`, `vlans`, `interface_vlans`; for `snmp`, `aaa_servers`, `local_users`, `management_apis`, `aaa_methods`, `management_servers`, `bgp_peers`, `ospf_interfaces` and `ospf_neighbours`, `reg.Implementations("cisco_iosxe", family, "17.15.1")` is empty (the collector then writes `no_recipe`, `internal/collector/scrape.go`). No new collector test: the `no_recipe` path and its effect on the verdict are already covered for `fakeos` (`internal/testutil` `NoRecipeFamilies`)
+- [X] T028 [P] [US3] `TestIOSXEFamilies` (removed: it froze the family list of feature 013 and would change with every new recipe) in `packs/packs_test.go`: `reg.Families("cisco_iosxe")` is exactly `neighbours`, `interfaces`, `vlans`, `interface_vlans`; for `snmp`, `aaa_servers`, `local_users`, `management_apis`, `aaa_methods`, `management_servers`, `bgp_peers`, `ospf_interfaces` and `ospf_neighbours`, `reg.Implementations("cisco_iosxe", family, "17.15.1")` is empty (the collector then writes `no_recipe`, `internal/collector/scrape.go`). No new collector test: the `no_recipe` path and its effect on the verdict are already covered for `fakeos` (`internal/testutil` `NoRecipeFamilies`)
 
 ---
 

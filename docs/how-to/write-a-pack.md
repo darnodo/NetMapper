@@ -296,6 +296,10 @@ A `.yml` file next to a `.raw`, in the ntc-templates `parsed_sample` format, is 
 field with what the template extracts. A recording with `_empty` in its name must give no row:
 it is a device with nothing to report.
 
+A `<switch>_show_version.txt` next to a switch's recordings makes the whole set run through the
+recipes at the version that show version gives: every family must have an implementation for it
+and must not be `parse_failed`.
+
 A `<switch>_<family>.facts.yml` file in `testdata/lab/` (`status:` and `rows:`) is compared with
 what the whole recipe produces from that switch's recordings, one per step: maps, values, split,
 defaults, merge and the schema check together. It runs the implementation that fits the software
