@@ -1,0 +1,59 @@
+# containerlab topology for the Cisco IOS-XE pack (feature 013), on NetLab next to test/lab.
+#   sudo containerlab deploy -t iosxe.clab.yaml
+#   sudo containerlab destroy -t iosxe.clab.yaml --cleanup
+# eos-a is the seed. cat1 (Cat9kv) sits between eos-a and eos-b, and eos-b is known only from
+# cat1's LLDP neighbours, so a crawl that reaches eos-b went through the Catalyst. eos-a and cat1
+# share a port-channel trunk (Port-Channel1 / Port-channel1, LACP, native VLAN 99, allowed
+# 10,20,99); cat1 Gi1/0/3 is an access port in VLAN 10 towards eos-b. LLDP runs on every node. The
+# netmapper account is privilege 1 on cat1 and privilege 15 with the network-operator role on the
+# Arista nodes, as in test/lab. SNMP v2c community `public` on all three.
+#
+# cat1 runs with CLAB_MGMT_PASSTHROUGH: without it, the VM's GigabitEthernet0/0 holds vrnetlab's
+# internal 10.0.0.15 and that is the address cat1 advertises in LLDP, so a crawl from eos-a would
+# never reach it (research R6). cat1.cfg is appended to vrnetlab's bootstrap configuration; see the
+# rules at the top of that file.
+#
+# Boot: cat1 takes 12 to 16 minutes (measured on NetLab, research R11). It is ready when both hold:
+#   docker logs clab-netmapper-iosxe-cat1 2>&1 | grep "Startup complete"
+#   docker exec clab-netmapper-iosxe-eos-a Cli -c "show lldp neighbors"    # lists cat1
+# Record nothing and crawl nothing before that. The Cat9kv VM takes 18 GB of RAM and 4 vCPU: with
+# the 28-node EVPN fabric running too, stop one of the two labs.
+#
+# vrnetlab adds dummy NICs for the ports with no link: most of Gi1/0/4 to Gi1/0/8 report
+# `connected` with nothing behind them, and which ones changes between deploys (Gi1/0/6 alone was
+# `notconnect` on 2026-10-21). The rows say what the device prints.
+name: netmapper-iosxe
+
+mgmt:
+  network: netmapper-iosxe-mgmt
+  ipv4-subnet: 172.20.22.0/24
+
+# No LLDP on the Arista nodes' Management0: on the management network every node sees every other
+# one, and eos-a would learn eos-b without going through cat1. containerlab rewrites the
+# Management0 block of a cEOS startup-config, so `exec` applies the setting after deploy.
+topology:
+  nodes:
+    eos-a:
+      kind: arista_ceos
+      image: "ceos:4.36.0F"
+      mgmt-ipv4: 172.20.22.2
+      startup-config: eos-a.cfg
+      exec:
+        - "Cli -p 15 -c 'configure\ninterface Management0\nno lldp transmit\nno lldp receive\nend'"
+    cat1:
+      kind: cisco_cat9kv
+      image: "vrnetlab/cisco_cat9kv:17.15.01"
+      mgmt-ipv4: 172.20.22.3
+      startup-config: cat1.cfg
+      env: {CLAB_MGMT_PASSTHROUGH: "true"}
+    eos-b:
+      kind: arista_ceos
+      image: "ceos:4.36.0F"
+      mgmt-ipv4: 172.20.22.4
+      startup-config: eos-b.cfg
+      exec:
+        - "Cli -p 15 -c 'configure\ninterface Management0\nno lldp transmit\nno lldp receive\nend'"
+  links:
+    - endpoints: ["eos-a:eth1", "cat1:Gi1/0/1"]   # Port-Channel1 / Port-channel1
+    - endpoints: ["eos-a:eth2", "cat1:Gi1/0/2"]   # Port-Channel1 / Port-channel1
+    - endpoints: ["cat1:Gi1/0/3", "eos-b:eth1"]   # access VLAN 10

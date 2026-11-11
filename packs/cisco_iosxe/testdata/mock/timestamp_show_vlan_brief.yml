@@ -1,0 +1,7 @@
+parsed_sample:
+    - vlan_id: "1"
+      name: default
+      status: active
+    - vlan_id: "10"
+      name: users
+      status: active

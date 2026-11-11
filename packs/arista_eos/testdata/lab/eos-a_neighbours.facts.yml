@@ -1,0 +1,7 @@
+# What the neighbours recipe must produce from eos-a's recording (test/lab-iosxe, feature 013): cat1,
+# the Cat9kv, on both members of Port-Channel1. cat1's ports as it advertises them (short form; the
+# projector canonicalises them with the cisco_iosxe pack), its chassis ID is its base MAC.
+status: collected
+rows:
+  - {local_interface: Ethernet1, protocol: lldp, remote_chassis_id: 0c00.9d67.3300, remote_interface: Gi1/0/1, remote_mgmt_address: 172.20.22.3, remote_mgmt_address_type: ipv4, remote_system_name: cat1.example.com}
+  - {local_interface: Ethernet2, protocol: lldp, remote_chassis_id: 0c00.9d67.3300, remote_interface: Gi1/0/2, remote_mgmt_address: 172.20.22.3, remote_mgmt_address_type: ipv4, remote_system_name: cat1.example.com}

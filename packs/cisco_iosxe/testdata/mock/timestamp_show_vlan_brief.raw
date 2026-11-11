@@ -1,0 +1,7 @@
+Load for five secs: 3%/0%; one minute: 4%; five minutes: 4%
+Time source is NTP, 10:00:00.000 UTC Wed Jan 01 2025
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Gi1/0/1, Gi1/0/2
+10   users                            active    Gi1/0/3

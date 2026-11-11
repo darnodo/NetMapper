@@ -1,0 +1,8 @@
+# cat1 with `shutdown` under VLAN 20 (act/lshut) and `state suspend` under VLAN 99, both reverted
+# after recording (feature 013, T008 step 10).
+status: collected
+rows:
+  - {vlan_id: 1, name: default, status: active}
+  - {vlan_id: 10, name: users, status: active}
+  - {vlan_id: 20, name: voice, status: shutdown}
+  - {vlan_id: 99, name: native, status: suspended}

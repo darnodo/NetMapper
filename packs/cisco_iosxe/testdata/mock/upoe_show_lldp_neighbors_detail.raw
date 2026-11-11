@@ -1,0 +1,52 @@
+------------------------------------------------
+Local Intf: Gi1/0/1
+Chassis id: 0200.0000.0001
+Port id: 0200.0000.0001
+System Name: ap-1
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 98 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 192.0.2.1
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0001
+UPOE/UPOE+ Power-via-MDI TLV:
+ Power Pair: Ignore
+ Power Class: Class 5
+ Power Device Type: Type 3 SS PD
+ Power Source: PSE
+ Power Priority: unknown
+ Power Requested: 26500 mW
+ Power Allocated: 26500 mW
+
+------------------------------------------------
+Local Intf: Gi1/0/2
+Chassis id: 0200.0000.0002
+Port id: 0200.0000.0002
+System Name: ap-2
+
+System Description: 
+Access point, firmware 1.0
+
+Time remaining: 98 seconds
+System Capabilities: B,W
+Enabled Capabilities: W
+Management Addresses:
+    IP: 192.0.2.2
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type: 30
+Vlan ID: - not advertised
+Peer Source MAC: 0200.0000.0002
+
+
+Total entries displayed: 2

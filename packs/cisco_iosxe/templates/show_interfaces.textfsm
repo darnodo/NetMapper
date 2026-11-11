@@ -1,0 +1,20 @@
+Value Required PORT (\S+)
+Value LINK_STATUS (.+?)
+Value PROTOCOL_STATUS (\S+?)
+Value MAC_ADDRESS ([a-fA-F0-9]{4}\.[a-fA-F0-9]{4}\.[a-fA-F0-9]{4})
+Value DESCRIPTION (.+?)
+Value MTU (\d+)
+Value LINK_SPEED (\d+(?:\.\d+)?[MG])
+
+Start
+  ^\S+\s+is\s+.+?,\s+line\s+protocol.*$$ -> Continue.Record
+  ^${PORT}\s+is\s+${LINK_STATUS},\s+line\s+protocol\s+is\s+${PROTOCOL_STATUS}(?:\s+\(.*\)|\s*,.*)?\s*$$
+  ^.+address\s+is\s+${MAC_ADDRESS}\s+\(bia\s+[a-fA-F0-9.]+\)\s*$$
+  ^\s+Description:\s+${DESCRIPTION}\s*$$
+  ^\s+MTU\s+${MTU}\s+bytes
+  # The speed a port that is up runs at: "Full-duplex, 1000Mb/s," gives 1000M. A port that is down
+  # prints "Auto-duplex, Auto-speed," and gives none (research R7, feature #57 rule).
+  ^\s+\S+-duplex,\s+${LINK_SPEED}b/s,
+  # Capture time-stamp if vty line has command time-stamping turned on
+  ^Load\s+for\s+
+  ^Time\s+source\s+is

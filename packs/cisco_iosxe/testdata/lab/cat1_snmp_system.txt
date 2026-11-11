@@ -1,0 +1,4 @@
+.1.3.6.1.2.1.1.2.0 = OID: .1.3.6.1.4.1.9.1.3160
+.1.3.6.1.2.1.1.1.0 = STRING: "Cisco IOS Software [IOSXE], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.15.1, RELEASE SOFTWARE (fc4)..Technical Support: http://www.cisco.com/techsupport..Copyright (c) 1986-2024 by Cisco Systems, Inc...Compiled Sun 11-Aug-24 22:16 by mcpre"
+.1.3.6.1.2.1.1.5.0 = STRING: "cat1.example.com"
+.1.3.6.1.2.1.47.1.1.1.1.11.1 = STRING: "9ZHXOCDHJV7"

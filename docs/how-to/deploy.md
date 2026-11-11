@@ -121,6 +121,18 @@ aaa authorization exec default local          ! or your server group, then local
 `configure`. Without `aaa authorization exec`, EOS ignores the account's privilege and the session
 lands in plain exec.
 
+On Cisco IOS-XE, privilege 1 is enough for every family the pack collects (identity, LLDP
+neighbours, interfaces, VLANs), and an account at that level cannot enter privileged exec or
+configuration mode:
+
+```text
+username netmapper privilege 1 secret <password>
+lldp run                                      ! IOS-XE runs CDP, not LLDP, by default
+```
+
+A command IOS-XE refuses at the account's level is answered `% Invalid input detected`, the same as
+a command that does not exist, so its family is recorded `parse_failed`, not `denied`.
+
 ## 4. The configuration document
 
 One YAML document, posted whole on every run and kept with the snapshot it produced:

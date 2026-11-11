@@ -1,0 +1,52 @@
+Value Filldown,Required INTERFACE (\S+)
+Value MODE (.+?)
+Value ACCESS_VLAN (\d+)
+Value CHANNEL (\S+)
+
+# One row per switched port, port-channels included (feature 013, research R10):
+# - mode: the operational mode (`trunk`, `static access`, or as printed), or the administrative mode
+#   when the port is down (`Operational Mode: down`), which says nothing of how it is set up;
+# - access_vlan: on access ports only, since a trunk prints an `Access Mode VLAN` line too;
+# - channel: on port-channel members (`trunk (member of bundle Po1)`, `down (suspended member of
+#   bundle Po1)`), with no other field: Clear drops the mode captured from the administrative line.
+# A routed port (`Switchport: Disabled`) gives no row: Clearall drops its name. INTERFACE is
+# Filldown only so that Clear keeps it; the next Name line replaces it.
+Start
+  ^Name: -> Continue.Record
+  ^Name:\s+${INTERFACE}\s*$$
+  ^Switchport:\s+Disabled -> Clearall
+  ^Administrative\s+Mode:\s+${MODE}\s*$$ -> Continue
+  ^Administrative\s+Mode:\s+static\s+access\s*$$ -> AdminAccess
+  ^Administrative\s+Mode: -> AdminOther
+  ^.*
+
+AdminAccess
+  ^Name: -> Continue.Record
+  ^Name:\s+${INTERFACE}\s*$$ -> Start
+  ^Operational\s+Mode:.*member\s+of\s+bundle -> Continue.Clear
+  ^Operational\s+Mode:.*member\s+of\s+bundle\s+${CHANNEL}\) -> Rest
+  ^Operational\s+Mode:\s+(static\s+access|down)\s*$$ -> Access
+  ^Operational\s+Mode:\s+${MODE}\s*$$ -> Rest
+  ^.*
+
+AdminOther
+  ^Name: -> Continue.Record
+  ^Name:\s+${INTERFACE}\s*$$ -> Start
+  ^Operational\s+Mode:.*member\s+of\s+bundle -> Continue.Clear
+  ^Operational\s+Mode:.*member\s+of\s+bundle\s+${CHANNEL}\) -> Rest
+  ^Operational\s+Mode:\s+down\s*$$ -> Rest
+  ^Operational\s+Mode:\s+${MODE}\s*$$ -> Continue
+  ^Operational\s+Mode:\s+static\s+access\s*$$ -> Access
+  ^Operational\s+Mode: -> Rest
+  ^.*
+
+Access
+  ^Name: -> Continue.Record
+  ^Name:\s+${INTERFACE}\s*$$ -> Start
+  ^Access\s+Mode\s+VLAN:\s+${ACCESS_VLAN}\b -> Rest
+  ^.*
+
+Rest
+  ^Name: -> Continue.Record
+  ^Name:\s+${INTERFACE}\s*$$ -> Start
+  ^.*

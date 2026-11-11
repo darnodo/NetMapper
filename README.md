@@ -18,7 +18,7 @@ Early. What works today:
 - interfaces and links (LLDP), with the evidence behind each;
 - on Arista EOS, how each device is managed: SNMP communities (never their strings) and v3 users,
   AAA servers and method lists, local accounts, management APIs, NTP, syslog and DNS servers;
-- on Arista EOS, VLANs and which ports carry them: access ports, trunks with their native, allowed
+- on Arista EOS and Cisco IOS-XE, VLANs and which ports carry them: access ports, trunks with their native, allowed
   and active VLANs, port-channels and their members;
 - L2 domains built from those VLANs: which devices share a broadcast domain, over which cables, how
   well it is known, and a finding when two ends of a cable carry different VLANs untagged (stored
@@ -28,7 +28,9 @@ Early. What works today:
 - snapshot eviction and pinning from the command line, so a crawl run with a broken configuration
   can be removed without wiping the rest.
 
-Supported platforms: Arista EOS. Others are added as data, see [writing a pack](docs/how-to/write-a-pack.md).
+Supported platforms: Arista EOS, and Cisco IOS-XE on Catalyst 9300 and 9500 (identity, LLDP
+neighbours, interfaces and VLANs; see the [pack's known gaps](packs/cisco_iosxe/README.md)). Others
+are added as data, see [writing a pack](docs/how-to/write-a-pack.md).
 
 Not built yet: MCP server, web UI, snapshot diffs, reconciliation with an intent source.
 

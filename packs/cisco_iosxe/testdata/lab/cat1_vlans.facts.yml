@@ -1,0 +1,8 @@
+# What the vlans recipe must produce from the cat1 recordings (test/lab-iosxe, Cat9kv 17.15.01).
+# VLANs 1002 to 1005, listed by the switch as act/unsup, are not rows (spec FR-006).
+status: collected
+rows:
+  - {vlan_id: 1, name: default, status: active}
+  - {vlan_id: 10, name: users, status: active}
+  - {vlan_id: 20, name: voice, status: active}
+  - {vlan_id: 99, name: native, status: active}

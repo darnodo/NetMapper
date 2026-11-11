@@ -1,0 +1,22 @@
+parsed_sample:
+    - description: ""
+      link_speed: ""
+      link_status: down
+      mac_address: 74ad.abcd.dcba
+      mtu: "1500"
+      port: TenGigabitEthernet0/1
+      protocol_status: down
+    - description: ""
+      link_speed: ""
+      link_status: administratively down
+      mac_address: c4f7.d514.6900
+      mtu: "1500"
+      port: GigabitEthernet0/0/0
+      protocol_status: down
+    - description: ""
+      link_speed: ""
+      link_status: down
+      mac_address: 4c77.abcd.1212
+      mtu: "1500"
+      port: TenGigabitEthernet0/0/13
+      protocol_status: down

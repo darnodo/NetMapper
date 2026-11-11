@@ -1,0 +1,16 @@
+# What the interfaces recipe must produce from the cat1 recordings (test/lab-iosxe, Cat9kv 17.15.01).
+# speed_bps only on ports that are up and print a speed; Gi0/0, the management port, prints
+# "Auto Duplex, Auto Speed" while up. Gi1/0/4 to Gi1/0/8 are vrnetlab dummy NICs.
+status: collected
+rows:
+  - {name: Vlan1, admin_state: down, oper_state: down, mtu: 1500, mac: "0c:00:9d:67:33:47"}
+  - {name: GigabitEthernet0/0, description: "Containerlab management interface", admin_state: up, oper_state: up, mtu: 1500, mac: "0c:00:9d:67:33:00"}
+  - {name: GigabitEthernet1/0/1, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:01"}
+  - {name: GigabitEthernet1/0/2, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:02"}
+  - {name: GigabitEthernet1/0/3, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:03"}
+  - {name: GigabitEthernet1/0/4, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:04"}
+  - {name: GigabitEthernet1/0/5, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:05"}
+  - {name: GigabitEthernet1/0/6, admin_state: up, oper_state: down, mtu: 1500, mac: "0c:00:9d:67:33:06"}
+  - {name: GigabitEthernet1/0/7, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:07"}
+  - {name: GigabitEthernet1/0/8, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:08"}
+  - {name: Port-channel1, admin_state: up, oper_state: up, speed_bps: 1000000000, mtu: 1500, mac: "0c:00:9d:67:33:01"}

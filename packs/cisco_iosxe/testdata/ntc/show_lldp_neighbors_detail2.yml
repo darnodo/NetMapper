@@ -1,0 +1,25 @@
+parsed_sample:
+    - chassis_id: a000.f00e.300d
+      local_interface: ""
+      mgmt_address: 11.11.11.11
+      mgmt_address_subtype: IP
+      neighbor_name: USSC-CAMPUS-CORE-GW2
+      neighbor_port_id: Eth1/6
+    - chassis_id: 2222.0642.7333
+      local_interface: ""
+      mgmt_address: 33.33.33.3
+      mgmt_address_subtype: IP
+      neighbor_name: USSC-CAMPUS-CORE-GW1.acme123.com
+      neighbor_port_id: Eth1/6
+    - chassis_id: 0015.2222.c330
+      local_interface: ""
+      mgmt_address: 55.55.55.55
+      mgmt_address_subtype: IP
+      neighbor_name: DMZ-SW1
+      neighbor_port_id: Gi2/0/24
+    - chassis_id: 0022.1111.2222
+      local_interface: ""
+      mgmt_address: ""
+      mgmt_address_subtype: ""
+      neighbor_name: ""
+      neighbor_port_id: g2

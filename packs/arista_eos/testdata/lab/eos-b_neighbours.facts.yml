@@ -1,0 +1,5 @@
+# What the neighbours recipe must produce from eos-b's recording (test/lab-iosxe, feature 013): cat1
+# on Ethernet1, its access port Gi1/0/3.
+status: collected
+rows:
+  - {local_interface: Ethernet1, protocol: lldp, remote_chassis_id: 0c00.9d67.3300, remote_interface: Gi1/0/3, remote_mgmt_address: 172.20.22.3, remote_mgmt_address_type: ipv4, remote_system_name: cat1.example.com}

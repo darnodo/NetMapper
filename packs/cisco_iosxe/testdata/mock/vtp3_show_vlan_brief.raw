@@ -1,0 +1,8 @@
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Gi1/0/1
+10   a-vlan-name-longer-than-its-column-with-vtp-version-3
+                                      active    Gi1/0/2, Gi1/0/3
+20   another-vlan-name-longer-than-its-column-with-vtp-3
+                                      act/lshut 
+30   users                            active    

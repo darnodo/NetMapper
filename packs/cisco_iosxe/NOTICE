@@ -1,0 +1,37 @@
+Three files in templates/ and the samples in testdata/ntc/ come from ntc-templates
+(https://github.com/networktocode/ntc-templates, commit d86d09fa105ee2a432795022e7df04737c65dd28),
+Copyright 2015 Jason Edelman and Network to Code, LLC, licensed under the Apache License,
+Version 2.0. The full license text is in testdata/ntc/LICENSE-ntc-templates.
+
+Changes:
+- templates/show_lldp_neighbors_detail.textfsm: from cisco_ios_show_lldp_neighbors_detail.textfsm.
+  Only the values the neighbours recipe maps are kept (local interface, chassis ID, port ID,
+  system name, management address); the description, capability, VLAN, MAC, power and LLDP-MED
+  values are dropped and their lines skipped. Added the MGMT_ADDRESS_SUBTYPE value and the
+  Addresses, AddressesV6 and AddressesDone states, so a block's management address is its first
+  IPv4 address, else its first IPv6 one, stored with its type; upstream keeps the last IPv4 line.
+- templates/show_interfaces.textfsm: from cisco_ios_show_interfaces.textfsm, renamed INTERFACE to
+  PORT. Only port, states, MAC, description and MTU are kept; addresses, counters, rates, queues,
+  encapsulation and timers are dropped. PROTOCOL_STATUS is the first word after "line protocol
+  is", without the "(connected)" or ", Autostate Enabled" that follows. Added the LINK_SPEED value,
+  the speed of a port that is up read from the duplex line ("1000Mb/s" gives 1000M).
+- templates/show_interfaces_switchport.textfsm: rewritten from cisco_ios_show_interfaces_switchport
+  .textfsm, keeping its block structure (one record per "Name:" block). Only interface, mode,
+  access VLAN and port-channel are kept; the mode is the operational one, or the administrative one
+  when the port is down; the access VLAN is read on access ports only; a port-channel member gives
+  its channel and nothing else; a routed port gives no row.
+- testdata/ntc/: raw samples only, renamed without the cisco_ios_ prefix:
+  show_lldp_neighbors_detail.raw, show_lldp_neighbors_detail2.raw and
+  show_lldp_neighbors_detail3.raw from tests/cisco_ios/show_lldp_neighbors_detail/
+  cisco_ios_show_lldp_neighbors_detail1.raw to 3; show_interfaces.raw and show_interfaces2.raw
+  from tests/cisco_ios/show_interfaces/cisco_ios_show_interfaces6.raw and
+  cisco_ios_show_interfaces_01.raw; show_interfaces_switchport.raw and
+  show_interfaces_switchport2.raw from tests/cisco_ios/show_interfaces_switchport/
+  cisco_ios_show_interfaces_switchport_app_interfaces.raw and
+  cisco_ios_show_interfaces_switchport3.raw. Their .yml files are not copied, since the templates
+  above keep other values under other names: each .yml next to a sample was written for this pack
+  from what its template extracts, and checked against the upstream .yml on every field both keep
+  (ports, chassis ID, names, addresses, states, MAC, MTU, mode, access VLAN).
+
+templates/show_vlan_brief.textfsm and templates/show_interfaces_trunk.textfsm are not from
+ntc-templates.

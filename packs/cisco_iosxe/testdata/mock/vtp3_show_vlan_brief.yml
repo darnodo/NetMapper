@@ -1,0 +1,13 @@
+parsed_sample:
+    - vlan_id: "1"
+      name: default
+      status: active
+    - vlan_id: "10"
+      name: a-vlan-name-longer-than-its-column-with-vtp-version-3
+      status: active
+    - vlan_id: "20"
+      name: another-vlan-name-longer-than-its-column-with-vtp-3
+      status: act/lshut
+    - vlan_id: "30"
+      name: users
+      status: active
