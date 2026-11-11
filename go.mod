@@ -1,6 +1,6 @@
 module github.com/darnodo/NetMapper
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/gosnmp/gosnmp v1.44.0

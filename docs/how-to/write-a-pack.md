@@ -284,6 +284,30 @@ Go regular expressions have no lookbehind or lookahead: templates that use them 
 
 ## 8. Test with recorded output
 
+### A pack is tested with its own data
+
+The tests in [`packs/packs_test.go`](../../packs/packs_test.go) know no vendor, device or site.
+They walk every pack and check the data that pack ships under `testdata/`. What a pack must
+handle is written there as files, and adding a case means adding files, not test code:
+
+- An output and the rows expected from it: a `.raw` and its `.yml` next to it. The template runs on
+  the output and must give those rows.
+- No test asserts a value or a count tied to one switch (its number of neighbours, one of its
+  VLANs, one of its ports). Such values live only in the `.yml` of the output they come from.
+- Lab and hardware recordings are both evidence, and neither is the reference. A lab misses forms
+  only hardware prints (PoE TLVs, VTP version 3 names), and one site shows only its own
+  configuration. A pack is refined as users report outputs it does not read.
+- An output form seen on a device goes in `testdata/mock/`, written by hand in the shape it was
+  seen in, with its `.yml`. Check that the test fails before you fix the template, then bump the
+  pack's `version`.
+- A recipe's `versions` bound moves only with outputs recorded on that release: one file per
+  command and the switch's `show version`, in `testdata/<source>/`.
+
+Vendor-specific tests already in `packs/packs_test.go` predate this rule. Do not add new ones: a
+case that can be written as an output and its rows goes in the pack.
+
+### Where the files go
+
 Put real outputs from a device in `testdata/<source>/`, one file per command, with the template's
 base name in the file name:
 
@@ -295,6 +319,10 @@ testdata/lab/sw1_show_lldp_neighbors_detail.raw
 A `.yml` file next to a `.raw`, in the ntc-templates `parsed_sample` format, is compared field by
 field with what the template extracts. A recording with `_empty` in its name must give no row:
 it is a device with nothing to report.
+
+An output form seen on a device but not recorded as such (a header some devices print, a TLV only
+some neighbours send) goes in `testdata/mock/`, written by hand in the shape it was seen in, with
+its `.yml`. No test code is needed: the same check reads it.
 
 A `<switch>_show_version.txt` next to a switch's recordings makes the whole set run through the
 recipes at the version that show version gives: every family must have an implementation for it
